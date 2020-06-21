@@ -149,7 +149,7 @@ cython_debug/
 
 
 # Topological Autoencoder trained model & data
-evaluation/models/topo-ae/trained_models/*
+evaluation/models/topoae/trained_models/*
 
 # data
 data/*
