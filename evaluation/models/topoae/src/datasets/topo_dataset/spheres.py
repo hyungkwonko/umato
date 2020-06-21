@@ -50,4 +50,4 @@ def create_sphere_dataset(n_samples=500, d=100, n_spheres=11, r=5, plot=False, s
         labels[label_index:label_index + n_sphere_samples] = index
         label_index += n_sphere_samples
     
-    return dataset, labels 
+    return dataset, labels

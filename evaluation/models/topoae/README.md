@@ -17,5 +17,9 @@ python -m exp.save_csv with settings/{dname}.json
 
 ## Run training & generating all at once
 ```
+# run for a specific dataset (e.g., MNIST dataset)
+sh run-topoae.sh mnist
+
+# run for all datasets
 sh run-topoae.sh
 ```

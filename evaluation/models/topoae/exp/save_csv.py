@@ -30,6 +30,7 @@ EXP.captured_out_filter = apply_backspaces_and_linefeeds
 
 @EXP.config
 def cfg():
+    dname = ''
     n_epochs = 10
     batch_size = 64
     learning_rate = 1e-3
@@ -62,35 +63,25 @@ def evaluate(dname, load_model, device, batch_size, quiet, val_size, evaluation,
         dataset, val_size, _rnd)
     test_dataset = dataset_config.get_instance(train=False)
 
-    load_model = './trained_models/' + dname + '.pth'
-    model = model_config.get_instance()
-    state_dict = torch.load(load_model)
-    model.load_state_dict(state_dict)
+    rundir = os.path.join(os.path.dirname(__file__), '..', 'trained_models')
 
-    rundir = './zz2'
-    try:
-        rundir = _run.observers[0].dir
-    except IndexError:
-        pass
+    model = model_config.get_instance()
+    state_dict = torch.load(os.path.join(rundir, f'{dname}.pth'))
+    model.load_state_dict(state_dict)
 
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, pin_memory=True,
-        drop_last=True
+        drop_last=False
     )
     train_latent, train_labels = get_space(
         model, dataloader, mode='latent', device=device, seed=_seed)
 
     df = pd.DataFrame(train_latent)
     df['labels'] = train_labels
-    df.to_csv(os.path.join(rundir, 'train_latents.csv'), index=False)
-    np.savez(
-        os.path.join(rundir, 'latents.npz'),
-        latents=train_latent, labels=train_labels
-    )
-    # Visualize latent space
-    visualize_latents(
-        train_latent, train_labels,
-        save_file=os.path.join(
-            rundir, 'train_latent_visualization.pdf')
-    )
 
+    rundir = os.path.join(rundir, '..', '..', '..', 'results', dname)
+   
+    if not os.path.isdir(rundir):
+        os.makedirs(rundir) # this makes directories including all paths
+
+    df.to_csv(os.path.join(rundir, 'topoae.csv'), index=False)
