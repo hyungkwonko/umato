@@ -146,3 +146,11 @@ cython_debug/
 
 # Local History for Visual Studio Code
 .history/
+
+
+# Topological Autoencoder trained model & data
+evaluation/models/topo-ae/trained_models/*
+
+# data
+data/*
+!data/*/raw/download.sh

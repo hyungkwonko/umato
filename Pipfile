@@ -12,6 +12,13 @@ scikit-learn = "*"
 scipy = "*"
 matplotlib = "*"
 numba = "*"
+torch = "*"
+torchvision = "*"
+sacred = "*"
+pandas = "*"
+tqdm = "*"
+tadasets = "*"
+ipython = "*"
 
 [requires]
 python_version = "3.7"
