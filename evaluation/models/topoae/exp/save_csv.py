@@ -77,7 +77,7 @@ def evaluate(dname, load_model, device, batch_size, quiet, val_size, evaluation,
         model, dataloader, mode='latent', device=device, seed=_seed)
 
     df = pd.DataFrame(train_latent)
-    df['labels'] = train_labels
+    df['label'] = train_labels
 
     rundir = os.path.join(rundir, '..', '..', '..', 'results', dname)
    

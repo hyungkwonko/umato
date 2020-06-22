@@ -156,6 +156,7 @@ evaluation/results
 # data
 data/spheres/*/*
 data/MNIST/*/*
-data/FMNIST/*/*
+data/FashionMNIST/*/*
 data/CIFAR10/*/*
+data/spheres/*
 !*.sh

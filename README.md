@@ -1,2 +1,21 @@
-# umato
-Uniform Manifold Approximation and Two-phase Optimization
+# Uniform Manifold Approximation and Two-phase Optimization
+
+## What is UMATO?
+work in progress...
+
+## Running benchmarks
+You can try the following code to see the result:
+```python
+# install requirements
+pipenv install
+
+cd evaluation
+
+# run all datasets
+sh run.sh
+
+# run specific dataset (e.g., MNIST dataset)
+sh run.sh mnist
+```
+
+For detailed information, please refer to [here](https://github.com/hyungkwonko/umato/tree/master/evaluation).

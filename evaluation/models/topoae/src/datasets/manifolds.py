@@ -65,7 +65,7 @@ class SCurve(ManifoldDataset):
 class Spheres(ManifoldDataset):
     def __init__(self, train=True, n_samples=500, d=100, n_spheres=11, r=5,
                 test_fraction=0.1, seed=42):
-        #here pos are actually class labels, just conforming with parent class!
+        #here pos are actually class label, just conforming with parent class!
         path = os.path.join('..', '..', '..', 'data', 'spheres')
 
         if not os.path.isdir(path):
@@ -73,15 +73,15 @@ class Spheres(ManifoldDataset):
 
         if os.path.isfile(os.path.join(path, 'spheres.csv')):
             df = pd.read_csv(os.path.join(path, 'spheres.csv')) # load data
-            data = df.drop(columns=['labels']).to_numpy()
-            labels = df['labels'].to_numpy()
+            data = df.drop(columns=['label']).to_numpy()
+            label = df['label'].to_numpy()
         else:
-            data, labels = create_sphere_dataset(n_samples, d, n_spheres, r, seed=seed) # create data
+            data, label = create_sphere_dataset(n_samples, d, n_spheres, r, seed=seed) # create data
             df = pd.DataFrame(data)
-            df['labels'] = labels
+            df['label'] = label
             df.to_csv(os.path.join(path, 'spheres.csv'), index=False)
 
-        pos = labels
+        pos = label
         data = data.astype(np.float32)
         pos = pos.astype(np.float32)
         _rnd = np.random.RandomState(seed)

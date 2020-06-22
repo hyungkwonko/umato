@@ -19,6 +19,7 @@ pandas = "*"
 tqdm = "*"
 tadasets = "*"
 ipython = "*"
+umap-learn = "*"
 
 [requires]
 python_version = "3.7"
