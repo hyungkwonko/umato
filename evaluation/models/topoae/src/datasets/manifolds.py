@@ -23,18 +23,28 @@ def normalize_features(data_train, data_test):
     transformed_test = (data_test - mean) / std
     return transformed_train, transformed_test
 
+def normalize_x(data_train):
+    mean = np.mean(data_train, axis=0, keepdims=True)
+    std = np.std(data_train, axis=0, keepdims=True)
+    transformed_train = (data_train - mean) / std
+    return transformed_train
+
 def file_exist(dname):
     os.path.isfile(dname)
 
 class ManifoldDataset(Dataset):
     def __init__(self, data, position, train, test_fraction, random_seed):
-        train_data, test_data, train_pos, test_pos = train_test_split(
-            data, position, test_size=test_fraction, random_state=random_seed)
-        self.train_data, self.test_data = normalize_features(
-            train_data, test_data)
-        self.train_pos, self.test_pos = train_pos, test_pos
-        self.data = self.train_data if train else self.test_data
-        self.pos = self.train_pos if train else self.test_pos
+        if test_fraction > 0:
+            train_data, test_data, train_pos, test_pos = train_test_split(
+                data, position, test_size=test_fraction, random_state=random_seed)
+            self.train_data, self.test_data = normalize_features(
+                train_data, test_data)
+            self.train_pos, self.test_pos = train_pos, test_pos
+            self.data = self.train_data if train else self.test_data
+            self.pos = self.train_pos if train else self.test_pos
+        else: # get 100 % training
+            self.data = normalize_x(data)
+            self.pos = position
 
     def __getitem__(self, index):
         return self.data[index], self.pos[index]
@@ -64,7 +74,7 @@ class SCurve(ManifoldDataset):
 
 class Spheres(ManifoldDataset):
     def __init__(self, train=True, n_samples=500, d=100, n_spheres=11, r=5,
-                test_fraction=0.1, seed=42):
+                test_fraction=0.0, seed=42): # test fraction set to 0.0 to put all into training dataset
         #here pos are actually class label, just conforming with parent class!
         path = os.path.join('..', '..', '..', 'data', 'spheres')
 

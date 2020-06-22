@@ -19,6 +19,6 @@ if __name__ == "__main__":
     y = TSNE(n_components=args.dim, random_state=0, verbose=1).fit_transform(x)
 
     # save as csv
-    df = pd.DataFrame(x)
+    df = pd.DataFrame(y)
     df['label'] = label
     df.to_csv(os.path.join(os.getcwd(), 'results', args.data, 'tsne.csv'), index=False)

@@ -20,7 +20,7 @@ if __name__ == "__main__":
     y = UMAP(n_components=args.dim, verbose=True).fit_transform(x)
 
     # save as csv
-    df = pd.DataFrame(x)
+    df = pd.DataFrame(y)
     df['label'] = label
     df.to_csv(os.path.join(os.getcwd(), 'results', args.data, 'umap.csv'), index=False)
 
