@@ -12,10 +12,10 @@ pipenv install
 cd evaluation
 
 # run all datasets
-sh run.sh
+bash run.sh
 
 # run specific dataset (e.g., MNIST dataset)
-sh run.sh mnist
+bash run.sh mnist
 ```
 
 For detailed information, please refer to [here](https://github.com/hyungkwonko/umato/tree/master/evaluation).

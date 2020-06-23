@@ -150,7 +150,7 @@ cython_debug/
 
 # Topological Autoencoder trained model & data
 evaluation/models/topoae/trained_models/*
-evaluation/results
+# evaluation/results
 *.pth
 
 # data
@@ -160,3 +160,5 @@ data/FashionMNIST/*/*
 data/CIFAR10/*/*
 data/spheres/*
 !*.sh
+
+evaluation/utils.py
