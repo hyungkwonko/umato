@@ -84,3 +84,12 @@ def get_data(dname):
         return x, label
     else:
         pass
+
+def save_csv(path, alg_name, data, label):
+    df = pd.DataFrame(data)
+    df['label'] = label
+
+    if not os.path.isdir(path):
+        os.makedirs(path) # this makes directories including all paths
+
+    df.to_csv(os.path.join(path, f'{alg_name}.csv'), index=False)

@@ -10,10 +10,10 @@ We will generate embedding results for each algorithm for the comparison. The al
 We can run each method separately, or all of them at once.
 ```python
 # run all datasets
-sh run.sh
+bash run.sh
 
 # run specific dataset (e.g., MNIST dataset)
-sh run.sh mnist
+bash run.sh mnist
 ```
 
 ## Qualitative evaluation (TODO)
@@ -31,3 +31,8 @@ Likewise, we can compare the embedding result quantitatively. We use measures su
 # run comparison
 python comparison.py
 ```
+
+## References
+- Maaten, L. V. D., & Hinton, G. (2008). Visualizing data using t-SNE. JMLR, 9(Nov), 2579-2605.
+- McInnes, L., Healy, J., & Melville, J. (2018). Umap: Uniform manifold approximation and projection for dimension reduction. arXiv preprint arXiv:1802.03426.
+- Moor, M., Horn, M., Rieck, B., & Borgwardt, K. (2020). Topological autoencoders. ICML.

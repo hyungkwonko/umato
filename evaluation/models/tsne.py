@@ -1,8 +1,7 @@
 from sklearn.manifold import TSNE
 import argparse
 import os
-from .dataset import get_data
-import pandas as pd
+from .dataset import get_data, save_csv
 
 parser = argparse.ArgumentParser(description="t-SNE embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
@@ -13,12 +12,12 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
+    # read data
     x, label = get_data(args.data)
 
     # run TSNE
     y = TSNE(n_components=args.dim, random_state=0, verbose=1).fit_transform(x)
 
     # save as csv
-    df = pd.DataFrame(y)
-    df['label'] = label
-    df.to_csv(os.path.join(os.getcwd(), 'results', args.data, 'tsne.csv'), index=False)
+    path = os.path.join(os.getcwd(), "results", args.data)
+    save_csv(path, alg_name="tsne", data=y, label=label)
