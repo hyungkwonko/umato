@@ -79,7 +79,7 @@ def get_data(dname):
         path = os.path.join(os.getcwd(), "..", "data", "FashionMNIST", "raw")
         return load_mnist(path=path, kind="train")  # kind="t10k"
     elif dname == "cifar10":
-        path = os.path.join(os.getcwd(), "..", "data", "CIFAR10", "raw")
+        path = os.path.join(os.getcwd(), "..", "data", "cifar-10-batches-py")
         x, label, _, _ = get_CIFAR10_data(path)
         return x, label
     else:
