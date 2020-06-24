@@ -1,4 +1,4 @@
-# Running & comparing embedding results both quantitatively & quanlitatively
+# Run & Evaluate results both quantitatively and quanlitatively
 
 ## Training models & Generating embedding result
 We will generate embedding results for each algorithm for the comparison. The algorithms we will use are the following:
@@ -20,15 +20,16 @@ bash run.sh mnist
 For the qualitative evaluation, we can compare the 2D visualization of each algorithm. We used the python library [dash](https://github.com/plotly/dash) for the visualization.
 
 ```python
-# run visualization
+# see visualization
 python visualization.py
 ```
 
 ## Quantitative evaluation (TODO)
-Likewise, we can compare the embedding result quantitatively. We use measures such as X1, X2, ... for comparison. This will generate 4 * 5 table containing measures for each algorithm.
+Likewise, we can compare the embedding result quantitatively. We use measures such as RMSE, MRRE, Trustworthiness, continuity and KL-divergence for comparison. This will generate 4 * 5 table containing measures for each algorithm.
+
 
 ```python
-# run comparison
+# see table result
 python comparison.py
 ```
 

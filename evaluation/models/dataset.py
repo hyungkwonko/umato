@@ -85,6 +85,36 @@ def get_data(dname):
     else:
         pass
 
+def get_embed_data(dname, algo):
+    if dname == "spheres":
+        path = os.path.join(os.getcwd(), "results", "spheres")
+        df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
+        z = df.drop(columns=['label']).to_numpy()
+        return z
+    elif dname == "mnist":
+        path = os.path.join(os.getcwd(), "results", "mnist")
+        df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
+        z = df.drop(columns=['label']).to_numpy()
+        return z
+    elif dname == "fmnist":
+        path = os.path.join(os.getcwd(), "results", "fmnist")
+        df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
+        z = df.drop(columns=['label']).to_numpy()
+        return z
+    elif dname == "cifar10":
+        path = os.path.join(os.getcwd(), "results", "cifar-10")
+        df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
+        z = df.drop(columns=['label']).to_numpy()
+        return z
+    else:
+        pass
+
+def read_data(dname, algo):
+    z = get_embed_data(dname, algo)
+    x, label = get_data(dname)
+    return x, z, label
+    
+
 def save_csv(path, alg_name, data, label):
     df = pd.DataFrame(data)
     df['label'] = label
