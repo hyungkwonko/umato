@@ -20,5 +20,12 @@ References
 """
 
 import numpy as np
-from scipy.spatial.distance import pdist, squareform
-from scipy.stats import spearmanr
+from scipy.spatial.distance import pdist
+
+
+def rmse(x, z):
+    p_x = pdist(x)  # get pair-wise distance in high dimensional space
+    p_z = pdist(z)  # get pair-wise distance in low dimensional space
+    n = x.shape[0]
+    sum_of_squared_differences = np.square(p_x - p_z).sum()  # sum(y - y hat)
+    return np.sqrt((2 * sum_of_squared_differences) / n ** 2)

@@ -3,6 +3,7 @@ This will compare embedding result quantitatively using functions in util.py
 """
 
 from models.dataset import read_data
+from utils import rmse
 import pandas as pd
 import random  # remove after implementing all measures
 
@@ -25,7 +26,9 @@ if __name__ == "__main__":
             measures.extend(MEASURE_LIST)
 
             # calculate RMSE
-            values.append(random.random())
+            rmse_value = rmse(x, z)
+            values.append(rmse_value)
+            print("rmse get")
 
             # calculate MRRE
             values.append(random.random())

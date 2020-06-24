@@ -1,9 +1,9 @@
-# Run & Evaluate results both quantitatively and quanlitatively
+# Run & Evaluate results both qualitatively and quantitatively
 
 ## Training models & Generating embedding result
 We will generate embedding results for each algorithm for the comparison. The algorithms we will use are the following:
-- Topo-ae
 - t-SNE
+- Topological Autoencoder
 - UMAP
 - UMATO (ours, TODO)
 
@@ -24,8 +24,31 @@ For the qualitative evaluation, we can compare the 2D visualization of each algo
 python visualization.py
 ```
 
+### Embedding results of Fashion MNIST dataset for each algorithm:
+
+|            t-SNE         |   Topological Autoencoder   |
+:-------------------------:|:----------------------------:
+![Fashion MNIST tsne](./images/fmnist/tsne.png)|![Fashion MNIST topoae](./images/fmnist/topoae.png)
+
+
+|            UMAP             |           UMATO           |
+:----------------------------:|:--------------------------:
+![Fashion MNIST umap](./images/fmnist/umap.png)|![Fashion MNIST umato](./images/fmnist/umato.png)
+
+
 ## Quantitative evaluation (TODO)
 Likewise, we can compare the embedding result quantitatively. We use measures such as RMSE, MRRE, Trustworthiness, continuity and KL-divergence for comparison. This will generate 4 * 5 table containing measures for each algorithm.
+
+
+### Quantitative measures of Fashion MNIST dataset for each algorithm:
+
+|            |  tsne  |  umap  | topoae |  umato |
+| :--------: | :----: | :----: | :----: | :----: |
+| MRSE       | x.xxxx | x.xxxx | x.xxxx | x.xxxx |
+| MRRE       | x.xxxx | x.xxxx | x.xxxx | x.xxxx |
+| TRUST      | x.xxxx | x.xxxx | x.xxxx | x.xxxx |
+| Continuity | x.xxxx | x.xxxx | x.xxxx | x.xxxx |
+| KL-Div     | x.xxxx | x.xxxx | x.xxxx | x.xxxx |
 
 
 ```python
