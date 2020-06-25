@@ -162,6 +162,4 @@ data/cifar-10-python.tar.gz
 data/spheres/*
 !*.sh
 
-evaluation/utils.py
-
-evaluation/utils_reference.py
+evaluation/utils_copy.py
