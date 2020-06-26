@@ -102,7 +102,7 @@ def get_embed_data(dname, algo):
         z = df.drop(columns=['label']).to_numpy()
         return z
     elif dname == "cifar10":
-        path = os.path.join(os.getcwd(), "results", "cifar-10")
+        path = os.path.join(os.getcwd(), "results", "cifar10")
         df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
         z = df.drop(columns=['label']).to_numpy()
         return z

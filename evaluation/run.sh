@@ -8,6 +8,10 @@ then
             sh run-topoae.sh $dname
             cd ../..
 
+            echo "[RUN-PCA INFO] PCA embedding using $invalue dataset..."
+            python -m models.pca --data=$invalue
+            echo "[RUN-PCA INFO] Finished PCA embedding!"
+
             echo "[RUN-T-SNE INFO] T-SNE embedding using $dname dataset..."
             python -m models.tsne --data=$dname
             echo "[RUN-T-SNE INFO] Finished T-SNE embedding!"
@@ -20,6 +24,10 @@ else # if data name is given, run for a specific dataset
     cd models/topoae
     sh run-topoae.sh $invalue
     cd ../..
+
+    echo "[RUN-PCA INFO] PCA embedding using $invalue dataset..."
+    python -m models.pca --data=$invalue
+    echo "[RUN-PCA INFO] Finished PCA embedding!"
 
     echo "[RUN-T-SNE INFO] T-SNE embedding using $invalue dataset..."
     python -m models.tsne --data=$invalue

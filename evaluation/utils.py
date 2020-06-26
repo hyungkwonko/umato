@@ -248,6 +248,24 @@ class Measure:
         density_z = self.dtm_calculation(self.adjacency_matrix_z, sigma=sigma)
         return np.abs(density_x - density_z).sum()
 
+    def dtm_kl(self, sigma=0.1):
+        """
+        KL Divergence between density distributions
+
+        KL Divergence between normal distribution density of the original and embedding space
+        - Lower is BETTER
+        - Global
+
+        Parameters
+        ----------
+        sigma : float
+            sigma for normalization
+        """
+        density_x = self.dtm_calculation(self.adjacency_matrix_x, sigma=sigma)
+        density_z = self.dtm_calculation(self.adjacency_matrix_z, sigma=sigma)
+        density_kl = density_x * (np.log(density_x) - np.log(density_z))
+        return density_kl.sum()
+
     @staticmethod
     def dtm_calculation(adjacency_matrix, sigma):
         # normalization using max value
