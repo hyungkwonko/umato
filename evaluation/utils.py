@@ -10,7 +10,7 @@ Provides
   3. Spearman's Rho
   4. Trustworthiness & Continuity
   5. Mean Relative Rank Error (MRRE)
-  6. Global density distribution
+  6. Distance To a Measure (DTM)
   7. KL Divergence between density distributions
   8. Set difference (TODO)
   9. Projection precision score (PPS) (TODO)
@@ -40,13 +40,13 @@ References
     - J.A. Lee, M. Verleysen, Quality assessment of dimensionality reduction: rank-based criteria, Neurocomput 72 (2009) 1431-1443.
     - http://www.ecmlpkdd2008.org/files/pdf/workshops/fsdm/2.pdf 
 
-.. [6] Global density distribution
+.. [6] Distance to a measure (2011)
     - Frédéric Chazal, David Cohen-Steiner, and Quentin Mérigot. Geometric inference for probability measures.
     Foundations of Computational Mathematics, 11(6):733–751, 2011.
-    - Frédéric Chazal, Brittany T. Fasy, Fabrizio Lecci, Bertrand Michel, Alessandro Rinaldo, and Larry Wasserman.
-    Robust topological inference: Distance to a measure and kernel distance. arXiv e-prints, art. arXiv:1412.7197, 2014b.
+    - Chazal, F., Fasy, B., Lecci, F., Michel, B., Rinaldo, A., Rinaldo, A., & Wasserman, L. (2017).
+    Robust topological inference: Distance to a measure and kernel distance. The Journal of Machine Learning Research, 18(1), 5845-5884.
 
-.. [7] KL Divergence between density distributions
+.. [7] KL Divergence between density distributions (2020)
     - Moor, M., Horn, M., Rieck, B., & Borgwardt, K. (2020). Topological autoencoders. ICML.
 
 .. [8] Set difference (2015) - focuses on neighborhood preservation
@@ -199,16 +199,16 @@ class Measure:
         """
         Mean Relative Rank Error (MRRE)
 
+        Similar to trustworthiness & continuity but uses normalizing factor
+        It denotes how well the NNs are preserved in terms of one space to another.
+        - Higher is BETTER (Preserved)
+        - Local
+
         Parameters
         ----------
         ratio : float
             ratio between 'mrre_zx' and 'mrre_xz',
             where mrre_zx ~= continuity and mrre_xz ~= trustworthiness
-
-        Similar to trustworthiness & continuity but uses normalizing factor
-        It denotes how well the NNs are preserved in terms of one space to another.
-        - Higher is BETTER (Preserved)
-        - Local
         """
         mrre_xz = self._mrre_caculation(
             self.nnidx_x, self.rank_x, self.rank_z, self.n_data, self.k
@@ -230,3 +230,29 @@ class Measure:
         # normalizing constant
         c = n_data * sum([abs(n_data - 2 * i + 1) / i for i in range(1, k + 1)])
         return 1 - mrre_temp / c
+
+    def dtm(self, sigma=0.1):
+        """
+        Distance To a Measure (DTM)
+
+        Compare normal distribution density between the original and embedding space
+        - Lower is BETTER
+        - Global
+
+        Parameters
+        ----------
+        sigma : float
+            sigma for normalization
+        """
+        density_x = self.dtm_calculation(self.adjacency_matrix_x, sigma=sigma)
+        density_z = self.dtm_calculation(self.adjacency_matrix_z, sigma=sigma)
+        return np.abs(density_x - density_z).sum()
+
+    @staticmethod
+    def dtm_calculation(adjacency_matrix, sigma):
+        # normalization using max value
+        x = adjacency_matrix / adjacency_matrix.max()
+
+        # get normalized density
+        density_x = np.sum(np.exp(-(x ** 2) / sigma), axis=-1)
+        return density_x / density_x.sum()
