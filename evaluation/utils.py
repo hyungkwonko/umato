@@ -34,7 +34,10 @@ References
 .. [4] Trustworthiness & Continuity (2001)
     - J. Venna, S. Kaski, Local multidimensional scaling, Neural Networks 19 (2006) 889-899.
 
-.. [5] MRRE
+.. [5] MRRE (2007)
+    - J.A. Lee, M. Verleysen, Nonlinear dimensionality reduction, Springer, New York, London, 2007.
+    - J.A. Lee, M. Verleysen, Rank-based quality assessment of nonlinear dimensionality reduction, in: ESANN, 2008, pp. 49-54.
+    - J.A. Lee, M. Verleysen, Quality assessment of dimensionality reduction: rank-based criteria, Neurocomput 72 (2009) 1431-1443.
     - http://www.ecmlpkdd2008.org/files/pdf/workshops/fsdm/2.pdf 
 
 .. [6] Global density distribution
@@ -65,6 +68,8 @@ References
 .. [Survey]
     - L. G. Nonato and M. Aupetit, “Multidimensional Projection for Visual Analytics: Linking Techniques with Distortions, Tasks, and Layout Enrichment,”
     IEEE Transactions on Visualization and Computer Graphics, vol. 25, no. 8, pp. 2650–2673, 2019.
+    - Gracia, A., González, S., Robles, V., & Menasalvas, E. (2014).
+    A methodology to compare dimensionality reduction algorithms in terms of loss of quality. Information Sciences, 270, 1-27.
 
 
 """
@@ -88,6 +93,8 @@ class Measure:
     def rmse(self):
         """
         Root Mean Squared Error (RMSE)
+        - Lower is BETTER
+        - Global
         """
         sum_of_squared_differences = np.square(
             self.adjacency_matrix_x - self.adjacency_matrix_z
@@ -98,7 +105,9 @@ class Measure:
         """
         Kruskal Stress Measure
 
-        A measure to capture the deviation from monotonicity in terms of GLOBAL perspective
+        A measure to capture the deviation from monotonicity
+        - Lower is BETTER
+        - Global
         """
         sum_of_squared_diff = np.square(self.pdist_x - self.pdist_z).sum() * 2
         sum_of_squares_z = np.square(self.pdist_z).sum() * 2
@@ -108,7 +117,9 @@ class Measure:
         """
         Sammon's Stress
 
-        An error measure used to test structure preservation in terms of GLOBAL perspective
+        An error measure used to test structure preservation
+        - Lower is BETTER
+        - Global
         """
         squared_diff = np.square(self.pdist_x - self.pdist_z)
         sum_of_squares_x = np.square(self.pdist_x)
@@ -119,15 +130,17 @@ class Measure:
         Get the index of NNs and ranks
         """
         idx = arr.argsort()
-        return idx[:, : self.k], idx.argsort()
+        return idx[:, 1 : self.k + 1], idx.argsort()
 
     def spearmans_rho(self):
         """
         Spearman's Rho
 
-        This measure estimates the correlation of rank order data, which means that it focuses on LOCAL structure.
+        This measure estimates the correlation of rank order data.
         It is defined as the Pearson correlation coefficient between the rank variables, 
         and can be viewed as one of the local neighborhood preservation measures.
+        - Higher is BETTER (Preserved)
+        - Local
         """
 
         ranks_list_x = []
@@ -148,10 +161,11 @@ class Measure:
         Trustworthiness
 
         A measure to check what extent the k nearest neighbours of a point are preserved when going from the original space to the latent space.
-        It means that the data points which were originally farther away captured as NNs of the embedding
+        If it is low it means that the data points originally farther away are captured as NNs of the embedding
         - Higher is BETTER (Preserved)
+        - Local
         """
-        return self._base_target(
+        return self._tc_calculation(
             self.nnidx_x, self.rank_x, self.nnidx_z, self.n_data, self.k
         )
 
@@ -159,15 +173,16 @@ class Measure:
         """
         Continuity
 
-        It means that data points that are originally close in high-dim are not captured as NNs in the embedding.
+        If it is low it means that data points that are originally close in high-dim are not captured as NNs in the embedding.
         - Higher is BETTER (Preserved)
+        - Local
         """
-        return self._base_target(
+        return self._tc_calculation(
             self.nnidx_z, self.rank_z, self.nnidx_x, self.n_data, self.k
         )
 
     @staticmethod
-    def _base_target(nnidx_base, rank, nnidx_target, n_data, k):
+    def _tc_calculation(nnidx_base, rank, nnidx_target, n_data, k):
         value = 0.0
 
         # Calculate NNs comparing base and target space
@@ -179,3 +194,39 @@ class Measure:
                 value += rank[n, missing] - k
 
         return 1 - 2 / (n_data * k * (2 * n_data - 3 * k - 1)) * value
+
+    def mrre(self, ratio=0.5):
+        """
+        Mean Relative Rank Error (MRRE)
+
+        Parameters
+        ----------
+        ratio : float
+            ratio between 'mrre_zx' and 'mrre_xz',
+            where mrre_zx ~= continuity and mrre_xz ~= trustworthiness
+
+        Similar to trustworthiness & continuity but uses normalizing factor
+        It denotes how well the NNs are preserved in terms of one space to another.
+        - Higher is BETTER (Preserved)
+        - Local
+        """
+        mrre_xz = self._mrre_caculation(
+            self.nnidx_x, self.rank_x, self.rank_z, self.n_data, self.k
+        )
+        mrre_zx = self._mrre_caculation(
+            self.nnidx_z, self.rank_z, self.rank_x, self.n_data, self.k
+        )
+        return mrre_xz * ratio + mrre_zx * (1 - ratio)
+
+    @staticmethod
+    def _mrre_caculation(nnidx_base, rank_base, rank_target, n_data, k):
+        mrre_temp = 0.0
+        for n in range(n_data):
+            rank_targets = rank_target[n][nnidx_base[n]]
+            rank_bases = rank_base[n][nnidx_base[n]]
+            rank_norm = abs(rank_targets - rank_bases) / rank_bases
+            mrre_temp += rank_norm.sum()
+
+        # normalizing constant
+        c = n_data * sum([abs(n_data - 2 * i + 1) / i for i in range(1, k + 1)])
+        return 1 - mrre_temp / c

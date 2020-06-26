@@ -32,7 +32,7 @@ if __name__ == "__main__":
             algorithms.extend([n] * len(MEASURE_LIST))
             measures.extend(MEASURE_LIST)
 
-            zz  = mc.trustworthiness()
+            zz  = mc.spearmans_rho()
             print(zz)
             exit()
 
