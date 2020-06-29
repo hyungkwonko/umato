@@ -1,3 +1,4 @@
+#!/bin/bash
 remove=$1
 if [ "$remove" = "remove" ]; then
   echo "Removing MNIST Dataset..."

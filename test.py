@@ -8,6 +8,6 @@ if __name__ == "__main__":
     x, label = get_data("mnist")  # spheres, mnist, fmnist, cifar10
 
     # UMTO
-    embedding = umato.UMATO(verbose=True).fit_transform(x.data)
+    embedding = umato.UMATO(verbose=True).fit_transform(x)
 
     print(embedding)
