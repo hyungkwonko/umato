@@ -2,8 +2,8 @@
 This will compare embedding result quantitatively using functions in utils.py
 """
 
-from models.dataset import read_data
-from utils import Measure
+from .models.dataset import read_data
+from .utils import Measure
 
 # from utils_copy import Measure
 import pandas as pd
@@ -23,6 +23,8 @@ MEASURE_LIST = [
 ]
 ALGO_LIST = ["pca", "tsne", "umap", "topoae"]  # (TODO) add umato
 DATA_LIST = ["spheres", "mnist", "fmnist", "cifar10"]
+DATA_LIST = ["fmnist"]
+
 
 if __name__ == "__main__":
 
@@ -34,8 +36,8 @@ if __name__ == "__main__":
         for n in ALGO_LIST:
             # read data & embedding result
             x, z, label = read_data(m, n)
-            x = x[:100]
-            z = z[:100]
+            # x = x[:100]
+            # z = z[:100]
 
             mc = Measure(x, z, k=5)
 

@@ -8,9 +8,9 @@ from warnings import warn
 import numpy as np
 import numba
 
-from umap.sparse import arr_unique, sparse_mul, sparse_diff, sparse_sum
+from umato.sparse import arr_unique, sparse_mul, sparse_diff, sparse_sum
 
-from umap.utils import tau_rand_int, norm
+from umato.utils import tau_rand_int, norm
 
 import scipy.sparse
 import locale

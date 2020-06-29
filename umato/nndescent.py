@@ -6,7 +6,7 @@ from __future__ import print_function
 import numpy as np
 import numba
 
-from umap.utils import (
+from umato.utils import (
     tau_rand,
     make_heap,
     heap_push,
@@ -16,9 +16,9 @@ from umap.utils import (
     new_build_candidates,
     deheap_sort,
 )
-import umap.distances as dist
+import umato.distances as dist
 
-from umap.rp_tree import search_flat_tree
+from umato.rp_tree import search_flat_tree
 
 
 @numba.njit(fastmath=True)

@@ -19,5 +19,5 @@ if __name__ == "__main__":
     y = PCA(n_components=args.dim).fit_transform(x)
 
     # save as csv
-    path = os.path.join(os.getcwd(), "results", args.data)
+    path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
     save_csv(path, alg_name="pca", data=y, label=label)

@@ -1,4 +1,4 @@
-from .umap_ import UMAP
+from .umato_ import UMATO
 
 # Workaround: https://github.com/numba/numba/issues/3341
 import numba

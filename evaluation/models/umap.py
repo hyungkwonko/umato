@@ -19,6 +19,6 @@ if __name__ == "__main__":
     y = UMAP(n_components=args.dim, verbose=True).fit_transform(x)
 
     # save as csv
-    path = os.path.join(os.getcwd(), "results", args.data)
+    path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
     save_csv(path, alg_name="umap", data=y, label=label)
 

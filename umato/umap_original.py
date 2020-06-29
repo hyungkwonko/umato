@@ -26,12 +26,12 @@ from scipy.sparse import tril as sparse_tril, triu as sparse_triu
 import scipy.sparse.csgraph
 import numba
 
-import umap.distances as dist
+import umato.distances as dist
 
-import umap.sparse as sparse
-import umap.sparse_nndescent as sparse_nn
+import umato.sparse as sparse
+import umato.sparse_nndescent as sparse_nn
 
-from umap.utils import (
+from umato.utils import (
     tau_rand_int,
     deheap_sort,
     submatrix,
@@ -39,8 +39,7 @@ from umap.utils import (
     csr_unique,
     fast_knn_indices,
 )
-from umap.rp_tree import rptree_leaf_array, make_forest
-from umap.nndescent import (
+from umato.nndescent import (
     # make_nn_descent,
     # make_initialisations,
     # make_initialized_nnd_search,
@@ -48,10 +47,10 @@ from umap.nndescent import (
     initialized_nnd_search,
     initialise_search,
 )
-from umap.rp_tree import rptree_leaf_array, make_forest
-from umap.spectral import spectral_layout
-from umap.utils import deheap_sort, submatrix
-from umap.layouts import (
+from umato.rp_tree import rptree_leaf_array, make_forest
+from umato.spectral import spectral_layout
+from umato.utils import deheap_sort, submatrix
+from umato.layouts import (
     optimize_layout_euclidean,
     optimize_layout_generic,
     optimize_layout_inverse,

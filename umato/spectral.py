@@ -8,8 +8,8 @@ import scipy.sparse.csgraph
 from sklearn.manifold import SpectralEmbedding
 from sklearn.metrics import pairwise_distances
 
-from umap.distances import pairwise_special_metric, SPECIAL_METRICS
-from umap.sparse import SPARSE_SPECIAL_METRICS, sparse_named_distances
+from umato.distances import pairwise_special_metric, SPECIAL_METRICS
+from umato.sparse import SPARSE_SPECIAL_METRICS, sparse_named_distances
 
 
 def component_layout(

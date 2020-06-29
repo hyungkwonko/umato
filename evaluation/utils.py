@@ -75,20 +75,19 @@ References
 """
 
 import numpy as np
-from scipy.spatial.distance import pdist, squareform
 from scipy.stats import spearmanr
+from sklearn import metrics
+import time
 
 
 class Measure:
     def __init__(self, x, z, k):
         self.k = k  # number of nearest neighbors
         self.n_data = x.shape[0]  # number of data
-        self.pdist_x = pdist(x)
-        self.pdist_z = pdist(z)
-        self.adjacency_matrix_x = squareform(self.pdist_x)
-        self.adjacency_matrix_z = squareform(self.pdist_z)
-        self.nnidx_x, self.rank_x = self.get_nnidx_rank(self.adjacency_matrix_x)
+        self.adjacency_matrix_z = metrics.pairwise.euclidean_distances(z)
+        self.adjacency_matrix_x = metrics.pairwise.euclidean_distances(x)  # much faster than scipy.spatial.distance.squareform(pdist(x))
         self.nnidx_z, self.rank_z = self.get_nnidx_rank(self.adjacency_matrix_z)
+        self.nnidx_x, self.rank_x = self.get_nnidx_rank(self.adjacency_matrix_x)
 
     def rmse(self):
         """
@@ -99,7 +98,7 @@ class Measure:
         sum_of_squared_differences = np.square(
             self.adjacency_matrix_x - self.adjacency_matrix_z
         ).sum()
-        return np.sqrt(sum_of_squared_differences / self.n_data ** 2)
+        return np.sqrt(sum_of_squared_differences / self.n_data)
 
     def kruskal_stress_measure(self):
         """
@@ -109,8 +108,8 @@ class Measure:
         - Lower is BETTER
         - Global
         """
-        sum_of_squared_diff = np.square(self.pdist_x - self.pdist_z).sum() * 2
-        sum_of_squares_z = np.square(self.pdist_z).sum() * 2
+        sum_of_squared_diff = np.square(self.adjacency_matrix_x - self.adjacency_matrix_z).sum()
+        sum_of_squares_z = np.square(self.adjacency_matrix_z).sum()
         return np.sqrt(sum_of_squared_diff / sum_of_squares_z)
 
     def sammon_stress(self):
@@ -121,8 +120,8 @@ class Measure:
         - Lower is BETTER
         - Global
         """
-        squared_diff = np.square(self.pdist_x - self.pdist_z)
-        sum_of_squares_x = np.square(self.pdist_x)
+        squared_diff = np.square(self.adjacency_matrix_x - self.adjacency_matrix_z)
+        sum_of_squares_x = np.square(self.adjacency_matrix_x)
         return (squared_diff / sum_of_squares_x).sum() / sum_of_squares_x.sum()
 
     def get_nnidx_rank(self, arr):

@@ -9,7 +9,7 @@ import locale
 import numba
 import numpy as np
 
-from umap.utils import (
+from umato.utils import (
     tau_rand,
     norm,
     make_heap,
