@@ -85,7 +85,9 @@ class Measure:
         self.k = k  # number of nearest neighbors
         self.n_data = x.shape[0]  # number of data
         self.adjacency_matrix_z = metrics.pairwise.euclidean_distances(z)
-        self.adjacency_matrix_x = metrics.pairwise.euclidean_distances(x)  # much faster than scipy.spatial.distance.squareform(pdist(x))
+        self.adjacency_matrix_x = metrics.pairwise.euclidean_distances(
+            x
+        )  # much faster than scipy.spatial.distance.squareform(pdist(x))
         self.nnidx_z, self.rank_z = self.get_nnidx_rank(self.adjacency_matrix_z)
         self.nnidx_x, self.rank_x = self.get_nnidx_rank(self.adjacency_matrix_x)
 
@@ -108,7 +110,9 @@ class Measure:
         - Lower is BETTER
         - Global
         """
-        sum_of_squared_diff = np.square(self.adjacency_matrix_x - self.adjacency_matrix_z).sum()
+        sum_of_squared_diff = np.square(
+            self.adjacency_matrix_x - self.adjacency_matrix_z
+        ).sum()
         sum_of_squares_z = np.square(self.adjacency_matrix_z).sum()
         return np.sqrt(sum_of_squared_diff / sum_of_squares_z)
 
@@ -121,8 +125,13 @@ class Measure:
         - Global
         """
         squared_diff = np.square(self.adjacency_matrix_x - self.adjacency_matrix_z)
-        sum_of_squares_x = np.square(self.adjacency_matrix_x)
-        return (squared_diff / sum_of_squares_x).sum() / sum_of_squares_x.sum()
+        numerator = np.divide(
+            squared_diff,
+            self.adjacency_matrix_x,
+            out=np.zeros(squared_diff.shape, dtype=float),
+            where=self.adjacency_matrix_x != 0,
+        )
+        return numerator.sum() / self.adjacency_matrix_x.sum()
 
     def get_nnidx_rank(self, arr):
         """

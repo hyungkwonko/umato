@@ -23,7 +23,7 @@ MEASURE_LIST = [
 ]
 ALGO_LIST = ["pca", "tsne", "umap", "topoae"]  # (TODO) add umato
 DATA_LIST = ["spheres", "mnist", "fmnist", "cifar10"]
-DATA_LIST = ["fmnist"]
+DATA_LIST = ["spheres", "fmnist"]
 
 
 if __name__ == "__main__":
@@ -34,6 +34,7 @@ if __name__ == "__main__":
         values = []
 
         for n in ALGO_LIST:
+            print(f"[INFO] Test on [{m}] dataset using [{n}]")
             # read data & embedding result
             x, z, label = read_data(m, n)
             # x = x[:100]
@@ -71,7 +72,7 @@ if __name__ == "__main__":
                 ]
             )
 
-        print(f"[INFO] {m} - Quantitative result")
+        print(f"[INFO] dataset [{m}] - Quantitative result")
         result = pd.DataFrame(
             {"measure": measures, "algorithm": algorithms, "values": values}
         )
