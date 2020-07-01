@@ -77,7 +77,6 @@ References
 import numpy as np
 from scipy.stats import spearmanr
 from sklearn import metrics
-import time
 
 
 class Measure:

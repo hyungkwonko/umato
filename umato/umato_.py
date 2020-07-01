@@ -379,8 +379,61 @@ def nearest_neighbors(
 
                 if verbose:
                     print(ts(), "Building RP forest with", str(n_trees), "trees")
-                rp_forest = make_forest(X, n_neighbors, n_trees, rng_state, angular)
-                leaf_array = rptree_leaf_array(rp_forest)
+
+                rp_forest = make_forest(X, n_neighbors, n_trees, rng_state, angular)  ######### RP FOREST
+                leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
+                
+                HUB_NUMBER = 300
+            
+                rp_forest2 = make_forest(X, X.shape[0] // (HUB_NUMBER // n_trees), n_trees, rng_state, angular)
+                leaf_array2 = rptree_leaf_array(rp_forest2)  # stacked rp_tree indices
+
+                # target_idx = random_state.choice(len(rp_forest))  # pick one (target) tree
+                # candidates = rp_forest[target_idx]
+        
+                hub_idx = []
+                for candidate in leaf_array:
+                    val = random_state.choice(candidate)
+                    if val > 0:
+                        hub_idx.append(val)
+
+                from evaluation.models.dataset import get_data, save_csv
+                _, label = get_data("spheres")  # spheres, mnist, fmni
+
+                hub_idx = set(hub_idx)  # use set for fast computation
+                hub_not_idx = set(list(range(X.shape[0])))
+                hub_not_idx -= hub_idx
+
+                hub_idx = list(hub_idx)
+                hub_not_idx = list(hub_not_idx)
+
+                t2 = time.time()
+                
+                
+                # np.unique(label[hub_idx], return_counts=True)  # get count
+
+                # from sklearn.manifold import SpectralEmbedding
+                from sklearn.decomposition import PCA
+                import matplotlib.pyplot as plt
+                embedding = PCA(n_components=2).fit_transform(X[hub_idx])
+                # embedding = SpectralEmbedding(n_components=2).fit_transform(X[hub_idx])
+                fig, ax = plt.subplots(1, figsize=(10, 10))
+                plt.scatter(*embedding.T, s=5.0, c=label[hub_idx], cmap='Spectral', alpha=1.0)
+                cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
+                cbar.set_ticks(np.arange(10))
+                plt.title('MNIST Embedded')
+                plt.savefig(f'./tmp/mypic_test2_{zzz}.png')
+
+                exit()
+
+
+
+
+
+
+
+
+
                 if verbose:
                     print(ts(), "NN descent for", str(n_iters), "iterations")
                 knn_indices, knn_dists = nn_descent(

@@ -23,7 +23,7 @@ MEASURE_LIST = [
 ]
 ALGO_LIST = ["pca", "tsne", "umap", "topoae"]  # (TODO) add umato
 DATA_LIST = ["spheres", "mnist", "fmnist", "cifar10"]
-DATA_LIST = ["spheres", "fmnist"]
+DATA_LIST = ["fmnist"]
 
 
 if __name__ == "__main__":
