@@ -55,6 +55,7 @@ from umato.layouts import (
     optimize_layout_euclidean,
     optimize_layout_generic,
     optimize_layout_inverse,
+    global_optimize,
 )
 
 try:
@@ -416,54 +417,20 @@ def nearest_neighbors(
 
                 
                 
-                print(np.unique(label[hub_idx], return_counts=True))  # get count
+                # print(np.unique(label[hub_idx], return_counts=True))  # get count
 
-                # from sklearn.manifold import SpectralEmbedding
                 from sklearn.decomposition import PCA
-                import matplotlib.pyplot as plt
+
                 Z = PCA(n_components=2).fit_transform(X[hub_idx])
                 Z /= max(Z.flatten())
-
                 P = euclidean_distances(X[hub_idx])
                 P /= max(P.flatten())
 
-                def CE(P, Y):
-                    Q = pow(1 + a * d2**b, -1)
-                    return - P * np.log(Q + 0.001) - (1 - P) * np.log(1 - Q + 0.001)
+                
+                a, b = find_ab_params(1, 0.1)
 
-                MAX_ITER = 50
-
-                CE_array = []
-                a, b = find_ab_params(1, 0.1) 
-
-                for i in range(MAX_ITER):
-                    d2 = np.square(euclidean_distances(Z, Z))
-                    y_diff = np.expand_dims(Z, 1) - np.expand_dims(Z, 0)
-                    inv_dist = pow(1 + a * d2 ** b, -1)
-
-                    Q = np.dot(1 - P, pow(0.001 + d2, -1))
-                    np.fill_diagonal(Q, 0)
-                    Q = Q / np.sum(Q, axis = 1, keepdims = True)
-
-                    fact = np.expand_dims(a * P * (1e-8 + d2) ** (b-1) - Q, 2)
-
-                    dZ = 2 * b * np.sum(fact * y_diff * np.expand_dims(inv_dist, 2), axis = 1)
-                    Z -= 0.005 * dZ
-
-                    if i % 2 == 0:
-                        fig, ax = plt.subplots(1, figsize=(10, 10))
-                        plt.scatter(Z[:,0], Z[:,1], s=8.0, c=label[hub_idx], cmap='Spectral', alpha=1.0)
-                        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
-                        cbar.set_ticks(np.arange(10))
-                        plt.title('MNIST Embedded')
-                        plt.savefig(f'./tmp/{i}.png')
-                        plt.close()
-                    
-                    CE_current = np.sum(CE(P, Z)) / 1e+5
-                    CE_array.append(CE_current)
-
-                    print("Cross-Entropy = " + str(CE_current) + " after " + str(i) + " iterations")
-
+                result = global_optimize(P, Z, a, b, alpha=0.005, max_iter=30,
+                    verbose=True, savefig=True, label=label[hub_idx])
 
 
 

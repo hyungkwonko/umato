@@ -2,6 +2,8 @@ import numpy as np
 import numba
 import umato.distances as dist
 from umato.utils import tau_rand_int
+from sklearn.metrics.pairwise import euclidean_distances
+import matplotlib.pyplot as plt
 
 
 @numba.njit()
@@ -550,3 +552,44 @@ def optimize_layout_inverse(
             print("\tcompleted ", n, " / ", n_epochs, "epochs")
 
     return head_embedding
+
+
+
+def get_CE(P, Y, d_squared, a, b):
+    Q = pow(1 + a * d_squared**b, -1)
+    loss = - P * np.log(Q + 0.001) - (1 - P) * np.log(1 - Q + 0.001)
+    return loss.sum() / 1e+5
+
+
+def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig=False, label=None):
+
+    CE_array = []
+
+    for i in range(max_iter):
+        d_squared = np.square(euclidean_distances(Z, Z))
+        z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
+        d_inverse = np.expand_dims(pow(1 + a * d_squared ** b, -1), axis=2)
+
+        Q = np.dot(1 - P, pow(0.001 + d_squared, -1))
+        np.fill_diagonal(Q, 0)
+        Q = Q / np.sum(Q, axis=1, keepdims=True)
+
+        grad = np.expand_dims(2 * a * b * P * (1e-12 + d_squared) ** (b-1) - 2 * b * Q, axis=2)
+        dZ = np.sum(grad * z_diff * d_inverse, axis=1)
+        Z -= alpha * dZ
+
+        if verbose:
+            CE_current = get_CE(P, Z, d_squared, a, b)
+            CE_array.append(CE_current)
+            print(f"[Info] Cross-Entropy loss: {CE_current:.6f}, Iteration: {i}/{max_iter}")
+
+        if savefig:
+            if i % 2 == 0:
+                plt.scatter(Z[:,0], Z[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
+                cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
+                cbar.set_ticks(np.arange(10))
+                plt.title('Fashion MNIST Embedded')
+                plt.savefig(f'./tmp/{i}.png')
+                plt.close()
+
+    return Z
