@@ -11,6 +11,7 @@ from scipy.optimize import curve_fit
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_random_state, check_array
 from sklearn.metrics import pairwise_distances
+from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.preprocessing import normalize
 from sklearn.neighbors import KDTree
 
@@ -383,22 +384,28 @@ def nearest_neighbors(
                 rp_forest = make_forest(X, n_neighbors, n_trees, rng_state, angular)  ######### RP FOREST
                 leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
                 
+
+
+
+
+
+
+
+
+
+                #### hub node extraction using RP-forest
                 HUB_NUMBER = 300
-            
                 rp_forest2 = make_forest(X, X.shape[0] // (HUB_NUMBER // n_trees), n_trees, rng_state, angular)
                 leaf_array2 = rptree_leaf_array(rp_forest2)  # stacked rp_tree indices
 
-                # target_idx = random_state.choice(len(rp_forest))  # pick one (target) tree
-                # candidates = rp_forest[target_idx]
-        
                 hub_idx = []
-                for candidate in leaf_array:
+                for candidate in leaf_array2:
                     val = random_state.choice(candidate)
                     if val > 0:
                         hub_idx.append(val)
 
                 from evaluation.models.dataset import get_data, save_csv
-                _, label = get_data("spheres")  # spheres, mnist, fmni
+                _, label = get_data("fmnist")  # spheres, mnist, fmni
 
                 hub_idx = set(hub_idx)  # use set for fast computation
                 hub_not_idx = set(list(range(X.shape[0])))
@@ -407,24 +414,62 @@ def nearest_neighbors(
                 hub_idx = list(hub_idx)
                 hub_not_idx = list(hub_not_idx)
 
-                t2 = time.time()
                 
                 
-                # np.unique(label[hub_idx], return_counts=True)  # get count
+                print(np.unique(label[hub_idx], return_counts=True))  # get count
 
                 # from sklearn.manifold import SpectralEmbedding
                 from sklearn.decomposition import PCA
                 import matplotlib.pyplot as plt
-                embedding = PCA(n_components=2).fit_transform(X[hub_idx])
-                # embedding = SpectralEmbedding(n_components=2).fit_transform(X[hub_idx])
-                fig, ax = plt.subplots(1, figsize=(10, 10))
-                plt.scatter(*embedding.T, s=5.0, c=label[hub_idx], cmap='Spectral', alpha=1.0)
-                cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
-                cbar.set_ticks(np.arange(10))
-                plt.title('MNIST Embedded')
-                plt.savefig(f'./tmp/mypic_test2_{zzz}.png')
+                Z = PCA(n_components=2).fit_transform(X[hub_idx])
+                Z /= max(Z.flatten())
+
+                P = euclidean_distances(X[hub_idx])
+                P /= max(P.flatten())
+
+                def CE(P, Y):
+                    Q = pow(1 + a * d2**b, -1)
+                    return - P * np.log(Q + 0.001) - (1 - P) * np.log(1 - Q + 0.001)
+
+                MAX_ITER = 50
+
+                CE_array = []
+                a, b = find_ab_params(1, 0.1) 
+
+                for i in range(MAX_ITER):
+                    d2 = np.square(euclidean_distances(Z, Z))
+                    y_diff = np.expand_dims(Z, 1) - np.expand_dims(Z, 0)
+                    inv_dist = pow(1 + a * d2 ** b, -1)
+
+                    Q = np.dot(1 - P, pow(0.001 + d2, -1))
+                    np.fill_diagonal(Q, 0)
+                    Q = Q / np.sum(Q, axis = 1, keepdims = True)
+
+                    fact = np.expand_dims(a * P * (1e-8 + d2) ** (b-1) - Q, 2)
+
+                    dZ = 2 * b * np.sum(fact * y_diff * np.expand_dims(inv_dist, 2), axis = 1)
+                    Z -= 0.005 * dZ
+
+                    if i % 2 == 0:
+                        fig, ax = plt.subplots(1, figsize=(10, 10))
+                        plt.scatter(Z[:,0], Z[:,1], s=8.0, c=label[hub_idx], cmap='Spectral', alpha=1.0)
+                        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
+                        cbar.set_ticks(np.arange(10))
+                        plt.title('MNIST Embedded')
+                        plt.savefig(f'./tmp/{i}.png')
+                        plt.close()
+                    
+                    CE_current = np.sum(CE(P, Z)) / 1e+5
+                    CE_array.append(CE_current)
+
+                    print("Cross-Entropy = " + str(CE_current) + " after " + str(i) + " iterations")
+
+
+
 
                 exit()
+
+
 
 
 

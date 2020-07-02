@@ -5,7 +5,7 @@ from evaluation.models.dataset import get_data, save_csv
 
 if __name__ == "__main__":
     # x = load_digits()  # (1797, 64 dim)
-    x, label = get_data("mnist")  # spheres, mnist, fmnist, cifar10
+    x, label = get_data("fmnist")  # spheres, mnist, fmnist, cifar10
 
     # UMTO
     embedding = umato.UMATO(verbose=True).fit_transform(x)
