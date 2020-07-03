@@ -561,6 +561,17 @@ def get_CE(P, Y, d_squared, a, b):
     return loss.sum() / 1e+5
 
 
+def get_DTM(adj_x, adj_z, sigma=0.1):
+    density_x = calc_DTM(adj_x, sigma)
+    density_z = calc_DTM(adj_z, sigma)
+    return np.abs(density_x - density_z).sum()
+
+
+def calc_DTM(adj, sigma):
+    density = np.sum(np.exp(-(adj ** 2) / sigma), axis=-1)
+    return density / density.sum()
+
+
 def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig=False, label=None):
 
     CE_array = []
@@ -572,19 +583,20 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig
 
         Q = np.dot(1 - P, pow(0.001 + d_squared, -1))
         np.fill_diagonal(Q, 0)
-        Q = Q / np.sum(Q, axis=1, keepdims=True)
+        Q /= np.sum(Q, axis=1, keepdims=True)
 
         grad = np.expand_dims(2 * a * b * P * (1e-12 + d_squared) ** (b-1) - 2 * b * Q, axis=2)
         dZ = np.sum(grad * z_diff * d_inverse, axis=1)
         Z -= alpha * dZ
 
         if verbose:
-            CE_current = get_CE(P, Z, d_squared, a, b)
+            # CE_current = get_CE(P, Z, d_squared, a, b)
+            CE_current = get_DTM(P, Q, sigma=0.1)
             CE_array.append(CE_current)
-            print(f"[Info] Cross-Entropy loss: {CE_current:.6f}, Iteration: {i}/{max_iter}")
+            print(f"[Info] Current loss: {CE_current:.6f}, @ iteration: {i}/{max_iter}")
 
         if savefig:
-            if i % 2 == 0:
+            if i % 1 == 0:
                 plt.scatter(Z[:,0], Z[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
                 cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
                 cbar.set_ticks(np.arange(10))

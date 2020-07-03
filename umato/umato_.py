@@ -950,20 +950,23 @@ def build_global_structure(
 
     #### for test only...
     # from evaluation.models.dataset import get_data, save_csv
-    # _, label = get_data("fmnist")  # spheres, mnist, fmni
+    # _, label = get_data("spheres")  # spheres, mnist, fmni
     # print(np.unique(label[hub_idx], return_counts=True))  # get count
 
     from sklearn.decomposition import PCA
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
-    Z /= max(Z.flatten())
+    Z /= Z.max()
 
     P = euclidean_distances(data[hub_idx])
-    P /= max(P.flatten())
+    P /= P.max()
 
     # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
     result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter)  # (TODO) how to optimize max_iter & alpha?
 
     return result
+
+def build_mst(data):
+    return 0
 
 
 def simplicial_set_embedding(
