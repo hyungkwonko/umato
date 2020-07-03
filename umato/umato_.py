@@ -382,69 +382,8 @@ def nearest_neighbors(
                 if verbose:
                     print(ts(), "Building RP forest with", str(n_trees), "trees")
 
-                rp_forest = make_forest(X, n_neighbors, n_trees, rng_state, angular)  ######### RP FOREST
+                rp_forest = make_forest(X, n_neighbors, n_trees, rng_state, angular)
                 leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
-                
-
-
-
-
-
-
-
-
-
-                #### hub node extraction using RP-forest
-                HUB_NUMBER = 300
-                rp_forest2 = make_forest(X, X.shape[0] // (HUB_NUMBER // n_trees), n_trees, rng_state, angular)
-                leaf_array2 = rptree_leaf_array(rp_forest2)  # stacked rp_tree indices
-
-                hub_idx = []
-                for candidate in leaf_array2:
-                    val = random_state.choice(candidate)
-                    if val > 0:
-                        hub_idx.append(val)
-
-                from evaluation.models.dataset import get_data, save_csv
-                _, label = get_data("fmnist")  # spheres, mnist, fmni
-
-                hub_idx = set(hub_idx)  # use set for fast computation
-                hub_not_idx = set(list(range(X.shape[0])))
-                hub_not_idx -= hub_idx
-
-                hub_idx = list(hub_idx)
-                hub_not_idx = list(hub_not_idx)
-
-                
-                
-                # print(np.unique(label[hub_idx], return_counts=True))  # get count
-
-                from sklearn.decomposition import PCA
-
-                Z = PCA(n_components=2).fit_transform(X[hub_idx])
-                Z /= max(Z.flatten())
-                P = euclidean_distances(X[hub_idx])
-                P /= max(P.flatten())
-
-                
-                a, b = find_ab_params(1, 0.1)
-
-                result = global_optimize(P, Z, a, b, alpha=0.005, max_iter=30,
-                    verbose=True, savefig=True, label=label[hub_idx])
-
-
-
-                exit()
-
-
-
-
-
-
-
-
-
-
 
                 if verbose:
                     print(ts(), "NN descent for", str(n_iters), "iterations")
@@ -968,6 +907,62 @@ def make_epochs_per_sample(weights, n_epochs):
     result = -1.0 * np.ones(weights.shape[0], dtype=np.float64)
     n_samples = n_epochs * (weights / weights.max())
     result[n_samples > 0] = float(n_epochs) / n_samples[n_samples > 0]
+    return result
+
+
+def build_global_structure(
+    data,
+    n_components,
+    a,
+    b,
+    random_state,
+    alpha=0.005,
+    n_trees=-1,
+    max_iter=30,
+    hub_number=300,
+    verbose=False,
+    angular=False,
+):
+    """
+    Author: Hyung-Kwon Ko
+    build the global structure 
+    """
+
+    if n_trees < 0:
+        n_trees = 5 + int(round((data.shape[0]) ** 0.5 / 20.0))  # (TODO) how to optimize this?
+
+    rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)  # hub node extraction using RP-forest
+    rp_forest = make_forest(data, data.shape[0] // (hub_number // n_trees), n_trees, rng_state, angular)  ######### RP FOREST
+    leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
+
+    hub_idx = []
+    for candidate in leaf_array:
+        val = random_state.choice(candidate)
+        if val > 0:
+            hub_idx.append(val)
+
+    hub_idx = set(hub_idx)  # use set for fast computation
+    hub_not_idx = set(list(range(data.shape[0])))
+    hub_not_idx -= hub_idx
+
+    hub_idx = list(hub_idx)  # indices of hub nodes
+    hub_not_idx = list(hub_not_idx)  # indices of other nodes
+
+    #### for test only...
+    # from evaluation.models.dataset import get_data, save_csv
+    # _, label = get_data("fmnist")  # spheres, mnist, fmni
+    # print(np.unique(label[hub_idx], return_counts=True))  # get count
+
+    from sklearn.decomposition import PCA
+    Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
+    Z /= max(Z.flatten())
+
+    P = euclidean_distances(data[hub_idx])
+    P /= max(P.flatten())
+
+    # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
+    result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter)  # (TODO) how to optimize max_iter & alpha?
+
     return result
 
 
@@ -2022,7 +2017,15 @@ class UMATO(BaseEstimator):
             n_epochs = self.n_epochs
 
         if self.verbose:
-            print(ts(), "Construct embedding")
+            print(ts(), "Construct global structure")
+
+        ###### Hyung-Kwon Ko
+        global_embedding = build_global_structure(data=X, n_components=self.n_components, a=self._a, b=self._b, random_state=random_state,)
+        exit()
+
+
+        if self.verbose:
+            print(ts(), "Construct local structure")
 
         self.embedding_ = simplicial_set_embedding(
             self._raw_data[index],  # JH why raw data?
