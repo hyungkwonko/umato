@@ -910,6 +910,52 @@ def make_epochs_per_sample(weights, n_epochs):
     return result
 
 
+##### Hyung-Kwon Ko
+
+def build_mst(data, graph):
+
+    """
+    1. build connected components with topological distance using coordinate format matrix (graph)
+    2. check if it is a GCC
+    3-1. if GCC, then return it as mst
+    3-2. else get the minimum topological distance between each components (TODO)
+    4. bridge all the connected components using the min topological distance btw connected components (TODO)
+    """
+    graph = graph.tocoo()
+    graph.sum_duplicates()
+    graph.eliminate_zeros()
+
+    components = list()  # list of connected components
+    index_list = set(range(data.shape[0]))
+
+    while len(index_list) > 0:
+        index = set({index_list.pop()})  # choose one from a set
+        for i in range(len(graph.data)):
+            if (graph.row[i] in index) or (graph.col[i] in index):
+                target = {graph.row[i], graph.col[i]}
+                index.update(target)
+                index_list -= target  # remove from 
+        components.append(index)  # append connected components
+
+    if len(components) == 1:
+        print("[INFO] This is a minimum spanning tree.")
+    else:
+        print(f"This still is not a MST w/ {len(components)} components")
+
+
+
+
+
+    # X = [[0], [3], [1]]
+    # from sklearn.neighbors import kneighbors_graph
+    # A = kneighbors_graph(X, 2, mode='connectivity', include_self=True)
+    # A.toarray()
+
+
+    exit()
+    return 0
+
+
 def build_global_structure(
     data,
     n_components,
@@ -918,7 +964,7 @@ def build_global_structure(
     random_state,
     alpha=0.005,
     n_trees=-1,
-    max_iter=30,
+    max_iter=20,
     hub_number=300,
     verbose=False,
     angular=False,
@@ -951,7 +997,7 @@ def build_global_structure(
     #### for test only...
     # from evaluation.models.dataset import get_data, save_csv
     # _, label = get_data("spheres")  # spheres, mnist, fmni
-    # print(np.unique(label[hub_idx], return_counts=True))  # get count
+    # print(np.unique(label[hub_idx], return_counts=True))  # get count per class
 
     from sklearn.decomposition import PCA
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
@@ -964,9 +1010,6 @@ def build_global_structure(
     result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter)  # (TODO) how to optimize max_iter & alpha?
 
     return result
-
-def build_mst(data):
-    return 0
 
 
 def simplicial_set_embedding(
@@ -2023,9 +2066,8 @@ class UMATO(BaseEstimator):
             print(ts(), "Construct global structure")
 
         ###### Hyung-Kwon Ko
+        mst = build_mst(data=X, graph=self.graph_)
         global_embedding = build_global_structure(data=X, n_components=self.n_components, a=self._a, b=self._b, random_state=random_state,)
-        exit()
-
 
         if self.verbose:
             print(ts(), "Construct local structure")
