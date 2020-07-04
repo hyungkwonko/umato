@@ -925,8 +925,10 @@ def build_mst(data, graph):
     graph.sum_duplicates()
     graph.eliminate_zeros()
 
+    n = data.shape[0]  # number of data
+
     components = list()  # list of connected components
-    index_list = set(range(data.shape[0]))
+    index_list = set(range(n))
 
     while len(index_list) > 0:
         index = set({index_list.pop()})  # choose one from a set
@@ -934,30 +936,65 @@ def build_mst(data, graph):
             if (graph.row[i] in index) or (graph.col[i] in index):
                 target = {graph.row[i], graph.col[i]}
                 index.update(target)
-                index_list -= target  # remove from 
+                index_list -= target  # remove from index list
         components.append(index)  # append connected components
 
     if len(components) == 1:
         print("[INFO] This is a minimum spanning tree.")
     else:
-        print(f"This still is not a MST w/ {len(components)} components")
+        print(f"[INFO] This is not a MST w/ {len(components)} components")
+        exit()  # (TODO) implementation of 3-2 & 4 required
+
+
+    # Build MST using Kruskal's algorithm w/ union finder
+    edge_val_set = set()
+    indices = np.argsort(-graph.data)  # sorted indices in descending order(-) / ascending order(+)
+    uf = UnionFind(n)
+
+    for j in range(len(graph.data)):
+        ix = indices[j]
+        no_cycle = uf.union(graph.col[ix], graph.row[ix])
+        if no_cycle:
+            edge_val_set.add((graph.col[ix], graph.row[ix], graph.data[ix]))  # add edge-value info
+
+    if (len(edge_val_set) + 1) != n:
+        raise ValueError(f"[ERROR] number of edges +1 ({len(edge_val_set)+1}) should match the total node number ({n})!")
+
+    return list(edge_val_set)
 
 
 
+# takes 11.5 seconds for spheres dataset
+class UnionFind():
+    def __init__(self, n):
+        self.parent_node = list(range(n))
+        self.n = n
 
+    def union(self, id1, id2):  # merge two sets
+        if self.parent_node[id1] == self.parent_node[id2]:
+            return False
+        elif self.parent_node[id1] < self.parent_node[id2]:  # parent setting using lower value
+            s2 = self.set_find(id2)
+            for s in s2:
+                self.parent_node[s] = self.parent_node[id1]
+            return True
+        else:
+            s1 = self.set_find(id1)
+            for s in s1:
+                self.parent_node[s] = self.parent_node[id2]
+            return True
 
-    # X = [[0], [3], [1]]
-    # from sklearn.neighbors import kneighbors_graph
-    # A = kneighbors_graph(X, 2, mode='connectivity', include_self=True)
-    # A.toarray()
-
-
-    exit()
-    return 0
-
+    def set_find(self, id):  # find set having the same parent id
+        s = set({id})
+        for i in range(self.n):
+            if self.parent_node[i] == self.parent_node[id]:
+                s.add(i)
+        return s
+    
 
 def build_global_structure(
     data,
+    mst,
     n_components,
     a,
     b,
@@ -973,6 +1010,8 @@ def build_global_structure(
     Author: Hyung-Kwon Ko
     build the global structure 
     """
+
+    ############ MST #############
 
     if n_trees < 0:
         n_trees = 5 + int(round((data.shape[0]) ** 0.5 / 20.0))  # (TODO) how to optimize this?
@@ -2067,7 +2106,7 @@ class UMATO(BaseEstimator):
 
         ###### Hyung-Kwon Ko
         mst = build_mst(data=X, graph=self.graph_)
-        global_embedding = build_global_structure(data=X, n_components=self.n_components, a=self._a, b=self._b, random_state=random_state,)
+        global_embedding = build_global_structure(data=X, mst=mst, n_components=self.n_components, a=self._a, b=self._b, random_state=random_state,)
 
         if self.verbose:
             print(ts(), "Construct local structure")
