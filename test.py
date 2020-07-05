@@ -12,6 +12,6 @@ if __name__ == "__main__":
     # x = np.array([[1,1,1,1,1]]*50 + [[7,7,7,7,7]]*50 + [[-6,-6,-6,-6,-6]]*50)
 
     # UMTO
-    embedding = umato.UMATO(verbose=True).fit_transform(x[:100])
+    embedding = umato.UMATO(verbose=True).fit_transform(x)
 
     print(embedding)

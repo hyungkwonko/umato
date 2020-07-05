@@ -962,25 +962,24 @@ def build_mst(data, graph):
         ix = indices[j]
         no_cycle = uf.union(graph.col[ix], graph.row[ix])
         if no_cycle:
-            if graph.col[ix] < graph.row[ix]:
-                if graph.col[ix] not in edge_val_set.keys():
-                    edge_val_set[graph.col[ix]] = [[], []]
-                edge_val_set[graph.col[ix]][0].append(graph.row[ix])
-                edge_val_set[graph.col[ix]][1].append(graph.data[ix])
-            else:
-                if graph.row[ix] not in edge_val_set.keys():
-                    edge_val_set[graph.row[ix]] = [[], []]
-                edge_val_set[graph.row[ix]][0].append(graph.col[ix])
-                edge_val_set[graph.row[ix]][1].append(graph.data[ix])
+            if graph.col[ix] not in [*edge_val_set]:
+                edge_val_set[graph.col[ix]] = [[], []]
+            edge_val_set[graph.col[ix]][0].append(graph.row[ix])
+            edge_val_set[graph.col[ix]][1].append(graph.data[ix])
+            if graph.row[ix] not in [*edge_val_set]:
+                edge_val_set[graph.row[ix]] = [[], []]
+            edge_val_set[graph.row[ix]][0].append(graph.col[ix])
+            edge_val_set[graph.row[ix]][1].append(graph.data[ix])
 
     # for double checking
     len_edge_val_set = 0
     for k in edge_val_set.keys():
         len_edge_val_set += len(edge_val_set[k][0])
+    len_edge_val_set = len_edge_val_set / 2 + 1
 
-    if (len_edge_val_set + 1) != n:
+    if len_edge_val_set != n:
         raise ValueError(
-            f"[ERROR] number of edges +1 ({len(edge_val_set)+1}) should match the total node number ({n})!"
+            f"[ERROR] number of edges +1 ({len_edge_val_set}) should match the total node number ({n})!"
         )
 
     return edge_val_set
@@ -1016,24 +1015,49 @@ class UnionFind:
                 s.add(i)
         return s
 
+def topological_path_dfs(mst, path, visited, prev, node, end):
+    if not visited[node]:
+        visited[node] = True
+        path.append(node)
 
-def topological_dist_dfs(mst, n, i, j):
-    visited = [False] * n
-    return 3
+        if node == end:  # escape
+            return True
 
+        neighbours = mst[node][0]
+        if prev != node:
+            neighbours.remove(prev)
+            neighbours.append(prev)
+
+        for neighbour in neighbours:
+            escape = topological_path_dfs(mst, path, visited, node, neighbour, end)
+            if escape:
+                return path
+    else:
+        path.pop()  # remove last element
+
+def topological_dist_dfs(mst, path):
+    dist = 0
+    for i in range(len(path)-1):
+        ix = mst[path[i]][0].index(path[i+1])
+        dist += mst[path[i]][1][ix]
+    return dist
 
 def topological_distances(mst, hub_idx):
     n = len(hub_idx)
-    dist = []
+    dists = []
     for i in range(n):
+        print(f"topological distance {i}/{n}")
         for j in range(i):
-            d = topological_dist_dfs(mst, n, hub_idx[i], hub_idx[j])
-            dist.append(d)
+            path = []
+            visited = [False] * len(mst)
+            path = topological_path_dfs(mst, path, visited, hub_idx[i], hub_idx[i], hub_idx[j])
+            dist = topological_dist_dfs(mst, path)
+            dists.append(dist)
 
     # calculate adjacency matrix
     adj = np.zeros((n, n))
     tril = np.tril_indices(n, -1)  # without diagonals
-    adj[tril] = dist
+    adj[tril] = dists
     return adj + adj.T
 
 
@@ -1095,13 +1119,24 @@ def build_global_structure(
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
     Z /= Z.max()
 
+    t1 = time.time()
+
     if dist == "euclidean":
+        print("[INFO] adjacency matrix using Euclidean distance")
         P = euclidean_distances(data[hub_idx])
     elif dist == "topological":
+        print("[INFO] adjacency matrix using approximated topological distance")
         P = topological_distances(mst, hub_idx)
     else:
         ValueError("Distance measure btw hub nodes not defined!")
     P /= P.max()
+
+    t2 = time.time()
+
+    print(len(hub_idx))
+    print(P.shape)
+    print(t2 - t1)
+    exit()
 
     # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
     result = global_optimize(
