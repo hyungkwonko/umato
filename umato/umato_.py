@@ -931,6 +931,16 @@ def build_mst(data, graph):
     components = list()  # list of connected components
     index_list = set(range(n))
 
+    print(len(graph.data))
+    cutoff = np.mean(graph.data)
+    print(cutoff)
+    cutoff = 0.9
+    ixs = [i for i in range(len(graph.data)) if graph.data[i] < cutoff]  ############### how to set cutoff????
+    print(len(ixs))
+    graph.data[ixs] = -1
+    graph.row[ixs] = -1
+    graph.col[ixs] = -1
+
     while len(index_list) > 0:
         index = set({index_list.pop()})  # choose one from a set
         for i in range(len(graph.data)):
@@ -958,6 +968,8 @@ def build_mst(data, graph):
     )  # sorted indices in descending order(-) / ascending order(+)
     uf = UnionFind(n)
 
+    zzz = []  #############
+
     for j in range(len(graph.data)):
         ix = indices[j]
         no_cycle = uf.union(graph.col[ix], graph.row[ix])
@@ -970,6 +982,20 @@ def build_mst(data, graph):
                 edge_val_set[graph.row[ix]] = [[], []]
             edge_val_set[graph.row[ix]][0].append(graph.col[ix])
             edge_val_set[graph.row[ix]][1].append(graph.data[ix])
+            zzz.append(graph.data[ix])  #############
+
+
+    print(len([l for l in zzz if l < 0.85]))  #############
+    print(len([l for l in zzz if l < 0.86]))  #############
+    print(len([l for l in zzz if l < 0.87]))  #############
+    print(len([l for l in zzz if l < 0.88]))  #############
+    print(len([l for l in zzz if l < 0.89]))  #############
+    print(len([l for l in zzz if l < 0.90]))  #############
+    m = sum(zzz) / len(zzz)
+    print(m)
+    print(len([l for l in zzz if l < m]))  #############
+    print(len(zzz))
+    exit()  #############
 
     # for double checking
     len_edge_val_set = 0
@@ -1035,8 +1061,9 @@ def topological_path_dfs(mst, path, visited, prev, node, end):
     else:
         path.pop()  # remove last element
 
+
 def topological_dist_dfs(mst, path):
-    dist = 0
+    dist = 0.0
     for i in range(len(path)-1):
         ix = mst[path[i]][0].index(path[i+1])
         dist += mst[path[i]][1][ix]
@@ -1110,9 +1137,9 @@ def build_global_structure(
     hub_not_idx = list(hub_not_idx)  # indices of other nodes
 
     #### for test only...
-    # from evaluation.models.dataset import get_data, save_csv
-    # _, label = get_data("spheres")  # spheres, mnist, fmni
-    # print(np.unique(label[hub_idx], return_counts=True))  # get count per class
+    from evaluation.models.dataset import get_data, save_csv
+    _, label = get_data("spheres")  # spheres, mnist, fmni
+    print(np.unique(label[hub_idx], return_counts=True))  # get count per class
 
     from sklearn.decomposition import PCA
 
@@ -1136,12 +1163,14 @@ def build_global_structure(
     print(len(hub_idx))
     print(P.shape)
     print(t2 - t1)
-    exit()
+    # exit()
 
-    # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
-    result = global_optimize(
-        P, Z, a, b, alpha=alpha, max_iter=max_iter
-    )  # (TODO) how to optimize max_iter & alpha?
+    result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
+    # result = global_optimize(
+    #     P, Z, a, b, alpha=alpha, max_iter=max_iter
+    # )  # (TODO) how to optimize max_iter & alpha?
+
+    exit()
 
     return result
 
@@ -2208,6 +2237,7 @@ class UMATO(BaseEstimator):
             a=self._a,
             b=self._b,
             random_state=random_state,
+            # dist="euclidean",
             dist="topological",
         )
 

@@ -593,7 +593,7 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig
             # CE_current = get_CE(P, Z, d_squared, a, b)
             CE_current = get_DTM(P, Q, sigma=0.1)
             CE_array.append(CE_current)
-            print(f"[Info] Current loss: {CE_current:.6f}, @ iteration: {i}/{max_iter}")
+            print(f"[INFO] Current loss: {CE_current:.6f}, @ iteration: {i}/{max_iter}")
 
         if savefig:
             if i % 1 == 0:

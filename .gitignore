@@ -164,3 +164,4 @@ data/cifar-10-python.tar.gz
 tmp/
 test_spectral.py
 test_spheres_umap.py
+numba_example.py
