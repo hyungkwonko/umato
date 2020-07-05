@@ -912,6 +912,7 @@ def make_epochs_per_sample(weights, n_epochs):
 
 ##### Hyung-Kwon Ko
 
+
 def build_mst(data, graph):
 
     """
@@ -939,33 +940,54 @@ def build_mst(data, graph):
                 index_list -= target  # remove from index list
         components.append(index)  # append connected components
 
+    ######### need to make edge weight symmetric in each component ############
+    ######### need to make edge weight symmetric in each component ############
+    ######### need to make edge weight symmetric in each component ############
+    ######### need to make edge weight symmetric in each component ############
+
     if len(components) == 1:
         print("[INFO] This is a minimum spanning tree.")
     else:
         print(f"[INFO] This is not a MST w/ {len(components)} components")
         exit()  # (TODO) implementation of 3-2 & 4 required
 
-
     # Build MST using Kruskal's algorithm w/ union finder
-    edge_val_set = set()
-    indices = np.argsort(-graph.data)  # sorted indices in descending order(-) / ascending order(+)
+    edge_val_set = dict()
+    indices = np.argsort(
+        -graph.data
+    )  # sorted indices in descending order(-) / ascending order(+)
     uf = UnionFind(n)
 
     for j in range(len(graph.data)):
         ix = indices[j]
         no_cycle = uf.union(graph.col[ix], graph.row[ix])
         if no_cycle:
-            edge_val_set.add((graph.col[ix], graph.row[ix], graph.data[ix]))  # add edge-value info
+            if graph.col[ix] < graph.row[ix]:
+                if graph.col[ix] not in edge_val_set.keys():
+                    edge_val_set[graph.col[ix]] = [[], []]
+                edge_val_set[graph.col[ix]][0].append(graph.row[ix])
+                edge_val_set[graph.col[ix]][1].append(graph.data[ix])
+            else:
+                if graph.row[ix] not in edge_val_set.keys():
+                    edge_val_set[graph.row[ix]] = [[], []]
+                edge_val_set[graph.row[ix]][0].append(graph.col[ix])
+                edge_val_set[graph.row[ix]][1].append(graph.data[ix])
 
-    if (len(edge_val_set) + 1) != n:
-        raise ValueError(f"[ERROR] number of edges +1 ({len(edge_val_set)+1}) should match the total node number ({n})!")
+    # for double checking
+    len_edge_val_set = 0
+    for k in edge_val_set.keys():
+        len_edge_val_set += len(edge_val_set[k][0])
 
-    return list(edge_val_set)
+    if (len_edge_val_set + 1) != n:
+        raise ValueError(
+            f"[ERROR] number of edges +1 ({len(edge_val_set)+1}) should match the total node number ({n})!"
+        )
 
+    return edge_val_set
 
 
 # takes 11.5 seconds for spheres dataset
-class UnionFind():
+class UnionFind:
     def __init__(self, n):
         self.parent_node = list(range(n))
         self.n = n
@@ -973,7 +995,9 @@ class UnionFind():
     def union(self, id1, id2):  # merge two sets
         if self.parent_node[id1] == self.parent_node[id2]:
             return False
-        elif self.parent_node[id1] < self.parent_node[id2]:  # parent setting using lower value
+        elif (
+            self.parent_node[id1] < self.parent_node[id2]
+        ):  # parent setting using lower value
             s2 = self.set_find(id2)
             for s in s2:
                 self.parent_node[s] = self.parent_node[id1]
@@ -984,13 +1008,34 @@ class UnionFind():
                 self.parent_node[s] = self.parent_node[id2]
             return True
 
+    # THIS takes most of the time (more than 95 %)
     def set_find(self, id):  # find set having the same parent id
         s = set({id})
         for i in range(self.n):
             if self.parent_node[i] == self.parent_node[id]:
                 s.add(i)
         return s
-    
+
+
+def topological_dist_dfs(mst, n, i, j):
+    visited = [False] * n
+    return 3
+
+
+def topological_distances(mst, hub_idx):
+    n = len(hub_idx)
+    dist = []
+    for i in range(n):
+        for j in range(i):
+            d = topological_dist_dfs(mst, n, hub_idx[i], hub_idx[j])
+            dist.append(d)
+
+    # calculate adjacency matrix
+    adj = np.zeros((n, n))
+    tril = np.tril_indices(n, -1)  # without diagonals
+    adj[tril] = dist
+    return adj + adj.T
+
 
 def build_global_structure(
     data,
@@ -999,6 +1044,7 @@ def build_global_structure(
     a,
     b,
     random_state,
+    dist="topological",
     alpha=0.005,
     n_trees=-1,
     max_iter=20,
@@ -1009,15 +1055,21 @@ def build_global_structure(
     """
     Author: Hyung-Kwon Ko
     build the global structure 
+
+    dist: topological / euclidean
     """
 
-    ############ MST #############
-
     if n_trees < 0:
-        n_trees = 5 + int(round((data.shape[0]) ** 0.5 / 20.0))  # (TODO) how to optimize this?
+        n_trees = 5 + int(
+            round((data.shape[0]) ** 0.5 / 20.0)
+        )  # (TODO) how to optimize this?
 
-    rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)  # hub node extraction using RP-forest
-    rp_forest = make_forest(data, data.shape[0] // (hub_number // n_trees), n_trees, rng_state, angular)  ######### RP FOREST
+    rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(
+        np.int64
+    )  # hub node extraction using RP-forest
+    rp_forest = make_forest(
+        data, data.shape[0] // (hub_number // n_trees), n_trees, rng_state, angular
+    )  ######### RP FOREST
     leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
 
     hub_idx = []
@@ -1039,14 +1091,22 @@ def build_global_structure(
     # print(np.unique(label[hub_idx], return_counts=True))  # get count per class
 
     from sklearn.decomposition import PCA
+
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
     Z /= Z.max()
 
-    P = euclidean_distances(data[hub_idx])
+    if dist == "euclidean":
+        P = euclidean_distances(data[hub_idx])
+    elif dist == "topological":
+        P = topological_distances(mst, hub_idx)
+    else:
+        ValueError("Distance measure btw hub nodes not defined!")
     P /= P.max()
 
     # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
-    result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter)  # (TODO) how to optimize max_iter & alpha?
+    result = global_optimize(
+        P, Z, a, b, alpha=alpha, max_iter=max_iter
+    )  # (TODO) how to optimize max_iter & alpha?
 
     return result
 
@@ -2106,7 +2166,15 @@ class UMATO(BaseEstimator):
 
         ###### Hyung-Kwon Ko
         mst = build_mst(data=X, graph=self.graph_)
-        global_embedding = build_global_structure(data=X, mst=mst, n_components=self.n_components, a=self._a, b=self._b, random_state=random_state,)
+        global_embedding = build_global_structure(
+            data=X,
+            mst=mst,
+            n_components=self.n_components,
+            a=self._a,
+            b=self._b,
+            random_state=random_state,
+            dist="topological",
+        )
 
         if self.verbose:
             print(ts(), "Construct local structure")
