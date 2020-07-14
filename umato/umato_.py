@@ -1057,9 +1057,9 @@ def build_global_structure(
     print("[INFO] Building global structure")
 
     #### for test only...
-    from evaluation.models.dataset import get_data, save_csv
-    _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-    print(np.unique(label[hub_idx], return_counts=True))  # get count per class
+    # from evaluation.models.dataset import get_data, save_csv
+    # _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
+    # print(np.unique(label[hub_idx], return_counts=True))  # get count per class
 
     from sklearn.decomposition import PCA
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
@@ -1079,35 +1079,89 @@ def build_global_structure(
 @numba.njit()
 def embed_others(
     data,
-    global_optimized,
+    init,
     hub_idx,
     leaf_list,
     knn_indices,
 ):
     # print("[INFO] Embedding other nodes")
 
-    init = np.zeros((data.shape[0], global_optimized.shape[1]))
-    init[hub_idx] = global_optimized
-
     all_idx = np.arange(data.shape[0])
     hub_not_idx = np.delete(all_idx, hub_idx)
+
+    num_log = np.zeros(data.shape[0])
+    num_log[hub_idx] = -1
 
     # hub_idx = set(hub_idx)  # use set for fast computation
     # hub_not_idx = set(list(range(data.shape[0])))
     # hub_not_idx -= hub_idx
 
+    # hub_idx_fin = set(hub_idx)
+    hub_idx = set(hub_idx)
     hub_idx_fin = hub_idx.copy()
+
+    for i in hub_idx:
+        for j in knn_indices[i]:
+            if num_log[j] > -1:
+                init[j] += init[i] + np.random.random() * 0.05
+                num_log[j] += 1
+                hub_idx_fin.add(j)
+
+        # for leaf in leaf_list:
+        #     leaf
+
+    for k in range(data.shape[0]):
+        if num_log[k] > 0:
+            init[k] /= num_log[k]
+
+    return init, hub_idx_fin
+
+
+# @numba.njit()
+def embed_others2(
+    data,
+    init,
+    hub_idx,
+    leaf_list,
+):
+    # print("[INFO] Embedding other nodes")
+
+    all_idx = np.arange(data.shape[0])
+    hub_not_idx = np.delete(all_idx, hub_idx)
+
+    num_log = np.zeros(data.shape[0])
+    num_log[hub_idx] = -1
+
+    hub_not_idx = set(hub_not_idx)
     hub_not_idx_fin = hub_not_idx.copy()
 
+    hub_idx = set(hub_idx)
+    hub_idx_fin = hub_idx.copy()
+
+
     for i in hub_not_idx:
-        for j in hub_idx:
-            for k in knn_indices[j]:
-                if i == k:
-                    hub_not_idx_fin = np.delete(hub_not_idx_fin, i)
+        for leaf in leaf_list:
+            for j in leaf:
+                if j == -1:
+                    break
+                if j == i:
+                    index = np.argwhere(leaf==-1)
+                    tmp = np.delete(leaf, index)
+                    index = np.argwhere(tmp==i)
+                    tmp2 = np.delete(tmp, index)
+                    print("tmp2: ", tmp2)
+                    for k in tmp2:
+                        init[i] += init[k] + np.random.random() * 0.05
+                        num_log[i] += 1
+                        hub_idx_fin.add(i)
 
-    hub_not_idx = hub_not_idx_fin.copy()
+    for l in range(data.shape[0]):
+        if num_log[l] > 0:
+            init[l] /= num_log[l]
 
-    return init, hub_not_idx_fin
+    return init, hub_idx_fin
+
+
 
 
 
@@ -2186,32 +2240,73 @@ class UMATO(BaseEstimator):
         )
 
 
+
+
         hub_idx = np.array(hub_idx)
 
-        init, z = embed_others(
-            data=X,
-            global_optimized=global_optimized,
-            hub_idx=hub_idx,
-            leaf_list=leaf_list,
-            knn_indices=self._knn_indices,
-        )
+        init = np.zeros((X.shape[0], global_optimized.shape[1]))
+        init[hub_idx] = global_optimized
 
         t1 = time.time()
 
-        init, z = embed_others(
+        # leaf_list = rptree_leaf_array(self._rp_forest)
+        # print(type(leaf_list))
+        # print(self._rp_forest)
+        print(leaf_list)
+        # print(leaf_list.shape)
+        # exit()
+        # print(leaf_list.shape)
+        # z = leaf_list.flatten()
+        # index = np.argwhere(z==-1)
+        # zz = np.delete(z, index)
+        # print(len(zz))
+        # exit()
+
+        for _ in range(5):
+
+            init, hub_idx = embed_others(
+                data=X,
+                init=init,
+                hub_idx=hub_idx,
+                leaf_list=leaf_list,
+                knn_indices=self._knn_indices,
+            )
+            hub_idx = np.array(list(hub_idx))
+            print(len(hub_idx))
+
+        print(np.isinf(init).any())
+
+        init, hub_idx_fin = embed_others2(
             data=X,
-            global_optimized=global_optimized,
+            init=init,
             hub_idx=hub_idx,
             leaf_list=leaf_list,
-            knn_indices=self._knn_indices,
         )
+
+        print(np.isinf(init).any())
+        print(len(hub_idx_fin))
+
+
+        print(init)
+        from evaluation.models.dataset import get_data, save_csv
+        _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
+
+        plt.scatter(init[:,0], init[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
+        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
+        cbar.set_ticks(np.arange(10))
+        plt.title('Spheres Embedded')
+        plt.savefig(f'./tmp/zzzz.png')
+        plt.close()
+        exit()
+
+
+
 
         t2 = time.time()
 
         print(init.shape)
-        print(len(z))
         print(t2-t1)
-        exit()
+
 
 
         if self.verbose:

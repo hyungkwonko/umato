@@ -1,7 +1,7 @@
 import umato
 from sklearn.datasets import load_digits
 from evaluation.models.dataset import get_data, save_csv
-
+import os
 
 if __name__ == "__main__":
     # x = load_digits()  # (1797, 64 dim)
@@ -14,4 +14,6 @@ if __name__ == "__main__":
     # UMTO
     embedding = umato.UMATO(verbose=True).fit_transform(x)
 
+
+    save_csv('./', alg_name="zzz", data=embedding, label=label)
     print(embedding)
