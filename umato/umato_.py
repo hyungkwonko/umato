@@ -914,7 +914,7 @@ def make_epochs_per_sample(weights, n_epochs):
 
 ##### Hyung-Kwon Ko
 
-def get_hub_idx(
+def hub_leaf_candidates(
     data,
     random_state,
     hub_num,
@@ -924,6 +924,7 @@ def get_hub_idx(
     ):
 
     hub_idxs = []
+    leaf_arrays = []
 
     for _ in range(iter_num):
 
@@ -939,45 +940,50 @@ def get_hub_idx(
             data, data.shape[0] // (hub_num // n_trees), n_trees, rng_state, angular
         )  ######### RP FOREST
         leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
+        leaf_arrays.append(leaf_array)
 
         hub_idx = []
         for candidate in leaf_array:
             val = random_state.choice(candidate)
-            if val > 0:
-                hub_idx.append(val)
+            if val > -1:
+                if val not in hub_idx:  # prevent duplicates
+                    hub_idx.append(val)
+            if len(hub_idx) >= hub_num:
+                break
+
         hub_idxs.append(hub_idx)
 
-    return hub_idxs
+    return hub_idxs, leaf_arrays
 
 
 
-def get_k(data, local_knum):
+def get_homology(data, local_knum, top_num, random_state):
     dist = pairwise_distances(data, data)
     dist /= dist.max()
 
     nn_index = np.argpartition(dist, kth=local_knum-1, axis=-1)[:, :local_knum]  # kill using local connectivity
 
     for i in range(len(dist)):
-        dist[i][nn_index[i]] = np.random.random(local_knum) * 0.1
+        dist[i][nn_index[i]] = random_state.random(local_knum) * 0.1
 
     rc = gd.RipsComplex(distance_matrix=dist, max_edge_length=1.0)
     rc_tree = rc.create_simplex_tree(max_dimension=2)
     barcodes = rc_tree.persistence()
 
-    return rc_tree.persistence_intervals_in_dimension(1)
+
+    hom1 = rc_tree.persistence_intervals_in_dimension(1)
+    # cutoff = 0.3
+    # hom1 = hom1[np.where(abs(hom1[:,0] - hom1[:,1]) > cutoff)]
+    hom1_max = abs(hom1[:,1] - hom1[:,0])
+    hom1_max_ix = hom1_max.argsort()[-top_num:][::-1]
+
+    return hom1[hom1_max_ix]
 
 
-def build_global_structure(
+def hub_leaf_indices(
     data,
-    mst,
-    n_components,
-    a,
-    b,
     random_state,
-    dist="topological",
-    alpha=0.005,
     n_trees=-1,
-    max_iter=10,
     hub_num=50,
     verbose=False,
     angular=False,
@@ -989,7 +995,7 @@ def build_global_structure(
     dist: topological / euclidean
     """
 
-    print("[INFO]: getting hub nodes")
+    print("[INFO]: Calculating hub nodes and RP-forest leaf indices")
 
     interval = 50
     top_num = 30
@@ -998,33 +1004,20 @@ def build_global_structure(
     local_knum = 7
 
     while True:
-
-        hub_list_1 = get_hub_idx(data, random_state, hub_num, iter_num, n_trees, angular)
-        hub_list_2 = get_hub_idx(data, random_state, hub_num + interval, iter_num, n_trees, angular)
-
         results = []
         k1_list = []
         k2_list = []
 
+        hub_list_1, leaf_list_1 = hub_leaf_candidates(data, random_state, hub_num, iter_num, n_trees, angular)
+        hub_list_2, _ = hub_leaf_candidates(data, random_state, hub_num + interval, iter_num, n_trees, angular)
+
         for i in range(iter_num):
             d1 = data[hub_list_1[i]]
-            d2 = data[hub_list_2[i]]
-
-            k1 = get_k(d1)
-            k2 = get_k(d2)
-
-            # cutoff = 0.3
-            # k1 = k1[np.where(abs(k1[:,0] - k1[:,1]) > cutoff)]
-            # k2 = k2[np.where(abs(k2[:,0] - k2[:,1]) > cutoff)]
-
-            k1_max = abs(k1[:,1] - k1[:,0])
-            k1_max_ix = k1_max.argsort()[-top_num:][::-1]
-            k1 = k1[k1_max_ix]
+            k1 = get_homology(d1, local_knum, top_num, random_state)
             k1_list.append(k1)
 
-            k2_max = abs(k2[:,1] - k2[:,0])
-            k2_max_ix = k2_max.argsort()[-top_num:][::-1]
-            k2 = k2[k2_max_ix]
+            d2 = data[hub_list_2[i]]
+            k2 = get_homology(d2, local_knum, top_num, random_state)
             k2_list.append(k2)
 
         for _k1 in k1_list:
@@ -1034,25 +1027,34 @@ def build_global_structure(
                 results.append(result)
 
         val = np.mean(results)
-
         print("val: ", val)
 
         if val < cutoff:
             break
-        elif hub_num > 300:
-            print(f"hub_num: {hub_num}")
+        elif hub_num > data.shape[0] * 0.03:  # break if > 3 % of total data
+            warn(f"Hub node number set to {hub_num}!")
             break
         else:
             hub_num += interval
 
     choice = random_state.choice(iter_num)
 
-    hub_idx = set(hub_list_1[choice])  # use set for fast computation
-    hub_not_idx = set(list(range(data.shape[0])))
-    hub_not_idx -= hub_idx
+    hub_idx = hub_list_1[choice]
+    leaf_list = leaf_list_1[choice]
+    return hub_idx, leaf_list
 
-    hub_idx = list(hub_idx)  # indices of hub nodes
-    hub_not_idx = list(hub_not_idx)  # indices of other nodes
+
+def build_global_structure(
+    data,
+    hub_idx,
+    n_components,
+    a,
+    b,
+    alpha=0.005,
+    max_iter=10,
+    verbose=False,
+):
+    print("[INFO] Building global structure")
 
     #### for test only...
     from evaluation.models.dataset import get_data, save_csv
@@ -1063,24 +1065,50 @@ def build_global_structure(
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
     Z /= Z.max()
 
-    if dist == "euclidean":
-        print("[INFO] adjacency matrix using Euclidean distance")
-        P = euclidean_distances(data[hub_idx])
-    elif dist == "topological":
-        print("[INFO] adjacency matrix using approximated topological distance")
-        P = topological_distances(mst, hub_idx)
-    else:
-        ValueError("Distance measure btw hub nodes not defined!")
+    P = euclidean_distances(data[hub_idx])
     P /= P.max()
 
-    result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
-    # result = global_optimize(
-    #     P, Z, a, b, alpha=alpha, max_iter=max_iter
-    # )  # (TODO) how to optimize max_iter & alpha?
-
-    exit()
+    # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
+    result = global_optimize(
+        P, Z, a, b, alpha=alpha, max_iter=max_iter
+    )  # (TODO) how to optimize max_iter & alpha?
 
     return result
+
+
+@numba.njit()
+def embed_others(
+    data,
+    global_optimized,
+    hub_idx,
+    leaf_list,
+    knn_indices,
+):
+    # print("[INFO] Embedding other nodes")
+
+    init = np.zeros((data.shape[0], global_optimized.shape[1]))
+    init[hub_idx] = global_optimized
+
+    all_idx = np.arange(data.shape[0])
+    hub_not_idx = np.delete(all_idx, hub_idx)
+
+    # hub_idx = set(hub_idx)  # use set for fast computation
+    # hub_not_idx = set(list(range(data.shape[0])))
+    # hub_not_idx -= hub_idx
+
+    hub_idx_fin = hub_idx.copy()
+    hub_not_idx_fin = hub_not_idx.copy()
+
+    for i in hub_not_idx:
+        for j in hub_idx:
+            for k in knn_indices[j]:
+                if i == k:
+                    hub_not_idx_fin = np.delete(hub_not_idx_fin, i)
+
+    hub_not_idx = hub_not_idx_fin.copy()
+
+    return init, hub_not_idx_fin
+
 
 
 def simplicial_set_embedding(
@@ -2137,16 +2165,54 @@ class UMATO(BaseEstimator):
             print(ts(), "Construct global structure")
 
         ###### Hyung-Kwon Ko
-        global_embedding = build_global_structure(
+        hub_idx, leaf_list = hub_leaf_indices(
             data=X,
-            mst=None,
+            random_state=random_state,
+            n_trees=-1,
+            hub_num=50,
+            verbose=False,
+            angular=False,
+        )
+
+        global_optimized = build_global_structure(
+            data=X,
+            hub_idx=hub_idx,
             n_components=self.n_components,
             a=self._a,
             b=self._b,
-            random_state=random_state,
-            dist="euclidean",
-            # dist="topological",
+            alpha=0.005,
+            max_iter=10,
+            verbose=False,
         )
+
+
+        hub_idx = np.array(hub_idx)
+
+        init, z = embed_others(
+            data=X,
+            global_optimized=global_optimized,
+            hub_idx=hub_idx,
+            leaf_list=leaf_list,
+            knn_indices=self._knn_indices,
+        )
+
+        t1 = time.time()
+
+        init, z = embed_others(
+            data=X,
+            global_optimized=global_optimized,
+            hub_idx=hub_idx,
+            leaf_list=leaf_list,
+            knn_indices=self._knn_indices,
+        )
+
+        t2 = time.time()
+
+        print(init.shape)
+        print(len(z))
+        print(t2-t1)
+        exit()
+
 
         if self.verbose:
             print(ts(), "Construct local structure")
