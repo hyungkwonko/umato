@@ -20,6 +20,8 @@ tqdm = "*"
 tadasets = "*"
 ipython = "*"
 umap-learn = "*"
+cython = "*"
+gudhi = "*"
 
 [requires]
 python_version = "3.7"

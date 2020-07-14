@@ -68,8 +68,6 @@ try:
 except ImportError:
     _HAVE_PYNNDESCENT = False
 
-import gudhi as gd
-
 locale.setlocale(locale.LC_NUMERIC, "C")
 
 INT32_MIN = np.iinfo(np.int32).min + 1
@@ -914,57 +912,8 @@ def make_epochs_per_sample(weights, n_epochs):
 
 ##### Hyung-Kwon Ko
 
-def get_hub_idx(
-    data,
-    random_state,
-    hub_num,
-    iter_num=5,
-    n_trees=-1,
-    angular=False,
-    ):
-
-    hub_idxs = []
-
-    for _ in range(iter_num):
-
-        if n_trees < 0:
-            n_trees = 5 + int(
-                round((data.shape[0]) ** 0.5 / 20.0)
-            )  # (TODO) how to optimize this?
-
-        rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(
-            np.int64
-        )  # hub node extraction using RP-forest
-        rp_forest = make_forest(
-            data, data.shape[0] // (hub_num // n_trees), n_trees, rng_state, angular
-        )  ######### RP FOREST
-        leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
-
-        hub_idx = []
-        for candidate in leaf_array:
-            val = random_state.choice(candidate)
-            if val > 0:
-                hub_idx.append(val)
-        hub_idxs.append(hub_idx)
-
-    return hub_idxs
 
 
-
-def get_k(data, local_knum):
-    dist = pairwise_distances(data, data)
-    dist /= dist.max()
-
-    nn_index = np.argpartition(dist, kth=local_knum-1, axis=-1)[:, :local_knum]  # kill using local connectivity
-
-    for i in range(len(dist)):
-        dist[i][nn_index[i]] = np.random.random(local_knum) * 0.1
-
-    rc = gd.RipsComplex(distance_matrix=dist, max_edge_length=1.0)
-    rc_tree = rc.create_simplex_tree(max_dimension=2)
-    barcodes = rc_tree.persistence()
-
-    return rc_tree.persistence_intervals_in_dimension(1)
 
 
 def build_global_structure(
@@ -977,8 +926,8 @@ def build_global_structure(
     dist="topological",
     alpha=0.005,
     n_trees=-1,
-    max_iter=10,
-    hub_num=50,
+    max_iter=20,
+    hub_number=400,
     verbose=False,
     angular=False,
 ):
@@ -989,65 +938,33 @@ def build_global_structure(
     dist: topological / euclidean
     """
 
-    print("[INFO]: getting hub nodes")
+    hub_idxs = []
 
-    interval = 50
-    top_num = 30
-    iter_num = 5
-    cutoff = 0.05
-    local_knum = 7
+    for _ in range(5):
 
-    while True:
+        if n_trees < 0:
+            n_trees = 5 + int(
+                round((data.shape[0]) ** 0.5 / 20.0)
+            )  # (TODO) how to optimize this?
 
-        hub_list_1 = get_hub_idx(data, random_state, hub_num, iter_num, n_trees, angular)
-        hub_list_2 = get_hub_idx(data, random_state, hub_num + interval, iter_num, n_trees, angular)
+        rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(
+            np.int64
+        )  # hub node extraction using RP-forest
+        rp_forest = make_forest(
+            data, data.shape[0] // (hub_number // n_trees), n_trees, rng_state, angular
+        )  ######### RP FOREST
+        leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
 
-        results = []
-        k1_list = []
-        k2_list = []
+        hub_idx = []
+        for candidate in leaf_array:
+            val = random_state.choice(candidate)
+            if val > 0:
+                hub_idx.append(val)
+        hub_idxs.append(hub_idx)
 
-        for i in range(iter_num):
-            d1 = data[hub_list_1[i]]
-            d2 = data[hub_list_2[i]]
-
-            k1 = get_k(d1)
-            k2 = get_k(d2)
-
-            # cutoff = 0.3
-            # k1 = k1[np.where(abs(k1[:,0] - k1[:,1]) > cutoff)]
-            # k2 = k2[np.where(abs(k2[:,0] - k2[:,1]) > cutoff)]
-
-            k1_max = abs(k1[:,1] - k1[:,0])
-            k1_max_ix = k1_max.argsort()[-top_num:][::-1]
-            k1 = k1[k1_max_ix]
-            k1_list.append(k1)
-
-            k2_max = abs(k2[:,1] - k2[:,0])
-            k2_max_ix = k2_max.argsort()[-top_num:][::-1]
-            k2 = k2[k2_max_ix]
-            k2_list.append(k2)
-
-        for _k1 in k1_list:
-            for _k2 in k2_list:
-                # result = gd.bottleneck_distance(_k1, _k2, 0.01)
-                result = gd.bottleneck_distance(_k1, _k2)
-                results.append(result)
-
-        val = np.mean(results)
-
-        print("val: ", val)
-
-        if val < cutoff:
-            break
-        elif hub_num > 300:
-            print(f"hub_num: {hub_num}")
-            break
-        else:
-            hub_num += interval
-
-    choice = random_state.choice(iter_num)
-
-    hub_idx = set(hub_list_1[choice])  # use set for fast computation
+    print(hub_idxs)
+    
+    hub_idx = set(hub_idx)  # use set for fast computation
     hub_not_idx = set(list(range(data.shape[0])))
     hub_not_idx -= hub_idx
 
@@ -1056,12 +973,25 @@ def build_global_structure(
 
     #### for test only...
     from evaluation.models.dataset import get_data, save_csv
-    _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
+    _, label = get_data("cifar10")  # spheres, mnist, fmni
+
+    # n = [1000] * 10
+    # nlist = [[ix] * e for ix, e in enumerate(n)]
+    # nlist = sum(nlist, [])
+    # label = np.array(nlist)
+
     print(np.unique(label[hub_idx], return_counts=True))  # get count per class
+    # print(hub_idx)
+    exit()
+
+    # exit()
 
     from sklearn.decomposition import PCA
+
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
     Z /= Z.max()
+
+    t1 = time.time()
 
     if dist == "euclidean":
         print("[INFO] adjacency matrix using Euclidean distance")
@@ -1073,10 +1003,24 @@ def build_global_structure(
         ValueError("Distance measure btw hub nodes not defined!")
     P /= P.max()
 
+    t2 = time.time()
+
+    # print(len(hub_idx))
+    # print(P.shape)
+    # print(t2 - t1)
+    # exit()
+
     result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
     # result = global_optimize(
     #     P, Z, a, b, alpha=alpha, max_iter=max_iter
     # )  # (TODO) how to optimize max_iter & alpha?
+
+    # print(result.shape)
+    import pandas as pd
+    data[hub_idx] /= np.max(data[hub_idx])
+    df = pd.DataFrame(data[hub_idx])
+    df['label'] = label[hub_idx]
+    df.to_csv('r1.csv', index=False)
 
     exit()
 

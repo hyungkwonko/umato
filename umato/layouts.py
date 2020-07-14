@@ -600,7 +600,7 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig
                 plt.scatter(Z[:,0], Z[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
                 cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
                 cbar.set_ticks(np.arange(10))
-                plt.title('Fashion MNIST Embedded')
+                plt.title('Spheres Embedded')
                 plt.savefig(f'./tmp/{i}.png')
                 plt.close()
 
