@@ -917,16 +917,12 @@ def make_epochs_per_sample(weights, n_epochs):
 ############### Hyung-Kwon Ko
 @numba.njit()
 def disjoint_nn(
-    data,
-    sorted_index,
-    hub_num,
+    data, sorted_index, hub_num,
 ):
 
     index = np.ones(data.shape[0])
     leaf_num = int(np.ceil(data.shape[0] / hub_num))
     disjoints = []
-    # disjoints = np.zeros((leaf_num, hub_num))
-
 
     for i in range(hub_num):
         tmp = 0
@@ -950,7 +946,7 @@ def disjoint_nn(
             distance = 0.0
             if sorted_index[target] > -1:
                 for dim in range(data.shape[1]):
-                    distance += (data[source][dim] - data[target][dim])**2
+                    distance += (data[source][dim] - data[target][dim]) ** 2
                 distances[target] = np.sqrt(distance)
 
         # append other elements
@@ -971,18 +967,36 @@ def disjoint_nn(
 
     return np.array(disjoints)
 
-# def 
+# @numba.njit()
+def pick_hubs(
+    disjoint,
+    random_state,
+):
+
+    hub_idx = []
+    (hub_num, leaf_num) = disjoint.shape
+
+    # append until second to last element
+    for i in range(hub_num - 1):
+        choice = random_state.choice(disjoint[i])
+        hub_idx.append(choice)
+
+    # append last element
+    last = disjoint[hub_num - 1]
+    last = last[last != -1]
+    choice = random_state.choice(last)
+    hub_idx.append(choice)
+
+    if hub_num != len(hub_idx):
+        ValueError(f"hub_num({hub_num}) is not the same as hub_idx({hub_idx})!")
+
+    return hub_idx
 
 
 
 def hub_leaf_candidates(
-    data,
-    random_state,
-    hub_num,
-    iter_num=5,
-    n_trees=-1,
-    angular=False,
-    ):
+    data, random_state, hub_num, iter_num=5, n_trees=-1, angular=False,
+):
 
     hub_idxs = []
     leaf_arrays = []
@@ -1017,12 +1031,13 @@ def hub_leaf_candidates(
     return hub_idxs, leaf_arrays
 
 
-
 def get_homology(data, local_knum, top_num, random_state):
     dist = pairwise_distances(data, data)
     dist /= dist.max()
 
-    nn_index = np.argpartition(dist, kth=local_knum-1, axis=-1)[:, :local_knum]  # kill using local connectivity
+    nn_index = np.argpartition(dist, kth=local_knum - 1, axis=-1)[
+        :, :local_knum
+    ]  # kill using local connectivity
 
     for i in range(len(dist)):
         dist[i][nn_index[i]] = random_state.random(local_knum) * 0.1
@@ -1031,11 +1046,10 @@ def get_homology(data, local_knum, top_num, random_state):
     rc_tree = rc.create_simplex_tree(max_dimension=2)
     barcodes = rc_tree.persistence()
 
-
     hom1 = rc_tree.persistence_intervals_in_dimension(1)
     # cutoff = 0.3
     # hom1 = hom1[np.where(abs(hom1[:,0] - hom1[:,1]) > cutoff)]
-    hom1_max = abs(hom1[:,1] - hom1[:,0])
+    hom1_max = abs(hom1[:, 1] - hom1[:, 0])
     hom1_max_ix = hom1_max.argsort()[-top_num:][::-1]
 
     return hom1[hom1_max_ix]
@@ -1066,21 +1080,25 @@ def hub_leaf_indices(
     local_knum = 7
 
     if debug:
-        hub_list_1, leaf_list_1 = hub_leaf_candidates(data, random_state, hub_num, iter_num, n_trees, angular)
+        hub_list_1, leaf_list_1 = hub_leaf_candidates(
+            data, random_state, hub_num, iter_num, n_trees, angular
+        )
         choice = random_state.choice(iter_num)
         hub_idx = hub_list_1[choice]
         leaf_list = leaf_list_1[choice]
         return hub_idx, leaf_list
-
-
 
     while True:
         results = []
         k1_list = []
         k2_list = []
 
-        hub_list_1, leaf_list_1 = hub_leaf_candidates(data, random_state, hub_num, iter_num, n_trees, angular)
-        hub_list_2, _ = hub_leaf_candidates(data, random_state, hub_num + interval, iter_num, n_trees, angular)
+        hub_list_1, leaf_list_1 = hub_leaf_candidates(
+            data, random_state, hub_num, iter_num, n_trees, angular
+        )
+        hub_list_2, _ = hub_leaf_candidates(
+            data, random_state, hub_num + interval, iter_num, n_trees, angular
+        )
 
         for i in range(iter_num):
             d1 = data[hub_list_1[i]]
@@ -1116,14 +1134,7 @@ def hub_leaf_indices(
 
 
 def build_global_structure(
-    data,
-    hub_idx,
-    n_components,
-    a,
-    b,
-    alpha=0.005,
-    max_iter=10,
-    verbose=False,
+    data, hub_idx, n_components, a, b, alpha=0.005, max_iter=10, verbose=False,
 ):
     print("[INFO] Building global structure")
 
@@ -1133,6 +1144,7 @@ def build_global_structure(
     # print(np.unique(label[hub_idx], return_counts=True))  # get count per class
 
     from sklearn.decomposition import PCA
+
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
     Z /= Z.max()
 
@@ -1149,11 +1161,7 @@ def build_global_structure(
 
 @numba.njit()
 def embed_others_nn(
-    data,
-    init,
-    hub_idx,
-    leaf_list,
-    knn_indices,
+    data, init, hub_idx, leaf_list, knn_indices,
 ):
     # print("[INFO] Embedding other nodes using NN information")
 
@@ -1185,10 +1193,7 @@ def embed_others_nn(
 
 @numba.njit()
 def embed_others_leaf(
-    data,
-    init,
-    hub_idx,
-    leaf_list,
+    data, init, hub_idx, leaf_list,
 ):
     # print("[INFO] Embedding other nodes")
 
@@ -1202,7 +1207,6 @@ def embed_others_leaf(
     # hub_not_idx_fin = hub_not_idx.copy()
     hub_idx = set(hub_idx)
     hub_idx_fin = hub_idx.copy()
-
 
     for leaf in leaf_list:
         hub_, hub_not_ = [], []
@@ -1218,7 +1222,7 @@ def embed_others_leaf(
                         break
                 if flag == 0:
                     hub_not_.append(j)
-        
+
         hub_ = np.array(hub_)
         hub_not_ = np.array(hub_not_)
         if len(hub_) > 0 and len(hub_not_) > 0:
@@ -1245,9 +1249,6 @@ def embed_others_leaf(
             init[l] /= num_log[l]
 
     return init, hub_idx_fin
-
-
-
 
 
 def simplicial_set_embedding(
@@ -2305,11 +2306,6 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Construct global structure")
 
-
-
-
-
-
         ###### Hyung-Kwon Ko
 
         hub_num = 300
@@ -2318,23 +2314,17 @@ class UMATO(BaseEstimator):
         index, freq = np.unique(flat_indices, return_counts=True)
         sorted_index = index[freq.argsort()]  # sorted index in decreasing order
 
-        disjoint = disjoint_nn(
-            data=X,
-            sorted_index=sorted_index,
-            hub_num=hub_num,
+        # get disjoint NN matrix
+        disjoint = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
+
+        # get hub idx from disjoint
+        hub_idx = pick_hubs(
+            disjoint=disjoint,
+            random_state=random_state,
         )
-        print(disjoint.shape)
-        print(disjoint[-1])
-        z1, z2 = np.unique(disjoint.flatten(), return_counts=True)
-        print(len(z1))
-        print(np.sum(z2))
+
         exit()
 
-        # get hub idx from disjoint (USE NUMBA for FAST ACCELERATION)
-        # hub_idx = pick_hubs(
-        #     disjoint=disjoint,
-        #     random_state=random_state,
-        # )
 
         hub_idx, leaf_list = hub_leaf_indices(
             data=X,
@@ -2375,25 +2365,23 @@ class UMATO(BaseEstimator):
 
         from evaluation.models.dataset import get_data, save_csv
         import matplotlib.pyplot as plt
+
         _, label = get_data("cifar10")  # spheres, mnist, fmnist, cifar10
 
         init = init[hub_idx]
         label = label[hub_idx]
 
-        plt.scatter(init[:,0], init[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
-        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
+        plt.scatter(init[:, 0], init[:, 1], s=8.0, c=label, cmap="Spectral", alpha=1.0)
+        cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
         cbar.set_ticks(np.arange(10))
-        plt.title('Spheres Embedded')
-        plt.savefig(f'./tmp/z1.png')
+        plt.title("Spheres Embedded")
+        plt.savefig(f"./tmp/z1.png")
         plt.close()
 
         exit()
 
         init, hub_idx = embed_others_leaf(
-            data=X,
-            init=init,
-            hub_idx=hub_idx,
-            leaf_list=leaf_list,
+            data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
         )
 
         # init = init[hub_idx]
@@ -2401,20 +2389,13 @@ class UMATO(BaseEstimator):
 
         _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
 
-        plt.scatter(init[:,0], init[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
-        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
+        plt.scatter(init[:, 0], init[:, 1], s=8.0, c=label, cmap="Spectral", alpha=1.0)
+        cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
         cbar.set_ticks(np.arange(10))
-        plt.title('Spheres Embedded')
-        plt.savefig(f'./tmp/z2.png')
+        plt.title("Spheres Embedded")
+        plt.savefig(f"./tmp/z2.png")
         plt.close()
         exit()
-
-
-
-
-
-
-
 
         if self.verbose:
             print(ts(), "Construct local structure")
