@@ -912,7 +912,68 @@ def make_epochs_per_sample(weights, n_epochs):
     return result
 
 
-##### Hyung-Kwon Ko
+############### Hyung-Kwon Ko
+############### Hyung-Kwon Ko
+############### Hyung-Kwon Ko
+@numba.njit()
+def disjoint_nn(
+    data,
+    sorted_index,
+    hub_num,
+):
+
+    index = np.ones(data.shape[0])
+    leaf_num = int(np.ceil(data.shape[0] / hub_num))
+    disjoints = []
+    # disjoints = np.zeros((leaf_num, hub_num))
+
+
+    for i in range(hub_num):
+        tmp = 0
+        source = -1
+        disjoint = []
+
+        # append the first element
+        for ix in range(len(sorted_index)):
+            if sorted_index[ix] > -1:
+                source = sorted_index[ix]
+                disjoint.append(source)
+                sorted_index[ix] = -1
+                tmp += 1
+                break
+        if source == -1:
+            break  # break if all indices == -1
+
+        # get distance for each element
+        distances = np.ones(len(sorted_index)) * np.inf
+        for target in range(len(sorted_index)):
+            distance = 0.0
+            if sorted_index[target] > -1:
+                for dim in range(data.shape[1]):
+                    distance += (data[source][dim] - data[target][dim])**2
+                distances[target] = np.sqrt(distance)
+
+        # append other elements
+        for _ in range(leaf_num - 1):
+            val = min(distances)
+            if np.isinf(val):
+                disjoint = disjoint + [-1] * (leaf_num - tmp)
+                break
+            else:
+                min_ix = np.argmin(distances)
+                target_ix = sorted_index[min_ix]
+                disjoint.append(target_ix)
+                distances[min_ix] = np.inf
+                sorted_index[min_ix] = -1
+                tmp += 1
+
+        disjoints.append(disjoint)
+
+    return np.array(disjoints)
+
+# def 
+
+
 
 def hub_leaf_candidates(
     data,
@@ -2245,12 +2306,41 @@ class UMATO(BaseEstimator):
             print(ts(), "Construct global structure")
 
 
+
+
+
+
         ###### Hyung-Kwon Ko
+
+        hub_num = 300
+
+        flat_indices = self._knn_indices.flatten()  # flattening all knn indices
+        index, freq = np.unique(flat_indices, return_counts=True)
+        sorted_index = index[freq.argsort()]  # sorted index in decreasing order
+
+        disjoint = disjoint_nn(
+            data=X,
+            sorted_index=sorted_index,
+            hub_num=hub_num,
+        )
+        print(disjoint.shape)
+        print(disjoint[-1])
+        z1, z2 = np.unique(disjoint.flatten(), return_counts=True)
+        print(len(z1))
+        print(np.sum(z2))
+        exit()
+
+        # get hub idx from disjoint (USE NUMBA for FAST ACCELERATION)
+        # hub_idx = pick_hubs(
+        #     disjoint=disjoint,
+        #     random_state=random_state,
+        # )
+
         hub_idx, leaf_list = hub_leaf_indices(
             data=X,
             random_state=random_state,
             n_trees=-1,
-            hub_num=150,
+            hub_num=300,
             verbose=False,
             angular=False,
             # debug=False,
@@ -2268,33 +2358,9 @@ class UMATO(BaseEstimator):
             verbose=False,
         )
 
-
-
-
         hub_idx = np.array(hub_idx)
-
         init = np.zeros((X.shape[0], global_optimized.shape[1]))
         init[hub_idx] = global_optimized
-
-        t1 = time.time()
-
-        # leaf_list = rptree_leaf_array(self._rp_forest)
-        # print(type(leaf_list))
-        # print(self._rp_forest)
-        # print(leaf_list.shape)
-        # exit()
-        # print(leaf_list.shape)
-        # z = leaf_list.flatten()
-        # index = np.argwhere(z==-1)
-        # zz = np.delete(z, index)
-        # print(len(zz))
-        # exit()
-
-        # print(leaf_list)
-        # print(leaf_list[0])
-        # print(leaf_list[1])
-        # print(leaf_list[2])
-        # exit()
 
         for _ in range(3):
 
@@ -2307,21 +2373,9 @@ class UMATO(BaseEstimator):
             )
             print(len(hub_idx))
 
-        # print(np.isinf(init).any())
-        # print("z====: ", np.isinf(leaf_list).any())
-
         from evaluation.models.dataset import get_data, save_csv
         import matplotlib.pyplot as plt
-        _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-
-
-        # for zz in leaf_list:
-        #     index = np.argwhere(zz==-1)
-        #     tmp = np.delete(zz, index)
-        #     if len(tmp) > 30:
-        #         print(np.unique(label[tmp], return_counts=True))  # get count per class
-
-        # exit()
+        _, label = get_data("cifar10")  # spheres, mnist, fmnist, cifar10
 
         init = init[hub_idx]
         label = label[hub_idx]
@@ -2333,6 +2387,8 @@ class UMATO(BaseEstimator):
         plt.savefig(f'./tmp/z1.png')
         plt.close()
 
+        exit()
+
         init, hub_idx = embed_others_leaf(
             data=X,
             init=init,
@@ -2340,16 +2396,10 @@ class UMATO(BaseEstimator):
             leaf_list=leaf_list,
         )
 
-        # print(np.isinf(init).any())
-        # print(len(hub_idx))
-        # print(len(init))
-        print(init)
-
         # init = init[hub_idx]
         # label = label[hub_idx]
 
         _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-
 
         plt.scatter(init[:,0], init[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
         cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
@@ -2362,10 +2412,7 @@ class UMATO(BaseEstimator):
 
 
 
-        t2 = time.time()
 
-        print(init.shape)
-        print(t2-t1)
 
 
 
