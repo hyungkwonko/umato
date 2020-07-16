@@ -68,6 +68,8 @@ try:
 except ImportError:
     _HAVE_PYNNDESCENT = False
 
+import gudhi as gd
+
 locale.setlocale(locale.LC_NUMERIC, "C")
 
 INT32_MIN = np.iinfo(np.int32).min + 1
@@ -912,35 +914,19 @@ def make_epochs_per_sample(weights, n_epochs):
 
 ##### Hyung-Kwon Ko
 
-
-
-
-
-def build_global_structure(
+def hub_leaf_candidates(
     data,
-    mst,
-    n_components,
-    a,
-    b,
     random_state,
-    dist="topological",
-    alpha=0.005,
+    hub_num,
+    iter_num=5,
     n_trees=-1,
-    max_iter=20,
-    hub_number=400,
-    verbose=False,
     angular=False,
-):
-    """
-    Author: Hyung-Kwon Ko
-    build the global structure 
-
-    dist: topological / euclidean
-    """
+    ):
 
     hub_idxs = []
+    leaf_arrays = []
 
-    for _ in range(5):
+    for _ in range(iter_num):
 
         if n_trees < 0:
             n_trees = 5 + int(
@@ -951,80 +937,256 @@ def build_global_structure(
             np.int64
         )  # hub node extraction using RP-forest
         rp_forest = make_forest(
-            data, data.shape[0] // (hub_number // n_trees), n_trees, rng_state, angular
+            data, data.shape[0] // (hub_num // n_trees), n_trees, rng_state, angular
         )  ######### RP FOREST
         leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
+        leaf_arrays.append(leaf_array)
 
         hub_idx = []
         for candidate in leaf_array:
             val = random_state.choice(candidate)
-            if val > 0:
-                hub_idx.append(val)
+            if val > -1:
+                if val not in hub_idx:  # prevent duplicates
+                    hub_idx.append(val)
+            if len(hub_idx) >= hub_num:
+                break
+
         hub_idxs.append(hub_idx)
 
-    print(hub_idxs)
-    
-    hub_idx = set(hub_idx)  # use set for fast computation
-    hub_not_idx = set(list(range(data.shape[0])))
-    hub_not_idx -= hub_idx
+    return hub_idxs, leaf_arrays
 
-    hub_idx = list(hub_idx)  # indices of hub nodes
-    hub_not_idx = list(hub_not_idx)  # indices of other nodes
+
+
+def get_homology(data, local_knum, top_num, random_state):
+    dist = pairwise_distances(data, data)
+    dist /= dist.max()
+
+    nn_index = np.argpartition(dist, kth=local_knum-1, axis=-1)[:, :local_knum]  # kill using local connectivity
+
+    for i in range(len(dist)):
+        dist[i][nn_index[i]] = random_state.random(local_knum) * 0.1
+
+    rc = gd.RipsComplex(distance_matrix=dist, max_edge_length=1.0)
+    rc_tree = rc.create_simplex_tree(max_dimension=2)
+    barcodes = rc_tree.persistence()
+
+
+    hom1 = rc_tree.persistence_intervals_in_dimension(1)
+    # cutoff = 0.3
+    # hom1 = hom1[np.where(abs(hom1[:,0] - hom1[:,1]) > cutoff)]
+    hom1_max = abs(hom1[:,1] - hom1[:,0])
+    hom1_max_ix = hom1_max.argsort()[-top_num:][::-1]
+
+    return hom1[hom1_max_ix]
+
+
+def hub_leaf_indices(
+    data,
+    random_state,
+    n_trees=-1,
+    hub_num=50,
+    verbose=False,
+    angular=False,
+    debug=False,
+):
+    """
+    Author: Hyung-Kwon Ko
+    build the global structure 
+
+    dist: topological / euclidean
+    """
+
+    print("[INFO]: Calculating hub nodes and RP-forest leaf indices")
+
+    interval = 50
+    top_num = 30
+    iter_num = 5
+    cutoff = 0.05
+    local_knum = 7
+
+    if debug:
+        hub_list_1, leaf_list_1 = hub_leaf_candidates(data, random_state, hub_num, iter_num, n_trees, angular)
+        choice = random_state.choice(iter_num)
+        hub_idx = hub_list_1[choice]
+        leaf_list = leaf_list_1[choice]
+        return hub_idx, leaf_list
+
+
+
+    while True:
+        results = []
+        k1_list = []
+        k2_list = []
+
+        hub_list_1, leaf_list_1 = hub_leaf_candidates(data, random_state, hub_num, iter_num, n_trees, angular)
+        hub_list_2, _ = hub_leaf_candidates(data, random_state, hub_num + interval, iter_num, n_trees, angular)
+
+        for i in range(iter_num):
+            d1 = data[hub_list_1[i]]
+            k1 = get_homology(d1, local_knum, top_num, random_state)
+            k1_list.append(k1)
+
+            d2 = data[hub_list_2[i]]
+            k2 = get_homology(d2, local_knum, top_num, random_state)
+            k2_list.append(k2)
+
+        for _k1 in k1_list:
+            for _k2 in k2_list:
+                # result = gd.bottleneck_distance(_k1, _k2, 0.01)
+                result = gd.bottleneck_distance(_k1, _k2)
+                results.append(result)
+
+        val = np.mean(results)
+        print("val: ", val)
+
+        if val < cutoff:
+            break
+        elif hub_num > 300:  # break if > 300
+            warn(f"Hub node number set to {hub_num}!")
+            break
+        else:
+            hub_num += interval
+
+    choice = random_state.choice(iter_num)
+
+    hub_idx = hub_list_1[choice]
+    leaf_list = leaf_list_1[choice]
+    return hub_idx, leaf_list
+
+
+def build_global_structure(
+    data,
+    hub_idx,
+    n_components,
+    a,
+    b,
+    alpha=0.005,
+    max_iter=10,
+    verbose=False,
+):
+    print("[INFO] Building global structure")
 
     #### for test only...
-    from evaluation.models.dataset import get_data, save_csv
-    _, label = get_data("cifar10")  # spheres, mnist, fmni
-
-    # n = [1000] * 10
-    # nlist = [[ix] * e for ix, e in enumerate(n)]
-    # nlist = sum(nlist, [])
-    # label = np.array(nlist)
-
-    print(np.unique(label[hub_idx], return_counts=True))  # get count per class
-    # print(hub_idx)
-    exit()
-
-    # exit()
+    # from evaluation.models.dataset import get_data, save_csv
+    # _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
+    # print(np.unique(label[hub_idx], return_counts=True))  # get count per class
 
     from sklearn.decomposition import PCA
-
     Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
     Z /= Z.max()
 
-    t1 = time.time()
-
-    if dist == "euclidean":
-        print("[INFO] adjacency matrix using Euclidean distance")
-        P = euclidean_distances(data[hub_idx])
-    elif dist == "topological":
-        print("[INFO] adjacency matrix using approximated topological distance")
-        P = topological_distances(mst, hub_idx)
-    else:
-        ValueError("Distance measure btw hub nodes not defined!")
+    P = euclidean_distances(data[hub_idx])
     P /= P.max()
 
-    t2 = time.time()
-
-    # print(len(hub_idx))
-    # print(P.shape)
-    # print(t2 - t1)
-    # exit()
-
-    result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
-    # result = global_optimize(
-    #     P, Z, a, b, alpha=alpha, max_iter=max_iter
-    # )  # (TODO) how to optimize max_iter & alpha?
-
-    # print(result.shape)
-    import pandas as pd
-    data[hub_idx] /= np.max(data[hub_idx])
-    df = pd.DataFrame(data[hub_idx])
-    df['label'] = label[hub_idx]
-    df.to_csv('r1.csv', index=False)
-
-    exit()
+    # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
+    result = global_optimize(
+        P, Z, a, b, alpha=alpha, max_iter=max_iter
+    )  # (TODO) how to optimize max_iter & alpha?
 
     return result
+
+
+@numba.njit()
+def embed_others_nn(
+    data,
+    init,
+    hub_idx,
+    leaf_list,
+    knn_indices,
+):
+    # print("[INFO] Embedding other nodes using NN information")
+
+    all_idx = np.arange(data.shape[0])
+    hub_not_idx = np.delete(all_idx, hub_idx)
+
+    num_log = np.zeros(data.shape[0])
+    num_log[hub_idx] = -1
+
+    hub_idx = set(hub_idx)
+    hub_idx_fin = hub_idx.copy()
+
+    for i in hub_idx:
+        for j, e in enumerate(knn_indices[i]):
+            if j > 5:  # use only 5 NNs
+                break
+            if num_log[e] > -1:
+                init[e] += init[i] + np.random.uniform(-0.001, 0.001, size=2)
+                num_log[e] += 1
+                hub_idx_fin.add(e)
+                # break
+
+    for k in range(data.shape[0]):
+        if num_log[k] > 0:
+            init[k] /= num_log[k]
+
+    return init, np.array(list(hub_idx_fin))
+
+
+@numba.njit()
+def embed_others_leaf(
+    data,
+    init,
+    hub_idx,
+    leaf_list,
+):
+    # print("[INFO] Embedding other nodes")
+
+    all_idx = np.arange(data.shape[0])
+    hub_not_idx = np.delete(all_idx, hub_idx)
+
+    num_log = np.zeros(data.shape[0])
+    num_log[hub_idx] = -1
+
+    # hub_not_idx = set(hub_not_idx)
+    # hub_not_idx_fin = hub_not_idx.copy()
+    hub_idx = set(hub_idx)
+    hub_idx_fin = hub_idx.copy()
+
+
+    for leaf in leaf_list:
+        hub_, hub_not_ = [], []
+        for j in leaf:
+            if j == -1:
+                break
+            else:
+                flag = 0
+                for k in hub_idx:
+                    if k == j:
+                        hub_.append(j)
+                        flag = 1
+                        break
+                if flag == 0:
+                    hub_not_.append(j)
+        
+        hub_ = np.array(hub_)
+        hub_not_ = np.array(hub_not_)
+        if len(hub_) > 0 and len(hub_not_) > 0:
+            for kk in hub_not_:
+                hub_idx_fin.add(kk)
+                jj = np.random.choice(hub_)
+                # for jj in hub_:
+                init[kk] += init[jj]  # + np.random.random() * 0.05
+                num_log[kk] += 1
+
+                # if j == i:
+                #     index = np.argwhere(leaf==-1)
+                #     tmp = np.delete(leaf, index)
+                #     index = np.argwhere(tmp==i)
+                #     tmp2 = np.delete(tmp, index)
+                #     print("tmp2: ", tmp2)
+                #     for k in tmp2:
+                #         init[i] += init[k] + np.random.random() * 0.05
+                #         num_log[i] += 1
+                #         hub_idx_fin.add(i)
+
+    for l in range(data.shape[0]):
+        if num_log[l] > 0:
+            init[l] /= num_log[l]
+
+    return init, hub_idx_fin
+
+
+
 
 
 def simplicial_set_embedding(
@@ -1498,6 +1660,7 @@ class UMATO(BaseEstimator):
         force_approximation_algorithm=False,
         verbose=False,
         unique=False,
+        ll=None,
     ):
         self.n_neighbors = n_neighbors
         self.metric = metric
@@ -1528,6 +1691,7 @@ class UMATO(BaseEstimator):
         self.force_approximation_algorithm = force_approximation_algorithm
         self.verbose = verbose
         self.unique = unique
+        self.ll = ll
 
         self.a = a
         self.b = b
@@ -2080,17 +2244,196 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Construct global structure")
 
+
+
+        ####### Hyung-Kwon Ko
+        ####### Hyung-Kwon Ko
+        ####### Hyung-Kwon Ko
+        # print(self._knn_indices[5000:5100])
+        # print(self._knn_indices[6000:6100])
+        # print(self._knn_indices[7000:7100])
+        # exit()
+
+        from evaluation.models.dataset import get_data, save_csv
+        import matplotlib.pyplot as plt
+        # print(np.unique(label, return_counts=True))
+
+        ix = np.arange(X.shape[0])
+        ix2 = ix[self.ll < 10]
+        # print(ix2)
+        # self.ll = self.ll[ix2]
+        # self._knn_indices = self._knn_indices[ix2]
+
+        scores = np.array([])
+        for i in ix:
+        # for i in range(len(self._knn_indices)):
+            score = 0
+            for j in range(1, 15):
+                if self.ll[self._knn_indices[i][j]] == self.ll[self._knn_indices[i][0]]:
+                    score += 1.0 / (15 - 1)
+            scores = np.append(scores, score)
+        print(len(scores))
+        print(np.mean(scores))
+
+        scores = np.array([])
+        for i in ix2:
+        # for i in range(len(self._knn_indices)):
+            score = 0
+            for j in range(1, 15):
+                if self.ll[self._knn_indices[i][j]] == self.ll[self._knn_indices[i][0]]:
+                    score += 1.0 / (15 - 1)
+            scores = np.append(scores, score)
+        print(len(scores))
+        print(np.mean(scores))
+
+        exit()
+
+
+
+
+
+        # zz = self._knn_indices.flatten()
+        # zz1, zz2 = np.unique(zz, return_counts=True)
+
+        # zz3 = np.argsort(zz2)[:1000]  # top 150 unpopular nodes
+        # # zz3 = np.argsort(zz2)[-300:]  # top 150 popular nodes
+
+        # print("zz1: ", zz1)
+        # print("zz2: ", zz2)
+
+        # for _ in range(5):
+        #     flattened = self._knn_indices[zz3].flatten()
+        #     zz3, zz4 = np.unique(flattened, return_counts=True)
+        #     print("zz3: ", zz3)
+        #     print("zz4: ", zz4)
+        #     print(len(zz4))
+
+        # exit()
+
+
         ###### Hyung-Kwon Ko
-        global_embedding = build_global_structure(
+        hub_idx, leaf_list = hub_leaf_indices(
             data=X,
-            mst=None,
+            random_state=random_state,
+            n_trees=-1,
+            hub_num=150,
+            verbose=False,
+            angular=False,
+            # debug=False,
+            debug=True,
+        )
+
+        global_optimized = build_global_structure(
+            data=X,
+            hub_idx=hub_idx,
             n_components=self.n_components,
             a=self._a,
             b=self._b,
-            random_state=random_state,
-            dist="euclidean",
-            # dist="topological",
+            alpha=0.005,
+            max_iter=10,
+            verbose=False,
         )
+
+
+
+
+        hub_idx = np.array(hub_idx)
+
+        init = np.zeros((X.shape[0], global_optimized.shape[1]))
+        init[hub_idx] = global_optimized
+
+        t1 = time.time()
+
+        # leaf_list = rptree_leaf_array(self._rp_forest)
+        # print(type(leaf_list))
+        # print(self._rp_forest)
+        # print(leaf_list.shape)
+        # exit()
+        # print(leaf_list.shape)
+        # z = leaf_list.flatten()
+        # index = np.argwhere(z==-1)
+        # zz = np.delete(z, index)
+        # print(len(zz))
+        # exit()
+
+        # print(leaf_list)
+        # print(leaf_list[0])
+        # print(leaf_list[1])
+        # print(leaf_list[2])
+        # exit()
+
+        for _ in range(3):
+
+            init, hub_idx = embed_others_nn(
+                data=X,
+                init=init,
+                hub_idx=hub_idx,
+                leaf_list=leaf_list,
+                knn_indices=self._knn_indices,
+            )
+            print(len(hub_idx))
+
+        # print(np.isinf(init).any())
+        # print("z====: ", np.isinf(leaf_list).any())
+
+        from evaluation.models.dataset import get_data, save_csv
+        import matplotlib.pyplot as plt
+        _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
+
+
+        # for zz in leaf_list:
+        #     index = np.argwhere(zz==-1)
+        #     tmp = np.delete(zz, index)
+        #     if len(tmp) > 30:
+        #         print(np.unique(label[tmp], return_counts=True))  # get count per class
+
+        # exit()
+
+        init = init[hub_idx]
+        label = label[hub_idx]
+
+        plt.scatter(init[:,0], init[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
+        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
+        cbar.set_ticks(np.arange(10))
+        plt.title('Spheres Embedded')
+        plt.savefig(f'./tmp/z1.png')
+        plt.close()
+
+        init, hub_idx = embed_others_leaf(
+            data=X,
+            init=init,
+            hub_idx=hub_idx,
+            leaf_list=leaf_list,
+        )
+
+        # print(np.isinf(init).any())
+        # print(len(hub_idx))
+        # print(len(init))
+        print(init)
+
+        # init = init[hub_idx]
+        # label = label[hub_idx]
+
+        _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
+
+
+        plt.scatter(init[:,0], init[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
+        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
+        cbar.set_ticks(np.arange(10))
+        plt.title('Spheres Embedded')
+        plt.savefig(f'./tmp/z2.png')
+        plt.close()
+        exit()
+
+
+
+
+        t2 = time.time()
+
+        print(init.shape)
+        print(t2-t1)
+
+
 
         if self.verbose:
             print(ts(), "Construct local structure")
