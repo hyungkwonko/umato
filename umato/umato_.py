@@ -971,26 +971,30 @@ def disjoint_nn(
 def pick_hubs(
     disjoint,
     random_state,
+    outliers=False,
 ):
 
-    hub_idx = []
-    (hub_num, leaf_num) = disjoint.shape
+    if outliers:
+        return disjoint[:, 0]
+    else:
+        hub_idx = []
+        (hub_num, leaf_num) = disjoint.shape
 
-    # append until second to last element
-    for i in range(hub_num - 1):
-        choice = random_state.choice(disjoint[i])
+        # append until second to last element
+        for i in range(hub_num - 1):
+            choice = random_state.choice(disjoint[i])
+            hub_idx.append(choice)
+
+        # append last element
+        last = disjoint[hub_num - 1]
+        last = last[last != -1]
+        choice = random_state.choice(last)
         hub_idx.append(choice)
 
-    # append last element
-    last = disjoint[hub_num - 1]
-    last = last[last != -1]
-    choice = random_state.choice(last)
-    hub_idx.append(choice)
+        if hub_num != len(hub_idx):
+            ValueError(f"hub_num({hub_num}) is not the same as hub_idx({hub_idx})!")
 
-    if hub_num != len(hub_idx):
-        ValueError(f"hub_num({hub_num}) is not the same as hub_idx({hub_idx})!")
-
-    return hub_idx
+        return np.array(hub_idx)
 
 
 
@@ -1134,14 +1138,10 @@ def hub_leaf_indices(
 
 
 def build_global_structure(
-    data, hub_idx, n_components, a, b, alpha=0.005, max_iter=10, verbose=False,
+    data, hub_idx, n_components, a, b, alpha=0.005, max_iter=10, verbose=False, label=None,
 ):
     print("[INFO] Building global structure")
-
-    #### for test only...
-    # from evaluation.models.dataset import get_data, save_csv
-    # _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-    # print(np.unique(label[hub_idx], return_counts=True))  # get count per class
+    print(np.unique(label[hub_idx], return_counts=True))  # get count per class
 
     from sklearn.decomposition import PCA
 
@@ -1151,19 +1151,114 @@ def build_global_structure(
     P = euclidean_distances(data[hub_idx])
     P /= P.max()
 
-    # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
-    result = global_optimize(
-        P, Z, a, b, alpha=alpha, max_iter=max_iter
-    )  # (TODO) how to optimize max_iter & alpha?
+    if verbose:
+        result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
+    else:
+        result = global_optimize(
+            P, Z, a, b, alpha=alpha, max_iter=max_iter
+        )  # (TODO) how to optimize max_iter & alpha?
 
     return result
 
 
+def embed_others(
+    data,
+    global_optimized,
+    hub_idx,
+    knn_indices,
+    disjoint,
+    label,
+):
+    init = np.zeros((data.shape[0], global_optimized.shape[1]))
+    init[hub_idx] = global_optimized
+
+    while True:
+        val = len(hub_idx)
+
+        # append other nodes using NN information
+        init, hub_idx = embed_others_nn(
+            data=data,
+            init=init,
+            hub_idx=hub_idx,
+            knn_indices=knn_indices,
+        )
+
+        if val == len(hub_idx):
+            if len(init) > len(hub_idx):
+                print(f"len(hub_idx) {len(hub_idx)} is smaller than len(init) {len(init)}")
+            break
+
+
+
+    import matplotlib.pyplot as plt
+
+    init2 = init[hub_idx]
+    plt.scatter(init2[:, 0], init2[:, 1], s=8.0, c=label[hub_idx], cmap="Spectral", alpha=1.0)
+    cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
+    cbar.set_ticks(np.arange(10))
+    plt.title("Embedded")
+    plt.savefig(f"./tmp/hub_fmnist4.png")
+    plt.close()
+
+
+    # append other nodes using NN disjoint information
+    init, hub_idx = embed_others_disjoint(data, init, hub_idx, disjoint,)
+    # init, hub_idx = embed_others_leaf(data, init, hub_idx, disjoint,)
+
+    print(len(hub_idx))
+
+    # init = init[hub_idx]
+    # label = label[hub_idx]
+
+    plt.scatter(init[:, 0], init[:, 1], s=8.0, c=label, cmap="Spectral", alpha=1.0)
+    cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
+    cbar.set_ticks(np.arange(10))
+    plt.title("Embedded")
+    plt.savefig(f"./tmp/hub_fmnist5.png")
+    plt.close()
+
+    if len(init) != len(hub_idx):
+        ValueError(f"len(init):{len(init)} != len(hub_idx):{len(hub_idx)}!")
+
+    return init
+
+
+@numba.njit()
+def embed_others_disjoint(data, init, hub_idx, disjoints,):
+
+    hub_true = np.zeros(data.shape[0])
+    hub_true[hub_idx] = True
+    hub_idx = set(hub_idx)
+
+    for disjoint in disjoints:
+        for j in disjoint:
+            # if it is not a hub node, we should embed this using NN in disjoint set
+            if not hub_true[j]:
+                distances = []
+                indices = []
+                # we use its neighbors
+                for k in disjoint:
+                    if hub_true[k]:
+                        distance = 0.0
+                        for l in range(data.shape[1]):
+                            distance += (data[j][l] - data[k][l]) ** 2
+                        distance = np.sqrt(distance)
+                        distances.append(distance)
+                        indices.append(k)
+                ix = np.array(distances).argsort()[0]
+                target_ix = indices[ix]
+                init[j] = init[target_ix] + np.random.uniform(-0.001, 0.001, size=2)
+
+                hub_idx.add(j)
+
+    return init, hub_idx
+
+
 @numba.njit()
 def embed_others_nn(
-    data, init, hub_idx, leaf_list, knn_indices,
+    data, init, hub_idx, knn_indices,
 ):
-    # print("[INFO] Embedding other nodes using NN information")
+    print("[INFO] Embedding other nodes using NN information")
 
     all_idx = np.arange(data.shape[0])
     hub_not_idx = np.delete(all_idx, hub_idx)
@@ -1195,7 +1290,7 @@ def embed_others_nn(
 def embed_others_leaf(
     data, init, hub_idx, leaf_list,
 ):
-    # print("[INFO] Embedding other nodes")
+    print("[INFO] Embedding other nodes using LEAF information")
 
     all_idx = np.arange(data.shape[0])
     hub_not_idx = np.delete(all_idx, hub_idx)
@@ -2312,30 +2407,41 @@ class UMATO(BaseEstimator):
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
-        sorted_index = index[freq.argsort()]  # sorted index in decreasing order
+        # sorted_index = index[freq.argsort()]  # sorted index in increasing order --> mnist accuracy: 0.1
+        sorted_index = index[freq.argsort()[::-1]]  # sorted index in decreasing order --> mnist accuracy: 0.1
 
         # get disjoint NN matrix
         disjoint = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
+
+        # ix2 = ix[self.ll < 10]
+        # scores = np.array([])
+        # for i in np.arange(disjoint.shape[0]):
+        #     score = 0
+        #     for j in range(1, disjoint.shape[1]):
+        #         if self.ll[disjoint[i][j]] == self.ll[disjoint[i][0]]:
+        #             score += 1.0 / (disjoint.shape[1] - 1)
+        #     scores = np.append(scores, score)
+        # print(len(scores))
+        # print(np.mean(scores))
+        # exit()
 
         # get hub idx from disjoint
         hub_idx = pick_hubs(
             disjoint=disjoint,
             random_state=random_state,
+            # outliers=True,
         )
 
-        exit()
-
-
-        hub_idx, leaf_list = hub_leaf_indices(
-            data=X,
-            random_state=random_state,
-            n_trees=-1,
-            hub_num=300,
-            verbose=False,
-            angular=False,
-            # debug=False,
-            debug=True,
-        )
+        # hub_idx, leaf_list = hub_leaf_indices(
+        #     data=X,
+        #     random_state=random_state,
+        #     n_trees=-1,
+        #     hub_num=300,
+        #     verbose=False,
+        #     angular=False,
+        #     # debug=False,
+        #     debug=True,
+        # )
 
         global_optimized = build_global_structure(
             data=X,
@@ -2345,57 +2451,23 @@ class UMATO(BaseEstimator):
             b=self._b,
             alpha=0.005,
             max_iter=10,
-            verbose=False,
+            verbose=True,
+            label=self.ll,
         )
 
-        hub_idx = np.array(hub_idx)
-        init = np.zeros((X.shape[0], global_optimized.shape[1]))
-        init[hub_idx] = global_optimized
-
-        for _ in range(3):
-
-            init, hub_idx = embed_others_nn(
-                data=X,
-                init=init,
-                hub_idx=hub_idx,
-                leaf_list=leaf_list,
-                knn_indices=self._knn_indices,
-            )
-            print(len(hub_idx))
-
-        from evaluation.models.dataset import get_data, save_csv
-        import matplotlib.pyplot as plt
-
-        _, label = get_data("cifar10")  # spheres, mnist, fmnist, cifar10
-
-        init = init[hub_idx]
-        label = label[hub_idx]
-
-        plt.scatter(init[:, 0], init[:, 1], s=8.0, c=label, cmap="Spectral", alpha=1.0)
-        cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
-        cbar.set_ticks(np.arange(10))
-        plt.title("Spheres Embedded")
-        plt.savefig(f"./tmp/z1.png")
-        plt.close()
-
-        exit()
-
-        init, hub_idx = embed_others_leaf(
-            data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
+        init = embed_others(
+            data=X,
+            global_optimized=global_optimized,
+            hub_idx=hub_idx,
+            knn_indices=self._knn_indices,
+            disjoint=disjoint,
+            label=self.ll,
         )
 
-        # init = init[hub_idx]
-        # label = label[hub_idx]
+        # init, hub_idx = embed_others_leaf(
+        #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
+        # )
 
-        _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-
-        plt.scatter(init[:, 0], init[:, 1], s=8.0, c=label, cmap="Spectral", alpha=1.0)
-        cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
-        cbar.set_ticks(np.arange(10))
-        plt.title("Spheres Embedded")
-        plt.savefig(f"./tmp/z2.png")
-        plt.close()
-        exit()
 
         if self.verbose:
             print(ts(), "Construct local structure")
