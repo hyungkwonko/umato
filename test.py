@@ -8,7 +8,7 @@ import time
 
 if __name__ == "__main__":
     # x = load_digits()  # (1797, 64 dim)
-    x, label = get_data("fmnist")  # spheres, mnist, fmnist, cifar10
+    x, label = get_data("cifar10")  # spheres, mnist, fmnist, cifar10
 
     # Synthetic data to check the # of connected components
     # import numpy as np
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     print(t2-t1)
 
 
-    plt.scatter(embedding[:, 0], embedding[:, 1], s=8.0, c=label, cmap="Spectral", alpha=0.5)
+    plt.scatter(embedding[:, 0], embedding[:, 1], s=1.0, c=label, cmap="Spectral", alpha=1.0)
     cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
     cbar.set_ticks(np.arange(10))
     plt.title("Embedded")
