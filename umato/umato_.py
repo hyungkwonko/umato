@@ -1189,7 +1189,6 @@ def embed_others(
             break
 
 
-
     import matplotlib.pyplot as plt
 
     init2 = init[hub_idx]
@@ -1197,15 +1196,12 @@ def embed_others(
     cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
     cbar.set_ticks(np.arange(10))
     plt.title("Embedded")
-    plt.savefig(f"./tmp/hub_fmnist4.png")
+    plt.savefig(f"./tmp/pic2.png")
     plt.close()
-
 
     # append other nodes using NN disjoint information
     init, hub_idx = embed_others_disjoint(data, init, hub_idx, disjoint,)
     # init, hub_idx = embed_others_leaf(data, init, hub_idx, disjoint,)
-
-    print(len(hub_idx))
 
     # init = init[hub_idx]
     # label = label[hub_idx]
@@ -1214,11 +1210,11 @@ def embed_others(
     cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
     cbar.set_ticks(np.arange(10))
     plt.title("Embedded")
-    plt.savefig(f"./tmp/hub_fmnist5.png")
+    plt.savefig(f"./tmp/pic3.png")
     plt.close()
 
     if len(init) != len(hub_idx):
-        ValueError(f"len(init):{len(init)} != len(hub_idx):{len(hub_idx)}!")
+        raise ValueError(f"len(init):{len(init)} != len(hub_idx):{len(hub_idx)}!")
 
     return init
 
@@ -1232,6 +1228,9 @@ def embed_others_disjoint(data, init, hub_idx, disjoints,):
 
     for disjoint in disjoints:
         for j in disjoint:
+            # j == -1 means we've run all the iteration
+            if j == -1:
+                break
             # if it is not a hub node, we should embed this using NN in disjoint set
             if not hub_true[j]:
                 distances = []
@@ -1247,7 +1246,7 @@ def embed_others_disjoint(data, init, hub_idx, disjoints,):
                         indices.append(k)
                 ix = np.array(distances).argsort()[0]
                 target_ix = indices[ix]
-                init[j] = init[target_ix] + np.random.uniform(-0.001, 0.001, size=2)
+                init[j] = init[target_ix] + np.random.uniform(-0.02, 0.02, size=2)
 
                 hub_idx.add(j)
 
@@ -1256,7 +1255,7 @@ def embed_others_disjoint(data, init, hub_idx, disjoints,):
 
 @numba.njit()
 def embed_others_nn(
-    data, init, hub_idx, knn_indices,
+    data, init, hub_idx, knn_indices, nn_consider=5,
 ):
     print("[INFO] Embedding other nodes using NN information")
 
@@ -1271,7 +1270,7 @@ def embed_others_nn(
 
     for i in hub_idx:
         for j, e in enumerate(knn_indices[i]):
-            if j > 5:  # use only 5 NNs
+            if j > nn_consider:  # use only 5 NNs
                 break
             if num_log[e] > -1:
                 init[e] += init[i] + np.random.uniform(-0.001, 0.001, size=2)
@@ -1344,6 +1343,22 @@ def embed_others_leaf(
             init[l] /= num_log[l]
 
     return init, hub_idx_fin
+
+
+def check_nn_accuracy(indices_info, label,):
+    # ix = np.arange(indices_info.shape[0])
+    # ix2 = ix[self.ll < 10]
+    scores = np.array([])
+    for i in np.arange(indices_info.shape[0]):
+        score = 0
+        for j in range(1, indices_info.shape[1]):
+            if self.ll[indices_info[i][j]] == self.ll[indices_info[i][0]]:
+                score += 1.0 / (indices_info.shape[1] - 1)
+        scores = np.append(scores, score)
+    print(len(scores))
+    print(np.mean(scores))
+
+    return 0
 
 
 def simplicial_set_embedding(
@@ -2403,7 +2418,7 @@ class UMATO(BaseEstimator):
 
         ###### Hyung-Kwon Ko
 
-        hub_num = 300
+        hub_num = 250
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
@@ -2413,17 +2428,8 @@ class UMATO(BaseEstimator):
         # get disjoint NN matrix
         disjoint = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
 
-        # ix2 = ix[self.ll < 10]
-        # scores = np.array([])
-        # for i in np.arange(disjoint.shape[0]):
-        #     score = 0
-        #     for j in range(1, disjoint.shape[1]):
-        #         if self.ll[disjoint[i][j]] == self.ll[disjoint[i][0]]:
-        #             score += 1.0 / (disjoint.shape[1] - 1)
-        #     scores = np.append(scores, score)
-        # print(len(scores))
-        # print(np.mean(scores))
-        # exit()
+        # check NN accuracy
+        check_nn_accuracy(indices_info=disjoint, label=self.ll,)
 
         # get hub idx from disjoint
         hub_idx = pick_hubs(
@@ -2463,6 +2469,7 @@ class UMATO(BaseEstimator):
             disjoint=disjoint,
             label=self.ll,
         )
+
 
         # init, hub_idx = embed_others_leaf(
         #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,

@@ -21,9 +21,10 @@ MEASURE_LIST = [
     "DTM_KL01",
     "DTM_KL001",
 ]
-ALGO_LIST = ["pca", "tsne", "umap", "topoae", "umato"]  # (TODO) add umato
-DATA_LIST = ["spheres", "mnist", "fmnist", "cifar10"]
-DATA_LIST = ["fmnist"]
+# ALGO_LIST = ["pca", "tsne", "umap", "topoae", "umato"]  # (TODO) add umato
+# DATA_LIST = ["spheres", "mnist", "fmnist", "cifar10"]
+ALGO_LIST = ["umato"]  # (TODO) add umato
+DATA_LIST = ["spheres"]
 
 
 if __name__ == "__main__":
