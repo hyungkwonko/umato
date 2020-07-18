@@ -14,6 +14,7 @@ from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.preprocessing import normalize
 from sklearn.neighbors import KDTree
+from sklearn.decomposition import PCA
 
 try:
     import joblib
@@ -1138,15 +1139,18 @@ def hub_leaf_indices(
 
 
 def build_global_structure(
-    data, hub_idx, n_components, a, b, alpha=0.005, max_iter=10, verbose=False, label=None,
+    data, hub_idx, n_components, a, b, alpha=0.005, max_iter=10, verbose=False, label=None, initialize="pca",
 ):
     print("[INFO] Building global structure")
     print(np.unique(label[hub_idx], return_counts=True))  # get count per class
 
-    from sklearn.decomposition import PCA
-
-    Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
-    Z /= Z.max()
+    if initialize == "pca":
+        Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
+        Z /= Z.max()
+    elif initialize == "random":
+        Z = np.random.random((len(hub_idx), n_components))
+    else:
+        raise ValueError("Check hub node initializing method!")
 
     P = euclidean_distances(data[hub_idx])
     P /= P.max()
@@ -1352,7 +1356,7 @@ def check_nn_accuracy(indices_info, label,):
     for i in np.arange(indices_info.shape[0]):
         score = 0
         for j in range(1, indices_info.shape[1]):
-            if self.ll[indices_info[i][j]] == self.ll[indices_info[i][0]]:
+            if label[indices_info[i][j]] == label[indices_info[i][0]]:
                 score += 1.0 / (indices_info.shape[1] - 1)
         scores = np.append(scores, score)
     print(len(scores))
