@@ -597,24 +597,109 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig
 
         if savefig:
             if i % 1 == 0:
-                plt.scatter(Z[:,0], Z[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
-                cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
-                cbar.set_ticks(np.arange(10))
-                plt.title('Spheres Embedded')
-                plt.savefig(f'./tmp/{i}.png')
-                plt.close()
+                from umato.umato_ import plot_tmptmp
+                plot_tmptmp(data=Z, label=label, name=f"global{i}")
 
     return Z
 
 
+def _nn_layout_optimize_single_epoch(
+    head_embedding,
+    tail_embedding,
+    head,
+    tail,
+    hub_info,
+    n_vertices,
+    epochs_per_sample,
+    a,
+    b,
+    rng_state,
+    gamma,
+    dim,
+    move_other,
+    alpha,
+    epochs_per_negative_sample,
+    epoch_of_next_negative_sample,
+    epoch_of_next_sample,
+    n,
+):
+    for i in numba.prange(epochs_per_sample.shape[0]):
+        if epoch_of_next_sample[i] <= n:
+            j = head[i]  # j == source index
+            k = tail[i]  # k == target index
+
+            current = head_embedding[j]  # current == source location
+            other = tail_embedding[k]  # other == target location
+
+            dist_squared = rdist(current, other)  # get distance between them
+
+            if dist_squared > 0.0:
+                grad_coeff = -2.0 * a * b * pow(dist_squared, b - 1.0)
+                grad_coeff /= a * pow(dist_squared, b) + 1.0
+            else:
+                grad_coeff = 0.0
+
+            for d in range(dim):
+                grad_d = clip(grad_coeff * (current[d] - other[d]))
+
+                grad_hub = 0  # grad coefficient for hub nodes (DO NOT move)
+                if hub_info[j] == 1:
+                    grad_hub = 1.0
+
+                grad_other = 0  # grad coefficient for for the opponent
+                if hub_info[k] == 1:
+                    grad_other = 1.0
+
+                current[d] += grad_d * alpha * grad_hub
+                if move_other:
+                    other[d] += -grad_d * alpha * grad_other
+
+            epoch_of_next_sample[i] += epochs_per_sample[i]
+
+            n_neg_samples = int(
+                (n - epoch_of_next_negative_sample[i]) / epochs_per_negative_sample[i]
+            )
+
+            # for p in range(n_neg_samples):
+            #     k = tau_rand_int(rng_state) % n_vertices
+
+            #     other = tail_embedding[k]
+
+            #     dist_squared = rdist(current, other)
+
+            #     if dist_squared > 0.0:
+            #         grad_coeff = 2.0 * gamma * b
+            #         grad_coeff /= (0.001 + dist_squared) * (
+            #             a * pow(dist_squared, b) + 1
+            #         )
+            #     elif j == k:
+            #         continue
+            #     else:
+            #         grad_coeff = 0.0
+
+            #     for d in range(dim):
+            #         if grad_coeff > 0.0:
+            #             grad_d = clip(grad_coeff * (current[d] - other[d]))
+            #         else:
+            #             grad_d = 4.0
+
+            #         grad_neg_other = 0
+            #         if hub_info[k] == 1:
+            #             grad_neg_other = 1.0
+
+            #         current[d] += grad_d * alpha * grad_neg_other
+
+            epoch_of_next_negative_sample[i] += (
+                n_neg_samples * epochs_per_negative_sample[i]
+            )
 
 
-@numba.njit(fastmath=True, parallel=True)
 def nn_layout_optimize(
     head_embedding,
     tail_embedding,
     head,
     tail,
+    hub_info,
     n_epochs,
     n_vertices,
     epochs_per_sample,
@@ -624,7 +709,10 @@ def nn_layout_optimize(
     gamma=1.0,
     initial_alpha=1.0,
     negative_sample_rate=5.0,
-    verbose=False):
+    parallel=False,
+    verbose=False,
+    label=None,
+):
 
     dim = head_embedding.shape[1]
     move_other = head_embedding.shape[0] == tail_embedding.shape[0]
@@ -634,65 +722,36 @@ def nn_layout_optimize(
     epoch_of_next_negative_sample = epochs_per_negative_sample.copy()
     epoch_of_next_sample = epochs_per_sample.copy()
 
+    optimize_fn = numba.njit(
+        _nn_layout_optimize_single_epoch, fastmath=True, parallel=parallel
+    )
     for n in range(n_epochs):
-        for i in range(epochs_per_sample.shape[0]):
-            if epoch_of_next_sample[i] <= n:
-                j = head[i]
-                k = tail[i]
-
-                current = head_embedding[j]
-                other = tail_embedding[k]
-
-                dist_squared = rdist(current, other)
-
-                if dist_squared > 0.0:
-                    grad_coeff = -2.0 * a * b * pow(dist_squared, b - 1.0)
-                    grad_coeff /= a * pow(dist_squared, b) + 1.0
-                else:
-                    grad_coeff = 0.0
-
-                for d in range(dim):
-                    grad_d = clip(grad_coeff * (current[d] - other[d]))
-                    current[d] += grad_d * alpha
-                    if move_other:
-                        other[d] += -grad_d * alpha
-
-                epoch_of_next_sample[i] += epochs_per_sample[i]
-
-                n_neg_samples = int(
-                    (n - epoch_of_next_negative_sample[i])
-                    / epochs_per_negative_sample[i]
-                )
-
-                for p in range(n_neg_samples):
-                    k = tau_rand_int(rng_state) % n_vertices
-
-                    other = tail_embedding[k]
-
-                    dist_squared = rdist(current, other)
-
-                    if dist_squared > 0.0:
-                        grad_coeff = 2.0 * gamma * b
-                        grad_coeff /= (0.001 + dist_squared) * (
-                            a * pow(dist_squared, b) + 1
-                        )
-                    elif j == k:
-                        continue
-                    else:
-                        grad_coeff = 0.0
-
-                    for d in range(dim):
-                        if grad_coeff > 0.0:
-                            grad_d = clip(grad_coeff * (current[d] - other[d]))
-                        else:
-                            grad_d = 4.0
-                        current[d] += grad_d * alpha
-
-                epoch_of_next_negative_sample[i] += (
-                    n_neg_samples * epochs_per_negative_sample[i]
-                )
+        optimize_fn(
+            head_embedding,
+            tail_embedding,
+            head,
+            tail,
+            hub_info,
+            n_vertices,
+            epochs_per_sample,
+            a,
+            b,
+            rng_state,
+            gamma,
+            dim,
+            move_other,
+            alpha,
+            epochs_per_negative_sample,
+            epoch_of_next_negative_sample,
+            epoch_of_next_sample,
+            n,
+        )
 
         alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
+
+        if verbose and n % int(n_epochs / 10) == 0:
+            from umato.umato_ import plot_tmptmp
+            plot_tmptmp(data=head_embedding, label=label, name=f"local{n}")
 
         if verbose and n % int(n_epochs / 10) == 0:
             print("\tcompleted ", n, " / ", n_epochs, "epochs")

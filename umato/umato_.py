@@ -57,6 +57,7 @@ from umato.layouts import (
     optimize_layout_generic,
     optimize_layout_inverse,
     global_optimize,
+    nn_layout_optimize,
 )
 
 try:
@@ -1181,8 +1182,19 @@ def build_global_structure(
 
     return result
 
+def plot_tmptmp(data, label, name):
+    import matplotlib.pyplot as plt
+    plt.scatter(
+        data[:, 0], data[:, 1], s=0.8, c=label, cmap="Spectral", alpha=1.0
+    )
+    cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
+    cbar.set_ticks(np.arange(11))
+    plt.title("Embedded")
+    plt.savefig(f"./tmp/{name}.png")
+    plt.close()
 
-def init_others(
+
+def embed_others(
     data, global_optimized, hubs, knn_indices, disjoints, label,
 ):
     init = np.zeros((data.shape[0], global_optimized.shape[1]))
@@ -1202,17 +1214,8 @@ def init_others(
                 print(f"len(hubs) {len(hubs)} is smaller than len(init) {len(init)}")
             break
 
-    import matplotlib.pyplot as plt
-
-    init2 = init[hubs]
-    plt.scatter(
-        init2[:, 0], init2[:, 1], s=8.0, c=label[hubs], cmap="Spectral", alpha=1.0
-    )
-    cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
-    cbar.set_ticks(np.arange(10))
-    plt.title("Embedded")
-    plt.savefig(f"./tmp/pic2.png")
-    plt.close()
+    # save figure2
+    plot_tmptmp(data=init[hubs], label=label[hubs], name="pic2")
 
     # append other nodes using NN disjoint information
     init, outliers = disjoint_initialize(
@@ -1220,12 +1223,8 @@ def init_others(
     )
     # init, outliers = rpleaf_embedding(data, init, hubs, disjoint,)
 
-    plt.scatter(init[:, 0], init[:, 1], s=8.0, c=label, cmap="Spectral", alpha=1.0)
-    cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
-    cbar.set_ticks(np.arange(10))
-    plt.title("Embedded")
-    plt.savefig(f"./tmp/pic3.png")
-    plt.close()
+    # save figure3
+    plot_tmptmp(data=init, label=label, name="pic3")
 
     if len(init) != len(outliers):
         raise ValueError(
@@ -1387,20 +1386,20 @@ def check_nn_accuracy(
 
 
 @numba.njit()
-def remove_from_graph(array, hub_info, target=0):
+def remove_from_graph(data, array, hub_info, remove_target=0):
     """
-    target == 0: outliers
-    target == 1: NNs
-    target == 2: hubs    
+    remove_target == 0: outliers
+    remove_target == 1: NNs
+    remove_target == 2: hubs    
     """
-    if target not in [0, 1, 2]:
-        raise ValueError("target should be 0 (outliers) or 1 (NNs) or 2 (hubs")
+    if remove_target not in [0, 1, 2]:
+        raise ValueError("remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs")
 
     for i, e in enumerate(array):
-        if hub_info[e] == target:
-            array[i] = -1
+        if hub_info[e] == remove_target:
+            data[i] = 0
 
-    return array
+    return data
 
 
 def local_optimize_nn(
@@ -1420,6 +1419,7 @@ def local_optimize_nn(
     metric_kwds,
     parallel=False,
     verbose=False,
+    label=None,
 ):
 
     graph = graph.tocoo()
@@ -1433,18 +1433,13 @@ def local_optimize_nn(
         else:
             n_epochs = 200
 
-    # select targets to remove
-    graph.row = remove_from_graph(graph.row, hub_info, target=0)
-    graph.col = remove_from_graph(graph.col, hub_info, target=0)
+    # remove outlier-related values from graph 
+    graph.data = remove_from_graph(graph.data, graph.row, hub_info, remove_target=0)
+    graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=0)
     
-    # remove values not necessary
+    # remove zero values
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
-    graph.data[graph.col == -1] = 0.0
-    graph.data[graph.row == -1] = 0.0
     graph.eliminate_zeros()
-
-    exit()
-
 
     init_data = np.array(init)
     if len(init_data.shape) == 2:
@@ -1477,6 +1472,7 @@ def local_optimize_nn(
         embedding,
         head,
         tail,
+        hub_info,
         n_epochs,
         n_vertices,
         epochs_per_sample,
@@ -1486,7 +1482,9 @@ def local_optimize_nn(
         gamma,
         initial_alpha,
         negative_sample_rate,
+        parallel=parallel,
         verbose=verbose,
+        label=label,
     )
 
     return embedding
@@ -2498,7 +2496,7 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        init, hub_info = init_others(
+        init, hub_info = embed_others(
             data=X,
             global_optimized=global_optimized,
             hubs=hubs,
@@ -2511,7 +2509,7 @@ class UMATO(BaseEstimator):
         #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
         # )
 
-        init = local_optimize_nn(
+        self.embedding_ = local_optimize_nn(
             data=X,
             graph=self.graph_,
             hub_info=hub_info,
@@ -2527,10 +2525,11 @@ class UMATO(BaseEstimator):
             metric=self._input_distance_func,
             metric_kwds=self.metric_kwds,
             parallel=False,
-            verbose=False,
+            verbose=True,
+            label=self.ll,
         )
 
-        exit()
+        return self
 
         #######
 
