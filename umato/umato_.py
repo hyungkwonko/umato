@@ -970,32 +970,32 @@ def disjoint_nn(
 
 # @numba.njit()
 def pick_hubs(
-    disjoint,
+    disjoints,
     random_state,
     outliers=False,
 ):
 
     if outliers:
-        return disjoint[:, 0]
+        return disjoints[:, 0]
     else:
-        hub_idx = []
-        (hub_num, leaf_num) = disjoint.shape
+        hubs = []
+        (hub_num, _) = disjoints.shape
 
         # append until second to last element
         for i in range(hub_num - 1):
-            choice = random_state.choice(disjoint[i])
-            hub_idx.append(choice)
+            choice = random_state.choice(disjoints[i])
+            hubs.append(choice)
 
         # append last element
-        last = disjoint[hub_num - 1]
+        last = disjoints[hub_num - 1]
         last = last[last != -1]
         choice = random_state.choice(last)
-        hub_idx.append(choice)
+        hubs.append(choice)
 
-        if hub_num != len(hub_idx):
-            ValueError(f"hub_num({hub_num}) is not the same as hub_idx({hub_idx})!")
+        if hub_num != len(hubs):
+            ValueError(f"hub_num({hub_num}) is not the same as hubs({hubs})!")
 
-        return np.array(hub_idx)
+        return np.array(hubs)
 
 
 
@@ -1139,24 +1139,24 @@ def hub_leaf_indices(
 
 
 def build_global_structure(
-    data, hub_idx, n_components, a, b, alpha=0.005, max_iter=10, verbose=False, label=None, initialize="pca",
+    data, hubs, n_components, a, b, alpha=0.005, max_iter=10, verbose=False, label=None, global_init="pca",
 ):
     print("[INFO] Building global structure")
-    print(np.unique(label[hub_idx], return_counts=True))  # get count per class
+    print(np.unique(label[hubs], return_counts=True))  # get count per class
 
-    if initialize == "pca":
-        Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
+    if global_init == "pca":
+        Z = PCA(n_components=n_components).fit_transform(data[hubs])
         Z /= Z.max()
-    elif initialize == "random":
-        Z = np.random.random((len(hub_idx), n_components))
+    elif global_init == "random":
+        Z = np.random.random((len(hubs), n_components))
     else:
         raise ValueError("Check hub node initializing method!")
 
-    P = euclidean_distances(data[hub_idx])
+    P = euclidean_distances(data[hubs])
     P /= P.max()
 
     if verbose:
-        result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
+        result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hubs])
     else:
         result = global_optimize(
             P, Z, a, b, alpha=alpha, max_iter=max_iter
@@ -1168,35 +1168,36 @@ def build_global_structure(
 def embed_others(
     data,
     global_optimized,
-    hub_idx,
+    hubs,
     knn_indices,
-    disjoint,
+    random_state,
+    disjoints,
     label,
 ):
     init = np.zeros((data.shape[0], global_optimized.shape[1]))
-    init[hub_idx] = global_optimized
+    original_hubs = hubs.copy()
+    init[hubs] = global_optimized
 
     while True:
-        val = len(hub_idx)
+        val = len(hubs)
 
         # append other nodes using NN information
-        init, hub_idx = embed_others_nn(
+        init, hubs = nn_embedding(
             data=data,
             init=init,
-            hub_idx=hub_idx,
+            hubs=hubs,
             knn_indices=knn_indices,
         )
 
-        if val == len(hub_idx):
-            if len(init) > len(hub_idx):
-                print(f"len(hub_idx) {len(hub_idx)} is smaller than len(init) {len(init)}")
+        if val == len(hubs):
+            if len(init) > len(hubs):
+                print(f"len(hubs) {len(hubs)} is smaller than len(init) {len(init)}")
             break
 
 
     import matplotlib.pyplot as plt
-
-    init2 = init[hub_idx]
-    plt.scatter(init2[:, 0], init2[:, 1], s=8.0, c=label[hub_idx], cmap="Spectral", alpha=1.0)
+    init2 = init[hubs]
+    plt.scatter(init2[:, 0], init2[:, 1], s=8.0, c=label[hubs], cmap="Spectral", alpha=1.0)
     cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
     cbar.set_ticks(np.arange(10))
     plt.title("Embedded")
@@ -1204,11 +1205,8 @@ def embed_others(
     plt.close()
 
     # append other nodes using NN disjoint information
-    init, hub_idx = embed_others_disjoint(data, init, hub_idx, disjoint,)
-    # init, hub_idx = embed_others_leaf(data, init, hub_idx, disjoint,)
-
-    # init = init[hub_idx]
-    # label = label[hub_idx]
+    init, outliers = nn_disjoint_embedding(data=data, init=init, hubs=hubs, disjoints=disjoints)
+    # init, outliers = rpleaf_embedding(data, init, hubs, disjoint,)
 
     plt.scatter(init[:, 0], init[:, 1], s=8.0, c=label, cmap="Spectral", alpha=1.0)
     cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
@@ -1217,18 +1215,24 @@ def embed_others(
     plt.savefig(f"./tmp/pic3.png")
     plt.close()
 
-    if len(init) != len(hub_idx):
-        raise ValueError(f"len(init):{len(init)} != len(hub_idx):{len(hub_idx)}!")
+    if len(init) != len(outliers):
+        raise ValueError(f"total data # ({len(init)}) != total embedded # ({len(outliers)})!")
 
-    return init
+    hub_info = np.zeros(data.shape[0])
+    hub_info[hubs] = 1
+    hub_info[original_hubs] = 2
+
+    return init, hub_info
 
 
 @numba.njit()
-def embed_others_disjoint(data, init, hub_idx, disjoints,):
+def nn_disjoint_embedding(data, init, hubs, disjoints,):
 
-    hub_true = np.zeros(data.shape[0])
-    hub_true[hub_idx] = True
-    hub_idx = set(hub_idx)
+    hubs_true = np.zeros(data.shape[0])
+    hubs_true[hubs] = True
+    hubs = set(hubs)
+
+    nndist = np.sum(init[:, 1]) / len(hubs)
 
     for disjoint in disjoints:
         for j in disjoint:
@@ -1236,12 +1240,12 @@ def embed_others_disjoint(data, init, hub_idx, disjoints,):
             if j == -1:
                 break
             # if it is not a hub node, we should embed this using NN in disjoint set
-            if not hub_true[j]:
+            if not hubs_true[j]:
                 distances = []
                 indices = []
                 # we use its neighbors
                 for k in disjoint:
-                    if hub_true[k]:
+                    if hubs_true[k]:
                         distance = 0.0
                         for l in range(data.shape[1]):
                             distance += (data[j][l] - data[k][l]) ** 2
@@ -1252,101 +1256,101 @@ def embed_others_disjoint(data, init, hub_idx, disjoints,):
                 target_ix = indices[ix]
                 init[j] = init[target_ix] + np.random.uniform(-0.02, 0.02, size=2)
 
-                hub_idx.add(j)
+                hubs.add(j)
 
-    return init, hub_idx
+    return init, hubs
 
 
 @numba.njit()
-def embed_others_nn(
-    data, init, hub_idx, knn_indices, nn_consider=5,
+def nn_embedding(
+    data, init, hubs, knn_indices, nn_consider=5,
 ):
     print("[INFO] Embedding other nodes using NN information")
 
     all_idx = np.arange(data.shape[0])
-    hub_not_idx = np.delete(all_idx, hub_idx)
-
     num_log = np.zeros(data.shape[0])
-    num_log[hub_idx] = -1
+    num_log[hubs] = -1
 
-    hub_idx = set(hub_idx)
-    hub_idx_fin = hub_idx.copy()
+    hubs = set(hubs)
+    hubs_fin = hubs.copy()
 
-    for i in hub_idx:
+    nndist = np.sum(init[:, 1]) / len(hubs)
+
+    for i in hubs:
         for j, e in enumerate(knn_indices[i]):
             if j > nn_consider:  # use only 5 NNs
                 break
             if num_log[e] > -1:
                 init[e] += init[i] + np.random.uniform(-0.001, 0.001, size=2)
                 num_log[e] += 1
-                hub_idx_fin.add(e)
+                hubs_fin.add(e)
                 # break
 
     for k in range(data.shape[0]):
         if num_log[k] > 0:
             init[k] /= num_log[k]
 
-    return init, np.array(list(hub_idx_fin))
+    return init, np.array(list(hubs_fin))
 
 
-@numba.njit()
-def embed_others_leaf(
-    data, init, hub_idx, leaf_list,
-):
-    print("[INFO] Embedding other nodes using LEAF information")
+# @numba.njit()
+# def rpleaf_embedding(
+#     data, init, hub_idx, leaf_list,
+# ):
+#     print("[INFO] Embedding other nodes using LEAF information")
 
-    all_idx = np.arange(data.shape[0])
-    hub_not_idx = np.delete(all_idx, hub_idx)
+#     all_idx = np.arange(data.shape[0])
+#     hub_not_idx = np.delete(all_idx, hub_idx)
 
-    num_log = np.zeros(data.shape[0])
-    num_log[hub_idx] = -1
+#     num_log = np.zeros(data.shape[0])
+#     num_log[hub_idx] = -1
 
-    # hub_not_idx = set(hub_not_idx)
-    # hub_not_idx_fin = hub_not_idx.copy()
-    hub_idx = set(hub_idx)
-    hub_idx_fin = hub_idx.copy()
+#     # hub_not_idx = set(hub_not_idx)
+#     # hub_not_idx_fin = hub_not_idx.copy()
+#     hub_idx = set(hub_idx)
+#     hub_idx_fin = hub_idx.copy()
 
-    for leaf in leaf_list:
-        hub_, hub_not_ = [], []
-        for j in leaf:
-            if j == -1:
-                break
-            else:
-                flag = 0
-                for k in hub_idx:
-                    if k == j:
-                        hub_.append(j)
-                        flag = 1
-                        break
-                if flag == 0:
-                    hub_not_.append(j)
+#     for leaf in leaf_list:
+#         hub_, hub_not_ = [], []
+#         for j in leaf:
+#             if j == -1:
+#                 break
+#             else:
+#                 flag = 0
+#                 for k in hub_idx:
+#                     if k == j:
+#                         hub_.append(j)
+#                         flag = 1
+#                         break
+#                 if flag == 0:
+#                     hub_not_.append(j)
 
-        hub_ = np.array(hub_)
-        hub_not_ = np.array(hub_not_)
-        if len(hub_) > 0 and len(hub_not_) > 0:
-            for kk in hub_not_:
-                hub_idx_fin.add(kk)
-                jj = np.random.choice(hub_)
-                # for jj in hub_:
-                init[kk] += init[jj]  # + np.random.random() * 0.05
-                num_log[kk] += 1
+#         hub_ = np.array(hub_)
+#         hub_not_ = np.array(hub_not_)
+#         if len(hub_) > 0 and len(hub_not_) > 0:
+#             for kk in hub_not_:
+#                 hub_idx_fin.add(kk)
+#                 jj = np.random.choice(hub_)
+#                 # for jj in hub_:
+#                 init[kk] += init[jj]  # + np.random.random() * 0.05
+#                 num_log[kk] += 1
 
-                # if j == i:
-                #     index = np.argwhere(leaf==-1)
-                #     tmp = np.delete(leaf, index)
-                #     index = np.argwhere(tmp==i)
-                #     tmp2 = np.delete(tmp, index)
-                #     print("tmp2: ", tmp2)
-                #     for k in tmp2:
-                #         init[i] += init[k] + np.random.random() * 0.05
-                #         num_log[i] += 1
-                #         hub_idx_fin.add(i)
+#                 # if j == i:
+#                 #     index = np.argwhere(leaf==-1)
+#                 #     tmp = np.delete(leaf, index)
+#                 #     index = np.argwhere(tmp==i)
+#                 #     tmp2 = np.delete(tmp, index)
+#                 #     print("tmp2: ", tmp2)
+#                 #     for k in tmp2:
+#                 #         init[i] += init[k] + np.random.random() * 0.05
+#                 #         num_log[i] += 1
+#                 #         hub_idx_fin.add(i)
 
-    for l in range(data.shape[0]):
-        if num_log[l] > 0:
-            init[l] /= num_log[l]
+#     for l in range(data.shape[0]):
+#         if num_log[l] > 0:
+#             init[l] /= num_log[l]
 
-    return init, hub_idx_fin
+#     return init, hub_idx_fin
 
 
 def check_nn_accuracy(indices_info, label,):
@@ -1363,6 +1367,87 @@ def check_nn_accuracy(indices_info, label,):
     print(np.mean(scores))
 
     return 0
+
+
+def local_optimize_nn(
+    data,
+    graph,
+    n_components,
+    initial_alpha,
+    a,
+    b,
+    gamma,
+    negative_sample_rate,
+    n_epochs,
+    init,
+    random_state,
+    metric,
+    metric_kwds,
+    parallel=False,
+    verbose=False,
+):
+    graph = graph.tocoo()
+    graph.sum_duplicates()
+    n_vertices = graph.shape[1]
+
+    if n_epochs <= 0:
+        # For smaller datasets we can use more epochs
+        if graph.shape[0] <= 10000:
+            n_epochs = 500
+        else:
+            n_epochs = 200
+
+    graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
+    graph.eliminate_zeros()
+
+
+    init_data = np.array(init)
+    if len(init_data.shape) == 2:
+        if np.unique(init_data, axis=0).shape[0] < init_data.shape[0]:
+            tree = KDTree(init_data)
+            dist, ind = tree.query(init_data, k=2)
+            nndist = np.mean(dist[:, 1])
+            embedding = init_data + random_state.normal(
+                scale=0.001 * nndist, size=init_data.shape
+            ).astype(np.float32)
+        else:
+            embedding = init_data
+
+    epochs_per_sample = make_epochs_per_sample(graph.data, n_epochs)
+
+    head = graph.row
+    tail = graph.col
+    weight = graph.data
+
+    rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
+
+    embedding = (
+        10.0
+        * (embedding - np.min(embedding, 0))
+        / (np.max(embedding, 0) - np.min(embedding, 0))
+    ).astype(np.float32, order="C")
+
+    embedding = optimize_layout_euclidean(
+        embedding,
+        embedding,
+        head,
+        tail,
+        n_epochs,
+        n_vertices,
+        epochs_per_sample,
+        a,
+        b,
+        rng_state,
+        gamma,
+        initial_alpha,
+        negative_sample_rate,
+        parallel=parallel,
+        verbose=verbose,
+    )
+
+    return embedding
+
+
 
 
 def simplicial_set_embedding(
@@ -2420,9 +2505,14 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Construct global structure")
 
+
+
+
+        ###### Hyung-Kwon Ko
+        ###### Hyung-Kwon Ko
         ###### Hyung-Kwon Ko
 
-        hub_num = 250
+        hub_num = 200
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
@@ -2430,14 +2520,14 @@ class UMATO(BaseEstimator):
         sorted_index = index[freq.argsort()[::-1]]  # sorted index in decreasing order --> mnist accuracy: 0.1
 
         # get disjoint NN matrix
-        disjoint = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
+        disjoints = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
 
         # check NN accuracy
-        check_nn_accuracy(indices_info=disjoint, label=self.ll,)
+        check_nn_accuracy(indices_info=disjoints, label=self.ll,)
 
-        # get hub idx from disjoint
-        hub_idx = pick_hubs(
-            disjoint=disjoint,
+        # get hub indices from disjoint
+        hubs = pick_hubs(
+            disjoints=disjoints,
             random_state=random_state,
             # outliers=True,
         )
@@ -2455,7 +2545,7 @@ class UMATO(BaseEstimator):
 
         global_optimized = build_global_structure(
             data=X,
-            hub_idx=hub_idx,
+            hubs=hubs,
             n_components=self.n_components,
             a=self._a,
             b=self._b,
@@ -2465,20 +2555,44 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        init = embed_others(
+        init, hub_info = embed_others(
             data=X,
             global_optimized=global_optimized,
-            hub_idx=hub_idx,
+            hubs=hubs,
             knn_indices=self._knn_indices,
-            disjoint=disjoint,
+            random_state=random_state,
+            disjoints=disjoints,
             label=self.ll,
         )
 
+        exit()
 
-        # init, hub_idx = embed_others_leaf(
+
+        # init, hub_idx = rpleaf_embedding(
         #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
         # )
 
+        init = local_optimize_nn(
+            data=X,
+            graph=self.graph_,
+            n_components=self.n_components,
+            initial_alpha=self._initial_alpha,
+            a=self._a,
+            b=self._b,
+            gamma=self.repulsion_strength,
+            negative_sample_rate=self.negative_sample_rate,
+            n_epochs=n_epochs,
+            init=init,
+            random_state=random_state,
+            metric=self._input_distance_func,
+            metric_kwds=self.metric_kwds,
+            parallel=False,
+            verbose=False,
+        )
+
+        exit()
+
+        #######
 
         if self.verbose:
             print(ts(), "Construct local structure")

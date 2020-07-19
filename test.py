@@ -8,7 +8,7 @@ import time
 
 if __name__ == "__main__":
     # x = load_digits()  # (1797, 64 dim)
-    x, label = get_data("mnist")  # spheres, mnist, fmnist, cifar10
+    x, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
 
     # Synthetic data to check the # of connected components
     # import numpy as np
