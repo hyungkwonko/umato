@@ -1185,7 +1185,7 @@ def build_global_structure(
 def plot_tmptmp(data, label, name):
     import matplotlib.pyplot as plt
     plt.scatter(
-        data[:, 0], data[:, 1], s=0.8, c=label, cmap="Spectral", alpha=1.0
+        data[:, 0], data[:, 1], s=4.0, c=label, cmap="Spectral", alpha=1.0
     )
     cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
     cbar.set_ticks(np.arange(11))
@@ -1194,8 +1194,8 @@ def plot_tmptmp(data, label, name):
     plt.close()
 
 
-def embed_others(
-    data, global_optimized, hubs, knn_indices, disjoints, label,
+def embed_others_nn(
+    data, global_optimized, hubs, knn_indices, label,
 ):
     init = np.zeros((data.shape[0], global_optimized.shape[1]))
     original_hubs = hubs.copy()
@@ -1214,14 +1214,24 @@ def embed_others(
                 print(f"len(hubs) {len(hubs)} is smaller than len(init) {len(init)}")
             break
 
+    hub_info = np.zeros(data.shape[0])
+    hub_info[hubs] = 1
+    hub_info[original_hubs] = 2
+
     # save figure2
     plot_tmptmp(data=init[hubs], label=label[hubs], name="pic2")
 
+    return init, hub_info, hubs
+
+
+
+def embed_others_disjoint(
+    data, init, hubs, disjoints, label,
+):
     # append other nodes using NN disjoint information
     init, outliers = disjoint_initialize(
         data=data, init=init, hubs=hubs, disjoints=disjoints
     )
-    # init, outliers = rpleaf_embedding(data, init, hubs, disjoint,)
 
     # save figure3
     plot_tmptmp(data=init, label=label, name="pic3")
@@ -1231,11 +1241,10 @@ def embed_others(
             f"total data # ({len(init)}) != total embedded # ({len(outliers)})!"
         )
 
-    hub_info = np.zeros(data.shape[0])
-    hub_info[hubs] = 1
-    hub_info[original_hubs] = 2
+    return init
 
-    return init, hub_info
+
+
 
 
 @numba.njit()
@@ -2496,14 +2505,24 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        init, hub_info = embed_others(
+        init, hub_info, hubs = embed_others_nn(
             data=X,
             global_optimized=global_optimized,
             hubs=hubs,
             knn_indices=self._knn_indices,
+            label=self.ll,
+        )
+
+        init = embed_others_disjoint(
+            data=X,
+            init=init,
+            hubs=hubs,
             disjoints=disjoints,
             label=self.ll,
         )
+
+        exit()
+
 
         # init, hub_idx = rpleaf_embedding(
         #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,

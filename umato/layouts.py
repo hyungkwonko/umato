@@ -660,34 +660,34 @@ def _nn_layout_optimize_single_epoch(
                 (n - epoch_of_next_negative_sample[i]) / epochs_per_negative_sample[i]
             )
 
-            # for p in range(n_neg_samples):
-            #     k = tau_rand_int(rng_state) % n_vertices
+            for p in range(n_neg_samples):
+                k = tau_rand_int(rng_state) % n_vertices
 
-            #     other = tail_embedding[k]
+                other = tail_embedding[k]
 
-            #     dist_squared = rdist(current, other)
+                dist_squared = rdist(current, other)
 
-            #     if dist_squared > 0.0:
-            #         grad_coeff = 2.0 * gamma * b
-            #         grad_coeff /= (0.001 + dist_squared) * (
-            #             a * pow(dist_squared, b) + 1
-            #         )
-            #     elif j == k:
-            #         continue
-            #     else:
-            #         grad_coeff = 0.0
+                if dist_squared > 0.0:
+                    grad_coeff = 2.0 * gamma * b
+                    grad_coeff /= (0.001 + dist_squared) * (
+                        a * pow(dist_squared, b) + 1
+                    )
+                elif j == k:
+                    continue
+                else:
+                    grad_coeff = 0.0
 
-            #     for d in range(dim):
-            #         if grad_coeff > 0.0:
-            #             grad_d = clip(grad_coeff * (current[d] - other[d]))
-            #         else:
-            #             grad_d = 4.0
+                for d in range(dim):
+                    if grad_coeff > 0.0:
+                        grad_d = clip(grad_coeff * (current[d] - other[d]))
+                    else:
+                        grad_d = 4.0
 
-            #         grad_neg_other = 0
-            #         if hub_info[k] == 1:
-            #             grad_neg_other = 1.0
+                    grad_neg_other = 0
+                    if hub_info[k] == 1:
+                        grad_neg_other = 0.001
 
-            #         current[d] += grad_d * alpha * grad_neg_other
+                    current[d] += grad_d * alpha * grad_neg_other
 
             epoch_of_next_negative_sample[i] += (
                 n_neg_samples * epochs_per_negative_sample[i]
