@@ -922,7 +922,6 @@ def disjoint_nn(
     data, sorted_index, hub_num,
 ):
 
-    index = np.ones(data.shape[0])
     leaf_num = int(np.ceil(data.shape[0] / hub_num))
     disjoints = []
 
@@ -932,11 +931,11 @@ def disjoint_nn(
         disjoint = []
 
         # append the first element
-        for ix in range(len(sorted_index)):
-            if sorted_index[ix] > -1:
-                source = sorted_index[ix]
+        for j in range(len(sorted_index)):
+            if sorted_index[j] > -1:
+                source = sorted_index[j]
                 disjoint.append(source)
-                sorted_index[ix] = -1
+                sorted_index[j] = -1
                 tmp += 1
                 break
         if source == -1:
@@ -944,9 +943,10 @@ def disjoint_nn(
 
         # get distance for each element
         distances = np.ones(len(sorted_index)) * np.inf
-        for target in range(len(sorted_index)):
+        for k in range(len(sorted_index)):
             distance = 0.0
-            if sorted_index[target] > -1:
+            if sorted_index[k] > -1:
+                target = sorted_index[k]
                 for dim in range(data.shape[1]):
                     distance += (data[source][dim] - data[target][dim]) ** 2
                 distances[target] = np.sqrt(distance)
@@ -958,11 +958,10 @@ def disjoint_nn(
                 disjoint = disjoint + [-1] * (leaf_num - tmp)
                 break
             else:
-                min_ix = np.argmin(distances)
-                target_ix = sorted_index[min_ix]
-                disjoint.append(target_ix)
-                distances[min_ix] = np.inf
-                sorted_index[min_ix] = -1
+                min_index = np.argmin(distances)
+                disjoint.append(min_index)
+                distances[min_index] = np.inf
+                sorted_index[sorted_index == min_index] = -1
                 tmp += 1
 
         disjoints.append(disjoint)
@@ -1182,11 +1181,11 @@ def build_global_structure(
 
     return result
 
+
 def plot_tmptmp(data, label, name):
     import matplotlib.pyplot as plt
-    plt.scatter(
-        data[:, 0], data[:, 1], s=4.0, c=label, cmap="Spectral", alpha=1.0
-    )
+
+    plt.scatter(data[:, 0], data[:, 1], s=2.0, c=label, cmap="Spectral", alpha=1.0)
     cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
     cbar.set_ticks(np.arange(11))
     plt.title("Embedded")
@@ -1195,19 +1194,29 @@ def plot_tmptmp(data, label, name):
 
 
 def embed_others_nn(
-    data, global_optimized, hubs, knn_indices, label,
+    data, global_optimized, hubs, knn_indices, random_state, label,
 ):
     init = np.zeros((data.shape[0], global_optimized.shape[1]))
     original_hubs = hubs.copy()
     init[hubs] = global_optimized
+
+    # generate random normal distribution
+    random_normal = random_state.normal(scale=0.005, size=list(init.shape)).astype(
+        np.float32
+    )
 
     while True:
         val = len(hubs)
 
         # append other nodes using NN information
         init, hubs = nn_initialize(
-            data=data, init=init, hubs=hubs, knn_indices=knn_indices,
+            data=data,
+            init=init,
+            hubs=hubs,
+            knn_indices=knn_indices,
+            random=random_normal,
         )
+
 
         if val == len(hubs):
             if len(init) > len(hubs):
@@ -1219,37 +1228,38 @@ def embed_others_nn(
     hub_info[original_hubs] = 2
 
     # save figure2
-    plot_tmptmp(data=init[hubs], label=label[hubs], name="pic2")
+    plot_tmptmp(data=init[hubs], label=label[hubs], name=f"pic2")
 
     return init, hub_info, hubs
 
 
-
 def embed_others_disjoint(
-    data, init, hubs, disjoints, label,
+    data, init, hubs, disjoints, random_state, label,
 ):
-    # append other nodes using NN disjoint information
-    init, outliers = disjoint_initialize(
-        data=data, init=init, hubs=hubs, disjoints=disjoints
+    # generate random normal distribution
+    random_normal = random_state.normal(scale=0.02, size=list(init.shape)).astype(
+        np.float32
     )
 
-    # save figure3
-    plot_tmptmp(data=init, label=label, name="pic3")
+    # append other nodes using NN disjoint information
+    init, outliers = disjoint_initialize(
+        data=data, init=init, hubs=hubs, disjoints=disjoints, random=random_normal,
+    )
 
     if len(init) != len(outliers):
         raise ValueError(
             f"total data # ({len(init)}) != total embedded # ({len(outliers)})!"
         )
 
+    # save figure3
+    plot_tmptmp(data=init, label=label, name="pic3")
+
     return init
-
-
-
 
 
 @numba.njit()
 def disjoint_initialize(
-    data, init, hubs, disjoints,
+    data, init, hubs, disjoints, random,
 ):
 
     hubs_true = np.zeros(data.shape[0])
@@ -1278,7 +1288,7 @@ def disjoint_initialize(
                         indices.append(k)
                 ix = np.array(distances).argsort()[0]
                 target_ix = indices[ix]
-                init[j] = init[target_ix] + np.random.uniform(-0.02, 0.02, size=2)
+                init[j] = init[target_ix] + random[j]  # add random value
 
                 hubs.add(j)
 
@@ -1287,7 +1297,7 @@ def disjoint_initialize(
 
 @numba.njit()
 def nn_initialize(
-    data, init, hubs, knn_indices, nn_consider=5,
+    data, init, hubs, knn_indices, random, nn_consider=5,
 ):
     print("[INFO] Embedding other nodes using NN information")
 
@@ -1305,7 +1315,7 @@ def nn_initialize(
             if j > nn_consider:  # use only 5 NNs
                 break
             if num_log[e] > -1:
-                init[e] += init[i] + np.random.uniform(-0.001, 0.001, size=2)
+                init[e] += init[i] + random[e]  # add random value
                 num_log[e] += 1
                 hubs_fin.add(e)
                 # break
@@ -1442,10 +1452,10 @@ def local_optimize_nn(
         else:
             n_epochs = 200
 
-    # remove outlier-related values from graph 
+    # remove outlier-related values from graph
     graph.data = remove_from_graph(graph.data, graph.row, hub_info, remove_target=0)
     graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=0)
-    
+
     # remove zero values
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
     graph.eliminate_zeros()
@@ -2458,14 +2468,17 @@ class UMATO(BaseEstimator):
         ###### Hyung-Kwon Ko
         ###### Hyung-Kwon Ko
 
-        hub_num = 200
+        hub_num = 300
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
-        # sorted_index = index[freq.argsort()]  # sorted index in increasing order --> mnist accuracy: 0.1
-        sorted_index = index[
-            freq.argsort()[::-1]
-        ]  # sorted index in decreasing order --> mnist accuracy: 0.1
+        # sorted_index = index[freq.argsort()]  # sorted index in increasing order
+        sorted_index = index[freq.argsort(kind="stable")[::-1]]  # sorted index in decreasing order
+        # sorted_index = index[freq.argsort()[::-1]]  # sorted index in decreasing order
+
+        # import pandas as pd
+        # dataset = pd.DataFrame({'index': index, 'freq': freq, 'label': self.ll})
+        # dataset.to_csv("./zz_random.csv", index=False)
 
         # get disjoint NN matrix
         disjoints = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
@@ -2510,6 +2523,7 @@ class UMATO(BaseEstimator):
             global_optimized=global_optimized,
             hubs=hubs,
             knn_indices=self._knn_indices,
+            random_state=random_state,
             label=self.ll,
         )
 
@@ -2518,11 +2532,11 @@ class UMATO(BaseEstimator):
             init=init,
             hubs=hubs,
             disjoints=disjoints,
+            random_state=random_state,
             label=self.ll,
         )
 
         exit()
-
 
         # init, hub_idx = rpleaf_embedding(
         #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,

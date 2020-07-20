@@ -49,19 +49,40 @@ def myfunc2(hub_idx):
     return y
 
 
+@numba.njit()
+def z1():
+    return 0
+
+@numba.njit("i4(i8[:])")
+def tau_rand_int(state):
+    """A fast (pseudo)-random number generator.
+
+    Parameters
+    ----------
+    state: array of int64, shape (3,)
+        The internal state of the rng
+
+    Returns
+    -------
+    A (pseudo)-random int32 value
+    """
+    state[0] = (((state[0] & 4294967294) << 12) & 0xFFFFFFFF) ^ (
+        (((state[0] << 13) & 0xFFFFFFFF) ^ state[0]) >> 19
+    )
+    state[1] = (((state[1] & 4294967288) << 4) & 0xFFFFFFFF) ^ (
+        (((state[1] << 2) & 0xFFFFFFFF) ^ state[1]) >> 25
+    )
+    state[2] = (((state[2] & 4294967280) << 17) & 0xFFFFFFFF) ^ (
+        (((state[2] << 3) & 0xFFFFFFFF) ^ state[2]) >> 11
+    )
+
+    return state[0] ^ state[1] ^ state[2]
+
 if __name__ == "__main__":
-    X, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-    X = X[:1000]
-
-    # go_fast(X)
-    # sum2d(X)
-    arr = np.array([1,2,3])
-    # myfunc(X, arr)
-    myfunc2(np.array([1,2]))
-    t1 = time.time()
+    INT32_MAX = np.iinfo(np.int32).max - 1
+    INT32_MIN = np.iinfo(np.int32).min - 1
+    random_state = np.random.mtrand._rand
+    rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
     
-    myfunc2(np.array([1,2]))
-
-    t2 = time.time()
-
-    print(t2-t1)
+    print(rng_state)
+    print(tau_rand_int(rng_state))

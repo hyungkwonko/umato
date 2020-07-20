@@ -596,9 +596,9 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig
             print(f"[INFO] Current loss: {CE_current:.6f}, @ iteration: {i+1}/{max_iter}")
 
         if savefig:
-            if i % 1 == 0:
+            if i % 2 == 0:
                 from umato.umato_ import plot_tmptmp
-                plot_tmptmp(data=Z, label=label, name=f"global{i}")
+                plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
 
     return Z
 
