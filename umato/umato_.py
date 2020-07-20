@@ -1162,6 +1162,24 @@ def build_global_structure(
     P = euclidean_distances(data[hubs])
     P /= P.max()
 
+
+
+    init = spectral_layout(data[hubs],
+            graph,
+            n_components,
+            random_state,
+            metric=metric,
+            metric_kwds=metric_kwds,
+        )
+
+    # local connectivity for global optimization
+    for _, e in enumerate(P):
+        indices = np.argsort(e)[:15]
+        e[indices] = 0.0
+
+
+
+
     if verbose:
         result = global_optimize(
             P=P,
@@ -1178,6 +1196,8 @@ def build_global_structure(
         result = global_optimize(
             P, Z, a, b, alpha=alpha, max_iter=max_iter
         )  # (TODO) how to optimize max_iter & alpha?
+
+    exit()
 
     return result
 
