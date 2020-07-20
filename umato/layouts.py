@@ -751,7 +751,7 @@ def nn_layout_optimize(
 
         if verbose and n % int(n_epochs / 10) == 0:
             from umato.umato_ import plot_tmptmp
-            plot_tmptmp(data=head_embedding, label=label, name=f"local{n}")
+            plot_tmptmp(data=head_embedding, label=label, name=f"pic3_local{n}")
 
         if verbose and n % int(n_epochs / 10) == 0:
             print("\tcompleted ", n, " / ", n_epochs, "epochs")

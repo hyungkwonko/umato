@@ -1252,7 +1252,7 @@ def embed_others_disjoint(
         )
 
     # save figure3
-    plot_tmptmp(data=init, label=label, name="pic3")
+    plot_tmptmp(data=init, label=label, name="pic4_disjoint")
 
     return init
 
@@ -2527,22 +2527,11 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        init = embed_others_disjoint(
-            data=X,
-            init=init,
-            hubs=hubs,
-            disjoints=disjoints,
-            random_state=random_state,
-            label=self.ll,
-        )
-
-        exit()
-
         # init, hub_idx = rpleaf_embedding(
         #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
         # )
 
-        self.embedding_ = local_optimize_nn(
+        init = local_optimize_nn(
             data=X,
             graph=self.graph_,
             hub_info=hub_info,
@@ -2561,6 +2550,18 @@ class UMATO(BaseEstimator):
             verbose=True,
             label=self.ll,
         )
+
+        # exit()
+
+        self.embedding_ = embed_others_disjoint(
+            data=X,
+            init=init,
+            hubs=hubs,
+            disjoints=disjoints,
+            random_state=random_state,
+            label=self.ll,
+        )
+
 
         return self
 

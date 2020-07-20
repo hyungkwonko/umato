@@ -9,7 +9,7 @@ from umato.umato_ import plot_tmptmp
 
 if __name__ == "__main__":
     # x = load_digits()  # (1797, 64 dim)
-    x, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
+    x, label = get_data("fmnist")  # spheres, mnist, fmnist, cifar10
 
     # UMTO
     t1 = time.time()
@@ -17,5 +17,5 @@ if __name__ == "__main__":
     t2 = time.time()
     print(t2-t1)
 
-    plot_tmptmp(embedding, label, "pic4")
+    plot_tmptmp(embedding, label, "pic5_fin")
     # save_csv('./', alg_name="umato", data=embedding, label=label)
