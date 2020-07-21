@@ -572,14 +572,40 @@ def calc_DTM(adj, sigma):
     return density / density.sum()
 
 
-def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig=False, label=None):
+def shaking(Z, num=-1):
+
+    if num < 0:
+        num = Z.shape[0] // 10
+
+    centre = Z.mean(axis=0)
+    distances = []
+    for i in range(Z.shape[0]):
+        distance = 0.0
+        for d in range(Z.shape[1]):
+            distance += (Z[i][d] - centre[d]) ** 2
+        distances.append(distance)
+    
+    distances = np.array(distances)
+
+    indices = np.argsort(distances)[-num:]
+    for j in indices:
+        Z[j] = centre + np.random.random(2) * 0.1
+
+    return Z
+
+def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig=False, label=None):
 
     CE_array = []
+    index = np.arange(len(Z))
 
     for i in range(max_iter):
         d_squared = np.square(euclidean_distances(Z, Z))
         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
         d_inverse = np.expand_dims(pow(1 + a * d_squared ** b, -1), axis=2)
+
+        # shaking for stable positioning
+        # if i % 5 == 0:
+        #     Z = shaking(Z=Z)
 
         Q = np.dot(1 - P, pow(0.001 + d_squared, -1))
         np.fill_diagonal(Q, 0)
@@ -590,13 +616,13 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=30, verbose=False, savefig
         Z -= alpha * dZ
 
         if verbose:
-            # CE_current = get_CE(P, Z, d_squared, a, b)
-            CE_current = get_DTM(P, Q, sigma=0.1)
+            CE_current = get_CE(P, Z, d_squared, a, b)
+            # CE_current = get_DTM(P, Q, sigma=0.1)
             CE_array.append(CE_current)
             print(f"[INFO] Current loss: {CE_current:.6f}, @ iteration: {i+1}/{max_iter}")
 
         if savefig:
-            if i % 2 == 0:
+            if i % 2 == 1:
                 from umato.umato_ import plot_tmptmp
                 plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
 

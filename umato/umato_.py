@@ -971,10 +971,10 @@ def disjoint_nn(
 
 # @numba.njit()
 def pick_hubs(
-    disjoints, random_state, outliers=False,
+    disjoints, random_state, popular=False,
 ):
 
-    if outliers:
+    if popular:
         return disjoints[:, 0]
     else:
         hubs = []
@@ -1136,12 +1136,26 @@ def hub_leaf_indices(
     return hub_idx, leaf_list
 
 
+def remove_local_connect(array, random_state, num=-1):
+    if num < 0:
+        num = array.shape[0] // 10  # use 10 % of the hub nodes
+    
+    normal = random_state.normal(loc=0.1, scale=0.1, size=num).astype(np.float32)
+    normal = np.clip(normal, a_min=0.0, a_max=0.1)
+
+    for _, e in enumerate(array):
+        indices = np.argsort(e)[:num]
+        e[indices] = np.sort(normal)
+
+    return array
+
 def build_global_structure(
     data,
     hubs,
     n_components,
     a,
     b,
+    random_state,
     alpha=0.005,
     max_iter=10,
     verbose=False,
@@ -1149,7 +1163,6 @@ def build_global_structure(
     global_init="pca",
 ):
     print("[INFO] Building global structure")
-    print(np.unique(label[hubs], return_counts=True))  # get count per class
 
     if global_init == "pca":
         Z = PCA(n_components=n_components).fit_transform(data[hubs])
@@ -1162,23 +1175,8 @@ def build_global_structure(
     P = euclidean_distances(data[hubs])
     P /= P.max()
 
-
-
-    init = spectral_layout(data[hubs],
-            graph,
-            n_components,
-            random_state,
-            metric=metric,
-            metric_kwds=metric_kwds,
-        )
-
     # local connectivity for global optimization
-    for _, e in enumerate(P):
-        indices = np.argsort(e)[:15]
-        e[indices] = 0.0
-
-
-
+    P = remove_local_connect(P, random_state)
 
     if verbose:
         result = global_optimize(
@@ -1196,8 +1194,6 @@ def build_global_structure(
         result = global_optimize(
             P, Z, a, b, alpha=alpha, max_iter=max_iter
         )  # (TODO) how to optimize max_iter & alpha?
-
-    exit()
 
     return result
 
@@ -1425,18 +1421,19 @@ def check_nn_accuracy(
 
 
 @numba.njit()
-def remove_from_graph(data, array, hub_info, remove_target=0):
+def remove_from_graph(data, array, hub_info, remove_target):
     """
     remove_target == 0: outliers
     remove_target == 1: NNs
     remove_target == 2: hubs    
     """
-    if remove_target not in [0, 1, 2]:
-        raise ValueError("remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs")
+    for target in remove_target:
+        if target not in [0, 1, 2]:
+            raise ValueError("remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs")
 
-    for i, e in enumerate(array):
-        if hub_info[e] == remove_target:
-            data[i] = 0
+        for i, e in enumerate(array):
+            if hub_info[e] == target:
+                data[i] = 0
 
     return data
 
@@ -1473,8 +1470,8 @@ def local_optimize_nn(
             n_epochs = 200
 
     # remove outlier-related values from graph
-    graph.data = remove_from_graph(graph.data, graph.row, hub_info, remove_target=0)
-    graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=0)
+    graph.data = remove_from_graph(graph.data, graph.row, hub_info, remove_target=np.array([0]))
+    graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
 
     # remove zero values
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
@@ -2512,7 +2509,7 @@ class UMATO(BaseEstimator):
         hubs = pick_hubs(
             disjoints=disjoints,
             random_state=random_state,
-            # outliers=True,
+            # popular=True,
         )
 
         # hub_idx, leaf_list = hub_leaf_indices(
@@ -2526,12 +2523,34 @@ class UMATO(BaseEstimator):
         #     debug=True,
         # )
 
+
+
+        # _m = self.metric if self._sparse_data else self._input_distance_func
+        # dmat_hubs = pairwise_distances(X[hubs], metric=_m, **self._metric_kwds)
+        # graph_hubs, _, _ = fuzzy_simplicial_set(
+        #     dmat_hubs,
+        #     self._n_neighbors,
+        #     random_state,
+        #     "precomputed",
+        #     self._metric_kwds,
+        #     None,
+        #     None,
+        #     self.angular_rp_forest,
+        #     self.set_op_mix_ratio,
+        #     self.local_connectivity,
+        #     True,
+        #     self.verbose,
+        # )
+
+        print(np.unique(self.ll[hubs], return_counts=True))  # get count per class
+
         global_optimized = build_global_structure(
             data=X,
             hubs=hubs,
             n_components=self.n_components,
             a=self._a,
             b=self._b,
+            random_state=random_state,
             alpha=0.005,
             max_iter=10,
             verbose=True,
@@ -2641,685 +2660,3 @@ class UMATO(BaseEstimator):
         """
         self.fit(X, y)
         return self.embedding_
-
-    def transform(self, X):
-        """Transform X into the existing embedded space and return that
-        transformed output.
-
-        Parameters
-        ----------
-        X : array, shape (n_samples, n_features)
-            New data to be transformed.
-
-        Returns
-        -------
-        X_new : array, shape (n_samples, n_components)
-            Embedding of the new data in low-dimensional space.
-        """
-        # If we fit just a single instance then error
-        if self.embedding_.shape[0] == 1:
-            raise ValueError(
-                "Transform unavailable when model was fit with only a single data sample."
-            )
-        # If we just have the original input then short circuit things
-        X = check_array(X, dtype=np.float32, accept_sparse="csr", order="C")
-        x_hash = joblib.hash(X)
-        if x_hash == self._input_hash:
-            return self.embedding_
-
-        if self.metric == "precomputed":
-            raise ValueError(
-                "Transform  of new data not available for precomputed metric."
-            )
-
-        # X = check_array(X, dtype=np.float32, order="C", accept_sparse="csr")
-        random_state = check_random_state(self.transform_seed)
-        rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
-
-        if self._small_data:
-            try:
-                # sklearn pairwise_distances fails for callable metric on sparse data
-                _m = self.metric if self._sparse_data else self._input_distance_func
-                dmat = pairwise_distances(
-                    X, self._raw_data, metric=_m, **self._metric_kwds
-                )
-            except (TypeError, ValueError):
-                dmat = dist.pairwise_special_metric(
-                    X,
-                    self._raw_data,
-                    metric=self._input_distance_func,
-                    kwds=self._metric_kwds,
-                )
-            indices = np.argpartition(dmat, self._n_neighbors)[:, : self._n_neighbors]
-            dmat_shortened = submatrix(dmat, indices, self._n_neighbors)
-            indices_sorted = np.argsort(dmat_shortened)
-            indices = submatrix(indices, indices_sorted, self._n_neighbors)
-            dists = submatrix(dmat_shortened, indices_sorted, self._n_neighbors)
-        elif _HAVE_PYNNDESCENT:
-            indices, dists = self._rp_forest.query(X, self.n_neighbors)
-        elif self._sparse_data:
-            if not scipy.sparse.issparse(X):
-                X = scipy.sparse.csr_matrix(X)
-
-            init = sparse_nn.sparse_initialise_search(
-                self._rp_forest,
-                self._raw_data.indices,
-                self._raw_data.indptr,
-                self._raw_data.data,
-                X.indices,
-                X.indptr,
-                X.data,
-                int(
-                    self._n_neighbors
-                    * self.transform_queue_size
-                    * (1 + int(self._sparse_data))
-                ),
-                rng_state,
-                self._input_distance_func,
-            )
-            result = sparse_nn.sparse_initialized_nnd_search(
-                self._raw_data.indices,
-                self._raw_data.indptr,
-                self._raw_data.data,
-                self._search_graph.indptr,
-                self._search_graph.indices,
-                init,
-                X.indices,
-                X.indptr,
-                X.data,
-                self._input_distance_func,
-            )
-
-            indices, dists = deheap_sort(result)
-            indices = indices[:, : self._n_neighbors]
-            dists = dists[:, : self._n_neighbors]
-        else:
-            init = initialise_search(
-                self._rp_forest,
-                self._raw_data,
-                X,
-                int(self._n_neighbors * self.transform_queue_size),
-                rng_state,
-                self._input_distance_func,
-            )
-            result = initialized_nnd_search(
-                self._raw_data,
-                self._search_graph.indptr,
-                self._search_graph.indices,
-                init,
-                X,
-                self._input_distance_func,
-            )
-
-            indices, dists = deheap_sort(result)
-            indices = indices[:, : self._n_neighbors]
-            dists = dists[:, : self._n_neighbors]
-
-        dists = dists.astype(np.float32, order="C")
-
-        adjusted_local_connectivity = max(0.0, self.local_connectivity - 1.0)
-        sigmas, rhos = smooth_knn_dist(
-            dists,
-            float(self._n_neighbors),
-            local_connectivity=float(adjusted_local_connectivity),
-        )
-
-        rows, cols, vals = compute_membership_strengths(indices, dists, sigmas, rhos)
-
-        graph = scipy.sparse.coo_matrix(
-            (vals, (rows, cols)), shape=(X.shape[0], self._raw_data.shape[0])
-        )
-
-        # This was a very specially constructed graph with constant degree.
-        # That lets us do fancy unpacking by reshaping the csr matrix indices
-        # and data. Doing so relies on the constant degree assumption!
-        csr_graph = normalize(graph.tocsr(), norm="l1")
-        inds = csr_graph.indices.reshape(X.shape[0], self._n_neighbors)
-        weights = csr_graph.data.reshape(X.shape[0], self._n_neighbors)
-        embedding = init_transform(inds, weights, self.embedding_)
-
-        if self.n_epochs is None:
-            # For smaller datasets we can use more epochs
-            if graph.shape[0] <= 10000:
-                n_epochs = 100
-            else:
-                n_epochs = 30
-        else:
-            n_epochs = int(self.n_epochs // 3.0)
-
-        graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
-        graph.eliminate_zeros()
-
-        epochs_per_sample = make_epochs_per_sample(graph.data, n_epochs)
-
-        head = graph.row
-        tail = graph.col
-        weight = graph.data
-
-        # optimize_layout = make_optimize_layout(
-        #     self._output_distance_func,
-        #     tuple(self.output_metric_kwds.values()),
-        # )
-
-        if self.output_metric == "euclidean":
-            embedding = optimize_layout_euclidean(
-                embedding,
-                self.embedding_.astype(np.float32, copy=True),  # Fixes #179 & #217,
-                head,
-                tail,
-                n_epochs,
-                graph.shape[1],
-                epochs_per_sample,
-                self._a,
-                self._b,
-                rng_state,
-                self.repulsion_strength,
-                self._initial_alpha / 4.0,
-                self.negative_sample_rate,
-                self.random_state is None,
-                verbose=self.verbose,
-            )
-        else:
-            embedding = optimize_layout_generic(
-                embedding,
-                self.embedding_.astype(np.float32, copy=True),  # Fixes #179 & #217
-                head,
-                tail,
-                n_epochs,
-                graph.shape[1],
-                epochs_per_sample,
-                self._a,
-                self._b,
-                rng_state,
-                self.repulsion_strength,
-                self._initial_alpha / 4.0,
-                self.negative_sample_rate,
-                self._output_distance_func,
-                tuple(self._output_metric_kwds.values()),
-                verbose=self.verbose,
-            )
-
-        return embedding
-
-    def inverse_transform(self, X):
-        """Transform X in the existing embedded space back into the input
-        data space and return that transformed output.
-
-        Parameters
-        ----------
-        X : array, shape (n_samples, n_components)
-            New points to be inverse transformed.
-
-        Returns
-        -------
-        X_new : array, shape (n_samples, n_features)
-            Generated data points new data in data space.
-        """
-
-        if self._sparse_data:
-            raise ValueError("Inverse transform not available for sparse input.")
-        elif self._inverse_distance_func is None:
-            raise ValueError("Inverse transform not available for given metric.")
-        elif self.n_components >= 8:
-            warn(
-                "Inverse transform works best with low dimensional embeddings."
-                " Results may be poor, or this approach to inverse transform"
-                " may fail altogether! If you need a high dimensional latent"
-                " space and inverse transform operations consider using an"
-                " autoencoder."
-            )
-
-        X = check_array(X, dtype=np.float32, order="C")
-        random_state = check_random_state(self.transform_seed)
-        rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
-
-        # build Delaunay complex (Does this not assume a roughly euclidean output metric)?
-        deltri = scipy.spatial.Delaunay(
-            self.embedding_, incremental=True, qhull_options="QJ"
-        )
-        neighbors = deltri.simplices[deltri.find_simplex(X)]
-        adjmat = scipy.sparse.lil_matrix(
-            (self.embedding_.shape[0], self.embedding_.shape[0]), dtype=int
-        )
-        for i in np.arange(0, deltri.simplices.shape[0]):
-            for j in deltri.simplices[i]:
-                if j < self.embedding_.shape[0]:
-                    idx = deltri.simplices[i][
-                        deltri.simplices[i] < self.embedding_.shape[0]
-                    ]
-                    adjmat[j, idx] = 1
-                    adjmat[idx, j] = 1
-
-        adjmat = scipy.sparse.csr_matrix(adjmat)
-
-        min_vertices = min(self._raw_data.shape[-1], self._raw_data.shape[0])
-
-        neighborhood = [
-            breadth_first_search(adjmat, v[0], min_vertices=min_vertices)
-            for v in neighbors
-        ]
-        if callable(self.output_metric):
-            # need to create another numba.jit-able wrapper for callable
-            # output_metrics that return a tuple (already checked that it does
-            # during param validation in `fit` method)
-            _out_m = self.output_metric
-
-            @numba.njit(fastmath=True)
-            def _output_dist_only(x, y, *kwds):
-                return _out_m(x, y, *kwds)[0]
-
-            dist_only_func = _output_dist_only
-        elif self.output_metric in dist.named_distances.keys():
-            dist_only_func = dist.named_distances[self.output_metric]
-        else:
-            # shouldn't really ever get here because of checks already performed,
-            # but works as a failsafe in case attr was altered manually after fitting
-            raise ValueError(
-                "Unrecognized output metric: {}".format(self.output_metric)
-            )
-
-        dist_args = tuple(self._output_metric_kwds.values())
-        distances = [
-            np.array(
-                [
-                    dist_only_func(X[i], self.embedding_[nb], *dist_args)
-                    for nb in neighborhood[i]
-                ]
-            )
-            for i in range(X.shape[0])
-        ]
-        idx = np.array([np.argsort(e)[:min_vertices] for e in distances])
-
-        dists_output_space = np.array(
-            [distances[i][idx[i]] for i in range(len(distances))]
-        )
-        indices = np.array([neighborhood[i][idx[i]] for i in range(len(neighborhood))])
-
-        rows, cols, distances = np.array(
-            [
-                [i, indices[i, j], dists_output_space[i, j]]
-                for i in range(indices.shape[0])
-                for j in range(min_vertices)
-            ]
-        ).T
-
-        # calculate membership strength of each edge
-        weights = 1 / (1 + self._a * distances ** (2 * self._b))
-
-        # compute 1-skeleton
-        # convert 1-skeleton into coo_matrix adjacency matrix
-        graph = scipy.sparse.coo_matrix(
-            (weights, (rows, cols)), shape=(X.shape[0], self._raw_data.shape[0])
-        )
-
-        # That lets us do fancy unpacking by reshaping the csr matrix indices
-        # and data. Doing so relies on the constant degree assumption!
-        # csr_graph = graph.tocsr()
-        csr_graph = normalize(graph.tocsr(), norm="l1")
-        inds = csr_graph.indices.reshape(X.shape[0], min_vertices)
-        weights = csr_graph.data.reshape(X.shape[0], min_vertices)
-        inv_transformed_points = init_transform(inds, weights, self._raw_data)
-
-        if self.n_epochs is None:
-            # For smaller datasets we can use more epochs
-            if graph.shape[0] <= 10000:
-                n_epochs = 100
-            else:
-                n_epochs = 30
-        else:
-            n_epochs = int(self.n_epochs // 3.0)
-
-        # graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
-        # graph.eliminate_zeros()
-
-        epochs_per_sample = make_epochs_per_sample(graph.data, n_epochs)
-
-        head = graph.row
-        tail = graph.col
-        weight = graph.data
-
-        inv_transformed_points = optimize_layout_inverse(
-            inv_transformed_points,
-            self._raw_data,
-            head,
-            tail,
-            weight,
-            self._sigmas,
-            self._rhos,
-            n_epochs,
-            graph.shape[1],
-            epochs_per_sample,
-            self._a,
-            self._b,
-            rng_state,
-            self.repulsion_strength,
-            self._initial_alpha / 4.0,
-            self.negative_sample_rate,
-            self._inverse_distance_func,
-            tuple(self._metric_kwds.values()),
-            verbose=self.verbose,
-        )
-
-        return inv_transformed_points
-
-
-class DataFrameUMATO(BaseEstimator):
-    def __init__(
-        self,
-        metrics,
-        n_neighbors=15,
-        n_components=2,
-        output_metric="euclidean",
-        output_metric_kwds=None,
-        n_epochs=None,
-        learning_rate=1.0,
-        init="spectral",
-        min_dist=0.1,
-        spread=1.0,
-        set_op_mix_ratio=1.0,
-        local_connectivity=1.0,
-        repulsion_strength=1.0,
-        negative_sample_rate=5,
-        transform_queue_size=4.0,
-        a=None,
-        b=None,
-        random_state=None,
-        angular_rp_forest=False,
-        target_n_neighbors=-1,
-        target_metric="categorical",
-        target_metric_kwds=None,
-        target_weight=0.5,
-        transform_seed=42,
-        verbose=False,
-    ):
-        self.metrics = metrics
-        self.n_neighbors = n_neighbors
-        self.output_metric = output_metric
-        self.output_metric_kwds = output_metric_kwds
-        self.n_epochs = n_epochs
-        self.init = init
-        self.n_components = n_components
-        self.repulsion_strength = repulsion_strength
-        self.learning_rate = learning_rate
-
-        self.spread = spread
-        self.min_dist = min_dist
-        self.set_op_mix_ratio = set_op_mix_ratio
-        self.local_connectivity = local_connectivity
-        self.negative_sample_rate = negative_sample_rate
-        self.random_state = random_state
-        self.angular_rp_forest = angular_rp_forest
-        self.transform_queue_size = transform_queue_size
-        self.target_n_neighbors = target_n_neighbors
-        self.target_metric = target_metric
-        self.target_metric_kwds = target_metric_kwds
-        self.target_weight = target_weight
-        self.transform_seed = transform_seed
-        self.verbose = verbose
-
-        self.a = a
-        self.b = b
-
-    def _validate_parameters(self):
-        if self.set_op_mix_ratio < 0.0 or self.set_op_mix_ratio > 1.0:
-            raise ValueError("set_op_mix_ratio must be between 0.0 and 1.0")
-        if self.repulsion_strength < 0.0:
-            raise ValueError("repulsion_strength cannot be negative")
-        if self.min_dist > self.spread:
-            raise ValueError("min_dist must be less than or equal to spread")
-        if self.min_dist < 0.0:
-            raise ValueError("min_dist must be greater than 0.0")
-        if not isinstance(self.init, str) and not isinstance(self.init, np.ndarray):
-            raise ValueError("init must be a string or ndarray")
-        if isinstance(self.init, str) and self.init not in ("spectral", "random"):
-            raise ValueError('string init values must be "spectral" or "random"')
-        if (
-            isinstance(self.init, np.ndarray)
-            and self.init.shape[1] != self.n_components
-        ):
-            raise ValueError("init ndarray must match n_components value")
-        if self.negative_sample_rate < 0:
-            raise ValueError("negative sample rate must be positive")
-        if self.learning_rate < 0.0:
-            raise ValueError("learning_rate must be positive")
-        if self.n_neighbors < 2:
-            raise ValueError("n_neighbors must be greater than 2")
-        if self.target_n_neighbors < 2 and self.target_n_neighbors != -1:
-            raise ValueError("target_n_neighbors must be greater than 2")
-        if not isinstance(self.n_components, int):
-            raise ValueError("n_components must be an int")
-        if self.n_components < 1:
-            raise ValueError("n_components must be greater than 0")
-        if self.n_epochs is not None and (
-            self.n_epochs <= 10 or not isinstance(self.n_epochs, int)
-        ):
-            raise ValueError("n_epochs must be a positive integer " "larger than 10")
-        if self.output_metric_kwds is None:
-            self._output_metric_kwds = {}
-        else:
-            self._output_metric_kwds = self.output_metric_kwds
-
-        if callable(self.output_metric):
-            self._output_distance_func = self.output_metric
-        elif (
-            self.output_metric in dist.named_distances
-            and self.output_metric in dist.named_distances_with_gradients
-        ):
-            self._output_distance_func = dist.named_distances_with_gradients[
-                self.output_metric
-            ]
-        elif self.output_metric == "precomputed":
-            raise ValueError("output_metric cannnot be 'precomputed'")
-        else:
-            if self.output_metric in dist.named_distances:
-                raise ValueError(
-                    "gradient function is not yet implemented for "
-                    + repr(self.output_metric)
-                    + "."
-                )
-            else:
-                raise ValueError(
-                    "output_metric is neither callable, " + "nor a recognised string"
-                )
-
-        # validate metrics argument
-        assert isinstance(self.metrics, list) or self.metrics == "infer"
-        if self.metrics != "infer":
-            for item in self.metrics:
-                assert isinstance(item, tuple) and len(item) == 3
-                assert isinstance(item[0], str)
-                assert item[1] in dist.named_distances
-                assert isinstance(item[2], list) and len(item[2]) >= 1
-
-                for col in item[2]:
-                    assert isinstance(col, str) or isinstance(col, int)
-
-    def fit(self, X, y=None):
-
-        self._validate_parameters()
-
-        # X should be a pandas dataframe, or np.array; check
-        # how column transformer handles this.
-        self._raw_data = X
-
-        # Handle all the optional arguments, setting default
-        if self.a is None or self.b is None:
-            self._a, self._b = find_ab_params(self.spread, self.min_dist)
-        else:
-            self._a = self.a
-            self._b = self.b
-
-        if isinstance(self.init, np.ndarray):
-            init = check_array(self.init, dtype=np.float32, accept_sparse=False)
-        else:
-            init = self.init
-
-        self._initial_alpha = self.learning_rate
-
-        # Error check n_neighbors based on data size
-        if X.shape[0] <= self.n_neighbors:
-            if X.shape[0] == 1:
-                self.embedding_ = np.zeros(
-                    (1, self.n_components)
-                )  # needed to sklearn comparability
-                return self
-
-            warn(
-                "n_neighbors is larger than the dataset size; truncating to "
-                "X.shape[0] - 1"
-            )
-            self._n_neighbors = X.shape[0] - 1
-        else:
-            self._n_neighbors = self.n_neighbors
-
-        if self.metrics == "infer":
-            raise NotImplementedError("Metric inference not implemented yet")
-
-        random_state = check_random_state(self.random_state)
-
-        self.metric_graphs_ = {}
-        self._sigmas = {}
-        self._rhos = {}
-        self._knn_indices = {}
-        self._knn_dists = {}
-        self._rp_forest = {}
-        self.graph_ = None
-
-        def is_discrete_metric(metric_data):
-            return metric_data[1] in dist.DISCRETE_METRICS
-
-        for metric_data in sorted(self.metrics, key=is_discrete_metric):
-            name, metric, columns = metric_data
-            print(name, metric, columns)
-
-            if metric in dist.DISCRETE_METRICS:
-                self.metric_graphs_[name] = None
-                for col in columns:
-
-                    discrete_space = X[col].values
-                    metric_kws = dist.get_discrete_params(discrete_space, metric)
-
-                    self.graph_ = discrete_metric_simplicial_set_intersection(
-                        self.graph_,
-                        discrete_space,
-                        metric=metric,
-                        metric_kws=metric_kws,
-                    )
-            else:
-                # Sparse not supported yet
-                sub_data = check_array(
-                    X[columns], dtype=np.float32, accept_sparse=False
-                )
-
-                if X.shape[0] < 4096:
-                    # small case
-                    self._small_data = True
-                    # TODO: metric keywords not supported yet!
-                    if metric in ("ll_dirichlet", "hellinger"):
-                        dmat = dist.pairwise_special_metric(sub_data, metric=metric)
-                    else:
-                        dmat = pairwise_distances(sub_data, metric=metric)
-
-                    (
-                        self.metric_graphs_[name],
-                        self._sigmas[name],
-                        self._rhos[name],
-                    ) = fuzzy_simplicial_set(
-                        dmat,
-                        self._n_neighbors,
-                        random_state,
-                        "precomputed",
-                        {},
-                        None,
-                        None,
-                        self.angular_rp_forest,
-                        self.set_op_mix_ratio,
-                        self.local_connectivity,
-                        False,
-                        self.verbose,
-                    )
-                else:
-                    self._small_data = False
-                    # Standard case
-                    # TODO: metric keywords not supported yet!
-                    (
-                        self._knn_indices[name],
-                        self._knn_dists[name],
-                        self._rp_forest[name],
-                    ) = nearest_neighbors(
-                        sub_data,
-                        self._n_neighbors,
-                        metric,
-                        {},
-                        self.angular_rp_forest,
-                        random_state,
-                        use_pynndescent=True,
-                        verbose=self.verbose,
-                    )
-
-                    (
-                        self.metric_graphs_[name],
-                        self._sigmas[name],
-                        self._rhos[name],
-                    ) = fuzzy_simplicial_set(
-                        sub_data,
-                        self.n_neighbors,
-                        random_state,
-                        metric,
-                        {},
-                        self._knn_indices[name],
-                        self._knn_dists[name],
-                        self.angular_rp_forest,
-                        self.set_op_mix_ratio,
-                        self.local_connectivity,
-                        False,
-                        self.verbose,
-                    )
-                    # TODO: set up transform data
-
-                if self.graph_ is None:
-                    self.graph_ = self.metric_graphs_[name]
-                else:
-                    self.graph_ = general_simplicial_set_intersection(
-                        self.graph_, self.metric_graphs_[name], 0.5
-                    )
-
-            print(self.graph_.data)
-            self.graph_ = reset_local_connectivity(
-                self.graph_, reset_local_metrics=True
-            )
-
-        if self.n_epochs is None:
-            n_epochs = 0
-        else:
-            n_epochs = self.n_epochs
-
-        if self.verbose:
-            print("Construct embedding")
-
-        # TODO: Handle connected component issues properly
-        # For now we just use manhattan and hope.
-        self.embedding_ = simplicial_set_embedding(
-            self._raw_data,
-            self.graph_,
-            self.n_components,
-            self._initial_alpha,
-            self._a,
-            self._b,
-            self.repulsion_strength,
-            self.negative_sample_rate,
-            n_epochs,
-            init,
-            random_state,
-            "manhattan",
-            {},
-            self._output_distance_func,
-            self.output_metric_kwds,
-            self.output_metric in ("euclidean", "l2"),
-            self.random_state is None,
-            self.verbose,
-        )
-
-        self._input_hash = joblib.hash(self._raw_data)
-
-        return self
