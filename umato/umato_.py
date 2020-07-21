@@ -1313,7 +1313,7 @@ def disjoint_initialize(
 
 @numba.njit()
 def nn_initialize(
-    data, init, hubs, knn_indices, random, nn_consider=5,
+    data, init, hubs, knn_indices, random, nn_consider=10,
 ):
     print("[INFO] Embedding other nodes using NN information")
 
@@ -1328,7 +1328,7 @@ def nn_initialize(
 
     for i in hubs:
         for j, e in enumerate(knn_indices[i]):
-            if j > nn_consider:  # use only 5 NNs
+            if j > nn_consider:  # use at most 10 neighbors by default
                 break
             if num_log[e] > -1:
                 init[e] += init[i] + random[e]  # add random value
@@ -1421,7 +1421,7 @@ def check_nn_accuracy(
 
 
 @numba.njit()
-def remove_from_graph(data, array, hub_info, remove_target):
+def remove_from_graph(data, array, array2, hub_info, remove_target):
     """
     remove_target == 0: outliers
     remove_target == 1: NNs
@@ -1433,10 +1433,22 @@ def remove_from_graph(data, array, hub_info, remove_target):
 
         for i, e in enumerate(array):
             if hub_info[e] == target:
-                data[i] = 0
+                if hub_info[array2[i]] == target:
+                    data[i] = 0
 
     return data
 
+@numba.njit()
+def change_graph_ix(array):
+    tracking = np.ones(len(array))
+    for ii in range(len(hubs)):
+        ixz = array == ii
+        ixz = ixz * tracking
+        tindex = np.where(ixz==1)[0]
+        tracking[tindex] = 0
+        array[tindex] = hubs[ii]
+
+    return array
 
 def local_optimize_nn(
     data,
@@ -1458,7 +1470,7 @@ def local_optimize_nn(
     label=None,
 ):
 
-    graph = graph.tocoo()
+    # graph = graph.tocoo()
     graph.sum_duplicates()
     n_vertices = graph.shape[1]
 
@@ -1470,8 +1482,8 @@ def local_optimize_nn(
             n_epochs = 200
 
     # remove outlier-related values from graph
-    graph.data = remove_from_graph(graph.data, graph.row, hub_info, remove_target=np.array([0]))
-    graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
+    graph.data = remove_from_graph(graph.data, graph.row, graph.col, hub_info, remove_target=np.array([0]))
+    # graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
 
     # remove zero values
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
@@ -2489,9 +2501,8 @@ class UMATO(BaseEstimator):
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
-        # sorted_index = index[freq.argsort()]  # sorted index in increasing order
+        # sorted_index = index[freq.argsort(kind="stable")]  # sorted index in increasing order
         sorted_index = index[freq.argsort(kind="stable")[::-1]]  # sorted index in decreasing order
-        # sorted_index = index[freq.argsort()[::-1]]  # sorted index in decreasing order
 
         # import pandas as pd
         # dataset = pd.DataFrame({'index': index, 'freq': freq, 'label': self.ll})
@@ -2523,25 +2534,6 @@ class UMATO(BaseEstimator):
         #     debug=True,
         # )
 
-
-
-        # _m = self.metric if self._sparse_data else self._input_distance_func
-        # dmat_hubs = pairwise_distances(X[hubs], metric=_m, **self._metric_kwds)
-        # graph_hubs, _, _ = fuzzy_simplicial_set(
-        #     dmat_hubs,
-        #     self._n_neighbors,
-        #     random_state,
-        #     "precomputed",
-        #     self._metric_kwds,
-        #     None,
-        #     None,
-        #     self.angular_rp_forest,
-        #     self.set_op_mix_ratio,
-        #     self.local_connectivity,
-        #     True,
-        #     self.verbose,
-        # )
-
         print(np.unique(self.ll[hubs], return_counts=True))  # get count per class
 
         global_optimized = build_global_structure(
@@ -2570,9 +2562,62 @@ class UMATO(BaseEstimator):
         #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
         # )
 
+
+
+        print("building graph2")
+
+        (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
+            X[hubs],
+            self._n_neighbors,
+            nn_metric,
+            self._metric_kwds,
+            self.angular_rp_forest,
+            random_state,
+            self.low_memory,
+            use_pynndescent=True,
+            verbose=True,
+        )
+        print("building graph2-2")
+
+        graph_hubs, _, _ = fuzzy_simplicial_set(
+            X[hubs],
+            self.n_neighbors,
+            random_state,
+            nn_metric,
+            self._metric_kwds,
+            _knn_indices2,
+            _knn_dists2,
+            self.angular_rp_forest,
+            self.set_op_mix_ratio,
+            self.local_connectivity,
+            True,
+            True,
+        )
+
+        print("building graph2-3")
+
+        print(graph_hubs)
+        graph_hubs = graph_hubs.tocoo()
+        graph_hubs.sum_duplicates()
+
+        hubs = sorted(hubs)
+        print(len(hubs) == len(np.unique(graph_hubs.row)))
+        tracking = np.ones(len(graph_hubs.row))
+        for ii in range(len(hubs)):
+            ixz = graph_hubs.row == ii
+            ixz = ixz * tracking
+            tindex = np.where(ixz==1)[0]
+            tracking[tindex] = 0
+            graph_hubs.row[tindex] = hubs[ii]
+
+        print(len(hubs) == len(np.unique(graph_hubs.row)))
+        graph_hubs.row = change_graph_ix(graph_hubs.row)
+        print(len(hubs) == len(np.unique(graph_hubs.col)))
+        graph_hubs.col = change_graph_ix(graph_hubs.col)
+
         init = local_optimize_nn(
             data=X,
-            graph=self.graph_,
+            graph=graph_hubs,
             hub_info=hub_info,
             n_components=self.n_components,
             initial_alpha=self._initial_alpha,
