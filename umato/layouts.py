@@ -645,14 +645,13 @@ def _nn_layout_optimize_single_epoch(
                 grad_hub = 0  # grad coefficient for hub nodes (DO NOT move)
                 if hub_info[j] == 1:
                     grad_hub = 1.0
-
-                grad_other = 0  # grad coefficient for for the opponent
-                if hub_info[k] == 1:
-                    grad_other = 1.0
-
                 current[d] += grad_d * alpha * grad_hub
-                if move_other:
-                    other[d] += -grad_d * alpha * grad_other
+
+                # grad_other = 0  # grad coefficient for the opponent
+                # if hub_info[k] == 1:
+                #     grad_other = 1.0
+                # if move_other:
+                #     other[d] += -grad_d * alpha * grad_other
 
             epoch_of_next_sample[i] += epochs_per_sample[i]
 
@@ -683,11 +682,7 @@ def _nn_layout_optimize_single_epoch(
                     else:
                         grad_d = 4.0
 
-                    grad_neg_other = 0
-                    if hub_info[k] == 1:
-                        grad_neg_other = 0.001
-
-                    current[d] += grad_d * alpha * grad_neg_other
+                    current[d] += grad_d * alpha * (grad_hub * 0.01)
 
             epoch_of_next_negative_sample[i] += (
                 n_neg_samples * epochs_per_negative_sample[i]

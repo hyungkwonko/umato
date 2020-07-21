@@ -2551,7 +2551,7 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        # exit()
+        exit()
 
         self.embedding_ = embed_others_disjoint(
             data=X,
