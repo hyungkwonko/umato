@@ -1439,16 +1439,11 @@ def remove_from_graph(data, array, array2, hub_info, remove_target):
     return data
 
 @numba.njit()
-def change_graph_ix(array):
-    tracking = np.ones(len(array))
-    for ii in range(len(hubs)):
-        ixz = array == ii
-        ixz = ixz * tracking
-        tindex = np.where(ixz==1)[0]
-        tracking[tindex] = 0
-        array[tindex] = hubs[ii]
-
-    return array
+def change_graph_ix(array, hubs):
+    result = array.copy()
+    for i, hub in enumerate(hubs):
+        result[array == i] = hub
+    return result
 
 def local_optimize_nn(
     data,
@@ -2601,19 +2596,24 @@ class UMATO(BaseEstimator):
         graph_hubs.sum_duplicates()
 
         hubs = sorted(hubs)
-        print(len(hubs) == len(np.unique(graph_hubs.row)))
-        tracking = np.ones(len(graph_hubs.row))
-        for ii in range(len(hubs)):
-            ixz = graph_hubs.row == ii
-            ixz = ixz * tracking
-            tindex = np.where(ixz==1)[0]
-            tracking[tindex] = 0
-            graph_hubs.row[tindex] = hubs[ii]
+        # print(len(hubs) == len(np.unique(graph_hubs.row)))
+        # tracking = np.ones(len(graph_hubs.row))
+        # for ii in range(len(hubs)):
+        #     ixz = graph_hubs.row == ii
+        #     ixz = ixz * tracking
+        #     tindex = np.where(ixz==1)[0]
+        #     tracking[tindex] = 0
+        #     graph_hubs.row[tindex] = hubs[ii]
 
+        t1 = time.time()
+        hubs = np.array(hubs)
         print(len(hubs) == len(np.unique(graph_hubs.row)))
-        graph_hubs.row = change_graph_ix(graph_hubs.row)
+        graph_hubs.row = change_graph_ix(graph_hubs.row, hubs)
         print(len(hubs) == len(np.unique(graph_hubs.col)))
-        graph_hubs.col = change_graph_ix(graph_hubs.col)
+        graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
+
+        t2 = time.time()
+        print(t2-t1)
 
         init = local_optimize_nn(
             data=X,
