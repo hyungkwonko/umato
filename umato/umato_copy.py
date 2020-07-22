@@ -14,6 +14,7 @@ from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.preprocessing import normalize
 from sklearn.neighbors import KDTree
+from sklearn.decomposition import PCA
 
 try:
     import joblib
@@ -56,6 +57,7 @@ from umato.layouts import (
     optimize_layout_generic,
     optimize_layout_inverse,
     global_optimize,
+    nn_layout_optimize,
 )
 
 try:
@@ -912,16 +914,92 @@ def make_epochs_per_sample(weights, n_epochs):
     return result
 
 
-##### Hyung-Kwon Ko
+############### Hyung-Kwon Ko
+############### Hyung-Kwon Ko
+############### Hyung-Kwon Ko
+@numba.njit()
+def disjoint_nn(
+    data, sorted_index, hub_num,
+):
+
+    leaf_num = int(np.ceil(data.shape[0] / hub_num))
+    disjoints = []
+
+    for i in range(hub_num):
+        tmp = 0
+        source = -1
+        disjoint = []
+
+        # append the first element
+        for j in range(len(sorted_index)):
+            if sorted_index[j] > -1:
+                source = sorted_index[j]
+                disjoint.append(source)
+                sorted_index[j] = -1
+                tmp += 1
+                break
+        if source == -1:
+            break  # break if all indices == -1
+
+        # get distance for each element
+        distances = np.ones(len(sorted_index)) * np.inf
+        for k in range(len(sorted_index)):
+            distance = 0.0
+            if sorted_index[k] > -1:
+                target = sorted_index[k]
+                for dim in range(data.shape[1]):
+                    distance += (data[source][dim] - data[target][dim]) ** 2
+                distances[target] = np.sqrt(distance)
+
+        # append other elements
+        for _ in range(leaf_num - 1):
+            val = min(distances)
+            if np.isinf(val):
+                disjoint = disjoint + [-1] * (leaf_num - tmp)
+                break
+            else:
+                min_index = np.argmin(distances)
+                disjoint.append(min_index)
+                distances[min_index] = np.inf
+                sorted_index[sorted_index == min_index] = -1
+                tmp += 1
+
+        disjoints.append(disjoint)
+
+    return np.array(disjoints)
+
+
+# @numba.njit()
+def pick_hubs(
+    disjoints, random_state, popular=False,
+):
+
+    if popular:
+        return disjoints[:, 0]
+    else:
+        hubs = []
+        (hub_num, _) = disjoints.shape
+
+        # append until second to last element
+        for i in range(hub_num - 1):
+            choice = random_state.choice(disjoints[i])
+            hubs.append(choice)
+
+        # append last element
+        last = disjoints[hub_num - 1]
+        last = last[last != -1]
+        choice = random_state.choice(last)
+        hubs.append(choice)
+
+        if hub_num != len(hubs):
+            ValueError(f"hub_num({hub_num}) is not the same as hubs({hubs})!")
+
+        return np.array(hubs)
+
 
 def hub_leaf_candidates(
-    data,
-    random_state,
-    hub_num,
-    iter_num=5,
-    n_trees=-1,
-    angular=False,
-    ):
+    data, random_state, hub_num, iter_num=5, n_trees=-1, angular=False,
+):
 
     hub_idxs = []
     leaf_arrays = []
@@ -956,12 +1034,13 @@ def hub_leaf_candidates(
     return hub_idxs, leaf_arrays
 
 
-
 def get_homology(data, local_knum, top_num, random_state):
     dist = pairwise_distances(data, data)
     dist /= dist.max()
 
-    nn_index = np.argpartition(dist, kth=local_knum-1, axis=-1)[:, :local_knum]  # kill using local connectivity
+    nn_index = np.argpartition(dist, kth=local_knum - 1, axis=-1)[
+        :, :local_knum
+    ]  # kill using local connectivity
 
     for i in range(len(dist)):
         dist[i][nn_index[i]] = random_state.random(local_knum) * 0.1
@@ -970,11 +1049,10 @@ def get_homology(data, local_knum, top_num, random_state):
     rc_tree = rc.create_simplex_tree(max_dimension=2)
     barcodes = rc_tree.persistence()
 
-
     hom1 = rc_tree.persistence_intervals_in_dimension(1)
     # cutoff = 0.3
     # hom1 = hom1[np.where(abs(hom1[:,0] - hom1[:,1]) > cutoff)]
-    hom1_max = abs(hom1[:,1] - hom1[:,0])
+    hom1_max = abs(hom1[:, 1] - hom1[:, 0])
     hom1_max_ix = hom1_max.argsort()[-top_num:][::-1]
 
     return hom1[hom1_max_ix]
@@ -1005,21 +1083,25 @@ def hub_leaf_indices(
     local_knum = 7
 
     if debug:
-        hub_list_1, leaf_list_1 = hub_leaf_candidates(data, random_state, hub_num, iter_num, n_trees, angular)
+        hub_list_1, leaf_list_1 = hub_leaf_candidates(
+            data, random_state, hub_num, iter_num, n_trees, angular
+        )
         choice = random_state.choice(iter_num)
         hub_idx = hub_list_1[choice]
         leaf_list = leaf_list_1[choice]
         return hub_idx, leaf_list
-
-
 
     while True:
         results = []
         k1_list = []
         k2_list = []
 
-        hub_list_1, leaf_list_1 = hub_leaf_candidates(data, random_state, hub_num, iter_num, n_trees, angular)
-        hub_list_2, _ = hub_leaf_candidates(data, random_state, hub_num + interval, iter_num, n_trees, angular)
+        hub_list_1, leaf_list_1 = hub_leaf_candidates(
+            data, random_state, hub_num, iter_num, n_trees, angular
+        )
+        hub_list_2, _ = hub_leaf_candidates(
+            data, random_state, hub_num + interval, iter_num, n_trees, angular
+        )
 
         for i in range(iter_num):
             d1 = data[hub_list_1[i]]
@@ -1054,82 +1136,218 @@ def hub_leaf_indices(
     return hub_idx, leaf_list
 
 
+def remove_local_connect(array, random_state, num=-1):
+    if num < 0:
+        num = array.shape[0] // 10  # use 10 % of the hub nodes
+    
+    normal = random_state.normal(loc=0.1, scale=0.1, size=num).astype(np.float32)
+    normal = np.clip(normal, a_min=0.0, a_max=0.1)
+
+    for _, e in enumerate(array):
+        indices = np.argsort(e)[:num]
+        e[indices] = np.sort(normal)
+
+    return array
+
 def build_global_structure(
     data,
-    hub_idx,
+    hubs,
     n_components,
     a,
     b,
+    random_state,
     alpha=0.005,
     max_iter=10,
     verbose=False,
+    label=None,
+    global_init="pca",
 ):
     print("[INFO] Building global structure")
 
-    #### for test only...
-    # from evaluation.models.dataset import get_data, save_csv
-    # _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-    # print(np.unique(label[hub_idx], return_counts=True))  # get count per class
+    if global_init == "pca":
+        Z = PCA(n_components=n_components).fit_transform(data[hubs])
+        Z /= Z.max()
+    elif global_init == "random":
+        Z = np.random.random((len(hubs), n_components))
+    else:
+        raise ValueError("Check hub node initializing method!")
 
-    from sklearn.decomposition import PCA
-    Z = PCA(n_components=n_components).fit_transform(data[hub_idx])
-    Z /= Z.max()
-
-    P = euclidean_distances(data[hub_idx])
+    P = euclidean_distances(data[hubs])
     P /= P.max()
 
-    # result = global_optimize(P, Z, a, b, alpha=alpha, max_iter=max_iter, verbose=True, savefig=True, label=label[hub_idx])
-    result = global_optimize(
-        P, Z, a, b, alpha=alpha, max_iter=max_iter
-    )  # (TODO) how to optimize max_iter & alpha?
+    # local connectivity for global optimization
+    P = remove_local_connect(P, random_state)
+
+    if verbose:
+        result = global_optimize(
+            P=P,
+            Z=Z,
+            a=a,
+            b=b,
+            alpha=alpha,
+            max_iter=max_iter,
+            verbose=True,
+            savefig=True,
+            label=label[hubs],
+        )
+    else:
+        result = global_optimize(
+            P, Z, a, b, alpha=alpha, max_iter=max_iter
+        )  # (TODO) how to optimize max_iter & alpha?
 
     return result
 
 
-@numba.njit()
+def plot_tmptmp(data, label, name):
+    import matplotlib.pyplot as plt
+
+    plt.scatter(data[:, 0], data[:, 1], s=2.0, c=label, cmap="Spectral", alpha=1.0)
+    cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
+    cbar.set_ticks(np.arange(11))
+    plt.title("Embedded")
+    plt.savefig(f"./tmp/{name}.png")
+    plt.close()
+
+
 def embed_others_nn(
-    data,
-    init,
-    hub_idx,
-    leaf_list,
-    knn_indices,
+    data, global_optimized, hubs, knn_indices, random_state, label,
 ):
-    # print("[INFO] Embedding other nodes using NN information")
+    init = np.zeros((data.shape[0], global_optimized.shape[1]))
+    original_hubs = hubs.copy()
+    init[hubs] = global_optimized
+
+    # generate random normal distribution
+    random_normal = random_state.normal(scale=0.005, size=list(init.shape)).astype(
+        np.float32
+    )
+
+    while True:
+        val = len(hubs)
+
+        # append other nodes using NN information
+        init, hubs = nn_initialize(
+            data=data,
+            init=init,
+            hubs=hubs,
+            knn_indices=knn_indices,
+            random=random_normal,
+        )
+
+
+        if val == len(hubs):
+            if len(init) > len(hubs):
+                print(f"len(hubs) {len(hubs)} is smaller than len(init) {len(init)}")
+            break
+
+    hub_info = np.zeros(data.shape[0])
+    hub_info[hubs] = 1
+    hub_info[original_hubs] = 2
+
+    # save figure2
+    plot_tmptmp(data=init[hubs], label=label[hubs], name=f"pic2")
+
+    return init, hub_info, hubs
+
+
+def embed_others_disjoint(
+    data, init, hubs, disjoints, random_state, label,
+):
+    # generate random normal distribution
+    random_normal = random_state.normal(scale=0.02, size=list(init.shape)).astype(
+        np.float32
+    )
+
+    # append other nodes using NN disjoint information
+    init, outliers = disjoint_initialize(
+        data=data, init=init, hubs=hubs, disjoints=disjoints, random=random_normal,
+    )
+
+    if len(init) != len(outliers):
+        raise ValueError(
+            f"total data # ({len(init)}) != total embedded # ({len(outliers)})!"
+        )
+
+    # save figure3
+    plot_tmptmp(data=init, label=label, name="pic4_disjoint")
+
+    return init
+
+
+@numba.njit()
+def disjoint_initialize(
+    data, init, hubs, disjoints, random,
+):
+
+    hubs_true = np.zeros(data.shape[0])
+    hubs_true[hubs] = True
+    hubs = set(hubs)
+
+    nndist = np.sum(init[:, 1]) / len(hubs)
+
+    for disjoint in disjoints:
+        for j in disjoint:
+            # j == -1 means we've run all the iteration
+            if j == -1:
+                break
+            # if it is not a hub node, we should embed this using NN in disjoint set
+            if not hubs_true[j]:
+                distances = []
+                indices = []
+                # we use its neighbors
+                for k in disjoint:
+                    if hubs_true[k]:
+                        distance = 0.0
+                        for l in range(data.shape[1]):
+                            distance += (data[j][l] - data[k][l]) ** 2
+                        distance = np.sqrt(distance)
+                        distances.append(distance)
+                        indices.append(k)
+                ix = np.array(distances).argsort()[0]
+                target_ix = indices[ix]
+                init[j] = init[target_ix] + random[j]  # add random value
+
+                hubs.add(j)
+
+    return init, hubs
+
+
+@numba.njit()
+def nn_initialize(
+    data, init, hubs, knn_indices, random, nn_consider=10,
+):
+    print("[INFO] Embedding other nodes using NN information")
 
     all_idx = np.arange(data.shape[0])
-    hub_not_idx = np.delete(all_idx, hub_idx)
-
     num_log = np.zeros(data.shape[0])
-    num_log[hub_idx] = -1
+    num_log[hubs] = -1
 
-    hub_idx = set(hub_idx)
-    hub_idx_fin = hub_idx.copy()
+    hubs = set(hubs)
+    hubs_fin = hubs.copy()
 
-    for i in hub_idx:
+    nndist = np.sum(init[:, 1]) / len(hubs)
+
+    for i in hubs:
         for j, e in enumerate(knn_indices[i]):
-            if j > 5:  # use only 5 NNs
+            if j > nn_consider:  # use at most 10 neighbors by default
                 break
             if num_log[e] > -1:
-                init[e] += init[i] + np.random.uniform(-0.001, 0.001, size=2)
+                init[e] += init[i] + random[e]  # add random value
                 num_log[e] += 1
-                hub_idx_fin.add(e)
+                hubs_fin.add(e)
                 # break
 
     for k in range(data.shape[0]):
         if num_log[k] > 0:
             init[k] /= num_log[k]
 
-    return init, np.array(list(hub_idx_fin))
+    return init, np.array(list(hubs_fin))
 
 
 @numba.njit()
-def embed_others_leaf(
-    data,
-    init,
-    hub_idx,
-    leaf_list,
+def rpleaf_embedding(
+    data, init, hub_idx, leaf_list,
 ):
-    # print("[INFO] Embedding other nodes")
+    print("[INFO] Embedding other nodes using LEAF information")
 
     all_idx = np.arange(data.shape[0])
     hub_not_idx = np.delete(all_idx, hub_idx)
@@ -1141,7 +1359,6 @@ def embed_others_leaf(
     # hub_not_idx_fin = hub_not_idx.copy()
     hub_idx = set(hub_idx)
     hub_idx_fin = hub_idx.copy()
-
 
     for leaf in leaf_list:
         hub_, hub_not_ = [], []
@@ -1157,7 +1374,7 @@ def embed_others_leaf(
                         break
                 if flag == 0:
                     hub_not_.append(j)
-        
+
         hub_ = np.array(hub_)
         hub_not_ = np.array(hub_not_)
         if len(hub_) > 0 and len(hub_not_) > 0:
@@ -1186,7 +1403,150 @@ def embed_others_leaf(
     return init, hub_idx_fin
 
 
+def check_nn_accuracy(
+    indices_info, label,
+):
+    # ix = np.arange(indices_info.shape[0])
+    # ix2 = ix[self.ll < 10]
+    scores = np.array([])
+    for i in np.arange(indices_info.shape[0]):
+        score = 0
+        for j in range(1, indices_info.shape[1]):
+            if label[indices_info[i][j]] == label[indices_info[i][0]]:
+                score += 1.0 / (indices_info.shape[1] - 1)
+        scores = np.append(scores, score)
+    print(len(scores))
+    print(np.mean(scores))
+    return 0
 
+
+@numba.njit()
+def remove_from_graph(data, array, array2, hub_info, remove_target):
+    """
+    remove_target == 0: outliers
+    remove_target == 1: NNs
+    remove_target == 2: hubs    
+    """
+    for target in remove_target:
+        if target not in [0, 1, 2]:
+            raise ValueError("remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs")
+
+        for i, e in enumerate(array):
+            if hub_info[e] == target:
+                if hub_info[array2[i]] == target:
+                    data[i] = 0
+
+    return data
+
+
+@numba.njit()
+def change_graph_ix(array, hubs):
+    result = array.copy()
+    for i, hub in enumerate(hubs):
+        result[array == i] = hub
+    return result
+
+
+# def compute_hub_nn_graph(data=X, hub_info=hub_info,):
+#     hubs = np.where(hub_info == 0)[0]
+#     nns = np.where(hub_info == 1)[0]
+#     return graph_hubs
+
+#         rows, cols, vals = compute_membership_strengths(
+#             knn_indices, knn_dists, sigmas, rhos
+#         )
+
+#         result = scipy.sparse.coo_matrix(
+#             (vals, (rows, cols)), shape=(X.shape[0], X.shape[0])
+#         )
+#         result.eliminate_zeros()
+
+def local_optimize_nn(
+    data,
+    graph,
+    hub_info,
+    n_components,
+    initial_alpha,
+    a,
+    b,
+    gamma,
+    negative_sample_rate,
+    n_epochs,
+    init,
+    random_state,
+    metric,
+    metric_kwds,
+    parallel=False,
+    verbose=False,
+    label=None,
+):
+
+    # graph = graph.tocoo()
+    graph.sum_duplicates()
+    n_vertices = graph.shape[1]
+
+    if n_epochs <= 0:
+        # For smaller datasets we can use more epochs
+        if graph.shape[0] <= 10000:
+            n_epochs = 500
+        else:
+            n_epochs = 200
+
+    # remove outlier-related values from graph
+    # graph.data = remove_from_graph(graph.data, graph.row, graph.col, hub_info, remove_target=np.array([0]))
+    # graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
+
+    # remove zero values
+    graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
+    graph.eliminate_zeros()
+
+    init_data = np.array(init)
+    if len(init_data.shape) == 2:
+        if np.unique(init_data, axis=0).shape[0] < init_data.shape[0]:
+            tree = KDTree(init_data)
+            dist, ind = tree.query(init_data, k=2)
+            nndist = np.mean(dist[:, 1])
+            embedding = init_data + random_state.normal(
+                scale=0.001 * nndist, size=init_data.shape
+            ).astype(np.float32)
+        else:
+            embedding = init_data
+
+    epochs_per_sample = make_epochs_per_sample(graph.data, n_epochs)
+
+    head = graph.row
+    tail = graph.col
+    weight = graph.data
+
+    rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
+
+    embedding = (
+        10.0
+        * (embedding - np.min(embedding, 0))
+        / (np.max(embedding, 0) - np.min(embedding, 0))
+    ).astype(np.float32, order="C")
+
+    embedding = nn_layout_optimize(
+        embedding,
+        embedding,
+        head,
+        tail,
+        hub_info,
+        n_epochs,
+        n_vertices,
+        epochs_per_sample,
+        a,
+        b,
+        rng_state,
+        gamma,
+        initial_alpha,
+        negative_sample_rate,
+        parallel=parallel,
+        verbose=verbose,
+        label=label,
+    )
+
+    return embedding
 
 
 def simplicial_set_embedding(
@@ -2136,106 +2496,6 @@ class UMATO(BaseEstimator):
 
                         self._input_distance_func = _partial_dist_func
 
-        # Currently not checking if any duplicate points have differing labels
-        # Might be worth throwing a warning...
-        if y is not None:
-            len_X = len(X) if not self._sparse_data else X.shape[0]
-            if len_X != len(y):
-                raise ValueError(
-                    "Length of x = {len_x}, length of y = {len_y}, while it must be equal.".format(
-                        len_x=len_X, len_y=len(y)
-                    )
-                )
-            y_ = check_array(y, ensure_2d=False)[index]
-            if self.target_metric == "categorical":
-                if self.target_weight < 1.0:
-                    far_dist = 2.5 * (1.0 / (1.0 - self.target_weight))
-                else:
-                    far_dist = 1.0e12
-                self.graph_ = discrete_metric_simplicial_set_intersection(
-                    self.graph_, y_, far_dist=far_dist
-                )
-            elif self.target_metric in dist.DISCRETE_METRICS:
-                if self.target_weight < 1.0:
-                    scale = 2.5 * (1.0 / (1.0 - self.target_weight))
-                else:
-                    scale = 1.0e12
-                # self.graph_ = discrete_metric_simplicial_set_intersection(
-                #     self.graph_,
-                #     y_,
-                #     metric=self.target_metric,
-                #     metric_kws=self.target_metric_kwds,
-                #     metric_scale=scale
-                # )
-
-                metric_kws = dist.get_discrete_params(y_, self.target_metric)
-
-                self.graph_ = discrete_metric_simplicial_set_intersection(
-                    self.graph_,
-                    y_,
-                    metric=self.target_metric,
-                    metric_kws=metric_kws,
-                    metric_scale=scale,
-                )
-            else:
-                if len(y_.shape) == 1:
-                    y_ = y_.reshape(-1, 1)
-                if self.target_n_neighbors == -1:
-                    target_n_neighbors = self._n_neighbors
-                else:
-                    target_n_neighbors = self.target_n_neighbors
-
-                # Handle the small case as precomputed as before
-                if y.shape[0] < 4096:
-                    try:
-                        ydmat = pairwise_distances(
-                            y_, metric=self.target_metric, **self._target_metric_kwds
-                        )
-                    except (TypeError, ValueError):
-                        ydmat = dist.pairwise_special_metric(
-                            y_,
-                            metric=self.target_metric,
-                            kwds=self._target_metric_kwds,
-                        )
-
-                    target_graph, target_sigmas, target_rhos = fuzzy_simplicial_set(
-                        ydmat,
-                        target_n_neighbors,
-                        random_state,
-                        "precomputed",
-                        self._target_metric_kwds,
-                        None,
-                        None,
-                        False,
-                        1.0,
-                        1.0,
-                        False,
-                    )
-                else:
-                    # Standard case
-                    target_graph, target_sigmas, target_rhos = fuzzy_simplicial_set(
-                        y_,
-                        target_n_neighbors,
-                        random_state,
-                        self.target_metric,
-                        self._target_metric_kwds,
-                        None,
-                        None,
-                        False,
-                        1.0,
-                        1.0,
-                        False,
-                    )
-                # product = self.graph_.multiply(target_graph)
-                # # self.graph_ = 0.99 * product + 0.01 * (self.graph_ +
-                # #                                        target_graph -
-                # #                                        product)
-                # self.graph_ = product
-                self.graph_ = general_simplicial_set_intersection(
-                    self.graph_, target_graph, self.target_weight
-                )
-                self.graph_ = reset_local_connectivity(self.graph_)
-
         if self.n_epochs is None:
             n_epochs = 0
         else:
@@ -2244,220 +2504,154 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Construct global structure")
 
-
-
-        ####### Hyung-Kwon Ko
-        ####### Hyung-Kwon Ko
-        ####### Hyung-Kwon Ko
-        # print(self._knn_indices[5000:5100])
-        # print(self._knn_indices[6000:6100])
-        # print(self._knn_indices[7000:7100])
-        # exit()
-
-        from evaluation.models.dataset import get_data, save_csv
-        import matplotlib.pyplot as plt
-        # print(np.unique(label, return_counts=True))
-
-        ix = np.arange(X.shape[0])
-        ix2 = ix[self.ll < 10]
-        # print(ix2)
-        # self.ll = self.ll[ix2]
-        # self._knn_indices = self._knn_indices[ix2]
-
-        scores = np.array([])
-        for i in ix:
-        # for i in range(len(self._knn_indices)):
-            score = 0
-            for j in range(1, 15):
-                if self.ll[self._knn_indices[i][j]] == self.ll[self._knn_indices[i][0]]:
-                    score += 1.0 / (15 - 1)
-            scores = np.append(scores, score)
-        print(len(scores))
-        print(np.mean(scores))
-
-        scores = np.array([])
-        for i in ix2:
-        # for i in range(len(self._knn_indices)):
-            score = 0
-            for j in range(1, 15):
-                if self.ll[self._knn_indices[i][j]] == self.ll[self._knn_indices[i][0]]:
-                    score += 1.0 / (15 - 1)
-            scores = np.append(scores, score)
-        print(len(scores))
-        print(np.mean(scores))
-
-        exit()
-
-
-
-
-
-        # zz = self._knn_indices.flatten()
-        # zz1, zz2 = np.unique(zz, return_counts=True)
-
-        # zz3 = np.argsort(zz2)[:1000]  # top 150 unpopular nodes
-        # # zz3 = np.argsort(zz2)[-300:]  # top 150 popular nodes
-
-        # print("zz1: ", zz1)
-        # print("zz2: ", zz2)
-
-        # for _ in range(5):
-        #     flattened = self._knn_indices[zz3].flatten()
-        #     zz3, zz4 = np.unique(flattened, return_counts=True)
-        #     print("zz3: ", zz3)
-        #     print("zz4: ", zz4)
-        #     print(len(zz4))
-
-        # exit()
-
-
         ###### Hyung-Kwon Ko
-        hub_idx, leaf_list = hub_leaf_indices(
-            data=X,
-            random_state=random_state,
-            n_trees=-1,
-            hub_num=150,
-            verbose=False,
-            angular=False,
-            # debug=False,
-            debug=True,
+        ###### Hyung-Kwon Ko
+        ###### Hyung-Kwon Ko
+
+        hub_num = 300
+
+        flat_indices = self._knn_indices.flatten()  # flattening all knn indices
+        index, freq = np.unique(flat_indices, return_counts=True)
+        # sorted_index = index[freq.argsort(kind="stable")]  # sorted index in increasing order
+        sorted_index = index[freq.argsort(kind="stable")[::-1]]  # sorted index in decreasing order
+
+        # import pandas as pd
+        # dataset = pd.DataFrame({'index': index, 'freq': freq, 'label': self.ll})
+        # dataset.to_csv("./zz_random.csv", index=False)
+
+        # get disjoint NN matrix
+        disjoints = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
+
+        # check NN accuracy
+        check_nn_accuracy(
+            indices_info=disjoints, label=self.ll,
         )
+
+        # get hub indices from disjoint
+        hubs = pick_hubs(
+            disjoints=disjoints,
+            random_state=random_state,
+            # popular=True,
+        )
+
+        # hub_idx, leaf_list = hub_leaf_indices(
+        #     data=X,
+        #     random_state=random_state,
+        #     n_trees=-1,
+        #     hub_num=300,
+        #     verbose=False,
+        #     angular=False,
+        #     # debug=False,
+        #     debug=True,
+        # )
+
+        print(np.unique(self.ll[hubs], return_counts=True))  # get count per class
 
         global_optimized = build_global_structure(
             data=X,
-            hub_idx=hub_idx,
+            hubs=hubs,
             n_components=self.n_components,
             a=self._a,
             b=self._b,
+            random_state=random_state,
             alpha=0.005,
             max_iter=10,
-            verbose=False,
+            verbose=True,
+            label=self.ll,
         )
 
-
-
-
-        hub_idx = np.array(hub_idx)
-
-        init = np.zeros((X.shape[0], global_optimized.shape[1]))
-        init[hub_idx] = global_optimized
-
-        t1 = time.time()
-
-        # leaf_list = rptree_leaf_array(self._rp_forest)
-        # print(type(leaf_list))
-        # print(self._rp_forest)
-        # print(leaf_list.shape)
-        # exit()
-        # print(leaf_list.shape)
-        # z = leaf_list.flatten()
-        # index = np.argwhere(z==-1)
-        # zz = np.delete(z, index)
-        # print(len(zz))
-        # exit()
-
-        # print(leaf_list)
-        # print(leaf_list[0])
-        # print(leaf_list[1])
-        # print(leaf_list[2])
-        # exit()
-
-        for _ in range(3):
-
-            init, hub_idx = embed_others_nn(
-                data=X,
-                init=init,
-                hub_idx=hub_idx,
-                leaf_list=leaf_list,
-                knn_indices=self._knn_indices,
-            )
-            print(len(hub_idx))
-
-        # print(np.isinf(init).any())
-        # print("z====: ", np.isinf(leaf_list).any())
-
-        from evaluation.models.dataset import get_data, save_csv
-        import matplotlib.pyplot as plt
-        _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-
-
-        # for zz in leaf_list:
-        #     index = np.argwhere(zz==-1)
-        #     tmp = np.delete(zz, index)
-        #     if len(tmp) > 30:
-        #         print(np.unique(label[tmp], return_counts=True))  # get count per class
-
-        # exit()
-
-        init = init[hub_idx]
-        label = label[hub_idx]
-
-        plt.scatter(init[:,0], init[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
-        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
-        cbar.set_ticks(np.arange(10))
-        plt.title('Spheres Embedded')
-        plt.savefig(f'./tmp/z1.png')
-        plt.close()
-
-        init, hub_idx = embed_others_leaf(
+        init, hub_info, hubs = embed_others_nn(
             data=X,
-            init=init,
-            hub_idx=hub_idx,
-            leaf_list=leaf_list,
+            global_optimized=global_optimized,
+            hubs=hubs,
+            knn_indices=self._knn_indices,
+            random_state=random_state,
+            label=self.ll,
         )
 
-        # print(np.isinf(init).any())
-        # print(len(hub_idx))
-        # print(len(init))
-        print(init)
-
-        # init = init[hub_idx]
-        # label = label[hub_idx]
-
-        _, label = get_data("spheres")  # spheres, mnist, fmnist, cifar10
-
-
-        plt.scatter(init[:,0], init[:,1], s=8.0, c=label, cmap='Spectral', alpha=1.0)
-        cbar = plt.colorbar(boundaries=np.arange(11)-0.5)
-        cbar.set_ticks(np.arange(10))
-        plt.title('Spheres Embedded')
-        plt.savefig(f'./tmp/z2.png')
-        plt.close()
-        exit()
+        # init, hub_idx = rpleaf_embedding(
+        #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
+        # )
 
 
 
+        (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
+            X[hubs],
+            self._n_neighbors,
+            nn_metric,
+            self._metric_kwds,
+            self.angular_rp_forest,
+            random_state,
+            self.low_memory,
+            use_pynndescent=True,
+            verbose=True,
+        )
 
-        t2 = time.time()
+        graph_hubs, _, _ = fuzzy_simplicial_set(
+            X[hubs],
+            self.n_neighbors,
+            random_state,
+            nn_metric,
+            self._metric_kwds,
+            _knn_indices2,
+            _knn_dists2,
+            self.angular_rp_forest,
+            self.set_op_mix_ratio,
+            self.local_connectivity,
+            True,
+            True,
+        )
 
-        print(init.shape)
-        print(t2-t1)
+        # graph_hubs = compute_hub_nn_graph(data=X, hub_info=hub_info,)
+        # rows, cols, vals = compute_membership_strengths(
+        #     knn_indices, knn_dists, sigmas, rhos
+        # )
+        # result = scipy.sparse.coo_matrix(
+        #     (vals, (rows, cols)), shape=(X.shape[0], X.shape[0])
+        # )
+        # result.eliminate_zeros()
 
-
+        print("building graph2-3")
+        graph_hubs = graph_hubs.tocoo()
+        graph_hubs.sum_duplicates()
+        hubs = sorted(hubs)
+        hubs = np.array(hubs)
+        print(len(hubs) == len(np.unique(graph_hubs.row)))
+        graph_hubs.row = change_graph_ix(graph_hubs.row, hubs)
+        print(len(hubs) == len(np.unique(graph_hubs.col)))
+        graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
 
         if self.verbose:
             print(ts(), "Construct local structure")
 
-        self.embedding_ = simplicial_set_embedding(
-            self._raw_data[index],  # JH why raw data?
-            self.graph_,
-            self.n_components,
-            self._initial_alpha,
-            self._a,
-            self._b,
-            self.repulsion_strength,
-            self.negative_sample_rate,
-            n_epochs,
-            init,
-            random_state,
-            self._input_distance_func,
-            self._metric_kwds,
-            self._output_distance_func,
-            self._output_metric_kwds,
-            self.output_metric in ("euclidean", "l2"),
-            self.random_state is None,
-            self.verbose,
-        )[inverse]
+        init = local_optimize_nn(
+            data=X,
+            graph=graph_hubs,
+            hub_info=hub_info,
+            n_components=self.n_components,
+            initial_alpha=self._initial_alpha,
+            a=self._a,
+            b=self._b,
+            gamma=self.repulsion_strength,
+            negative_sample_rate=self.negative_sample_rate,
+            n_epochs=n_epochs,
+            init=init,
+            random_state=random_state,
+            metric=self._input_distance_func,
+            metric_kwds=self.metric_kwds,
+            parallel=False,
+            verbose=True,
+            label=self.ll,
+        )
+
+        self.embedding_ = embed_others_disjoint(
+            data=X,
+            init=init,
+            hubs=hubs,
+            disjoints=disjoints,
+            random_state=random_state,
+            label=self.ll,
+        )
 
         if self.verbose:
             print(ts() + " Finished embedding")
@@ -2465,6 +2659,29 @@ class UMATO(BaseEstimator):
         self._input_hash = joblib.hash(self._raw_data)
 
         return self
+
+        #######
+        # self.embedding_ = simplicial_set_embedding(
+        #     self._raw_data[index],  # JH why raw data?
+        #     self.graph_,
+        #     self.n_components,
+        #     self._initial_alpha,
+        #     self._a,
+        #     self._b,
+        #     self.repulsion_strength,
+        #     self.negative_sample_rate,
+        #     n_epochs,
+        #     init,
+        #     random_state,
+        #     self._input_distance_func,
+        #     self._metric_kwds,
+        #     self._output_distance_func,
+        #     self._output_metric_kwds,
+        #     self.output_metric in ("euclidean", "l2"),
+        #     self.random_state is None,
+        #     self.verbose,
+        # )[inverse]
+
 
     def fit_transform(self, X, y=None):
         """Fit X into an embedded space and return that transformed
@@ -2489,685 +2706,3 @@ class UMATO(BaseEstimator):
         """
         self.fit(X, y)
         return self.embedding_
-
-    def transform(self, X):
-        """Transform X into the existing embedded space and return that
-        transformed output.
-
-        Parameters
-        ----------
-        X : array, shape (n_samples, n_features)
-            New data to be transformed.
-
-        Returns
-        -------
-        X_new : array, shape (n_samples, n_components)
-            Embedding of the new data in low-dimensional space.
-        """
-        # If we fit just a single instance then error
-        if self.embedding_.shape[0] == 1:
-            raise ValueError(
-                "Transform unavailable when model was fit with only a single data sample."
-            )
-        # If we just have the original input then short circuit things
-        X = check_array(X, dtype=np.float32, accept_sparse="csr", order="C")
-        x_hash = joblib.hash(X)
-        if x_hash == self._input_hash:
-            return self.embedding_
-
-        if self.metric == "precomputed":
-            raise ValueError(
-                "Transform  of new data not available for precomputed metric."
-            )
-
-        # X = check_array(X, dtype=np.float32, order="C", accept_sparse="csr")
-        random_state = check_random_state(self.transform_seed)
-        rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
-
-        if self._small_data:
-            try:
-                # sklearn pairwise_distances fails for callable metric on sparse data
-                _m = self.metric if self._sparse_data else self._input_distance_func
-                dmat = pairwise_distances(
-                    X, self._raw_data, metric=_m, **self._metric_kwds
-                )
-            except (TypeError, ValueError):
-                dmat = dist.pairwise_special_metric(
-                    X,
-                    self._raw_data,
-                    metric=self._input_distance_func,
-                    kwds=self._metric_kwds,
-                )
-            indices = np.argpartition(dmat, self._n_neighbors)[:, : self._n_neighbors]
-            dmat_shortened = submatrix(dmat, indices, self._n_neighbors)
-            indices_sorted = np.argsort(dmat_shortened)
-            indices = submatrix(indices, indices_sorted, self._n_neighbors)
-            dists = submatrix(dmat_shortened, indices_sorted, self._n_neighbors)
-        elif _HAVE_PYNNDESCENT:
-            indices, dists = self._rp_forest.query(X, self.n_neighbors)
-        elif self._sparse_data:
-            if not scipy.sparse.issparse(X):
-                X = scipy.sparse.csr_matrix(X)
-
-            init = sparse_nn.sparse_initialise_search(
-                self._rp_forest,
-                self._raw_data.indices,
-                self._raw_data.indptr,
-                self._raw_data.data,
-                X.indices,
-                X.indptr,
-                X.data,
-                int(
-                    self._n_neighbors
-                    * self.transform_queue_size
-                    * (1 + int(self._sparse_data))
-                ),
-                rng_state,
-                self._input_distance_func,
-            )
-            result = sparse_nn.sparse_initialized_nnd_search(
-                self._raw_data.indices,
-                self._raw_data.indptr,
-                self._raw_data.data,
-                self._search_graph.indptr,
-                self._search_graph.indices,
-                init,
-                X.indices,
-                X.indptr,
-                X.data,
-                self._input_distance_func,
-            )
-
-            indices, dists = deheap_sort(result)
-            indices = indices[:, : self._n_neighbors]
-            dists = dists[:, : self._n_neighbors]
-        else:
-            init = initialise_search(
-                self._rp_forest,
-                self._raw_data,
-                X,
-                int(self._n_neighbors * self.transform_queue_size),
-                rng_state,
-                self._input_distance_func,
-            )
-            result = initialized_nnd_search(
-                self._raw_data,
-                self._search_graph.indptr,
-                self._search_graph.indices,
-                init,
-                X,
-                self._input_distance_func,
-            )
-
-            indices, dists = deheap_sort(result)
-            indices = indices[:, : self._n_neighbors]
-            dists = dists[:, : self._n_neighbors]
-
-        dists = dists.astype(np.float32, order="C")
-
-        adjusted_local_connectivity = max(0.0, self.local_connectivity - 1.0)
-        sigmas, rhos = smooth_knn_dist(
-            dists,
-            float(self._n_neighbors),
-            local_connectivity=float(adjusted_local_connectivity),
-        )
-
-        rows, cols, vals = compute_membership_strengths(indices, dists, sigmas, rhos)
-
-        graph = scipy.sparse.coo_matrix(
-            (vals, (rows, cols)), shape=(X.shape[0], self._raw_data.shape[0])
-        )
-
-        # This was a very specially constructed graph with constant degree.
-        # That lets us do fancy unpacking by reshaping the csr matrix indices
-        # and data. Doing so relies on the constant degree assumption!
-        csr_graph = normalize(graph.tocsr(), norm="l1")
-        inds = csr_graph.indices.reshape(X.shape[0], self._n_neighbors)
-        weights = csr_graph.data.reshape(X.shape[0], self._n_neighbors)
-        embedding = init_transform(inds, weights, self.embedding_)
-
-        if self.n_epochs is None:
-            # For smaller datasets we can use more epochs
-            if graph.shape[0] <= 10000:
-                n_epochs = 100
-            else:
-                n_epochs = 30
-        else:
-            n_epochs = int(self.n_epochs // 3.0)
-
-        graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
-        graph.eliminate_zeros()
-
-        epochs_per_sample = make_epochs_per_sample(graph.data, n_epochs)
-
-        head = graph.row
-        tail = graph.col
-        weight = graph.data
-
-        # optimize_layout = make_optimize_layout(
-        #     self._output_distance_func,
-        #     tuple(self.output_metric_kwds.values()),
-        # )
-
-        if self.output_metric == "euclidean":
-            embedding = optimize_layout_euclidean(
-                embedding,
-                self.embedding_.astype(np.float32, copy=True),  # Fixes #179 & #217,
-                head,
-                tail,
-                n_epochs,
-                graph.shape[1],
-                epochs_per_sample,
-                self._a,
-                self._b,
-                rng_state,
-                self.repulsion_strength,
-                self._initial_alpha / 4.0,
-                self.negative_sample_rate,
-                self.random_state is None,
-                verbose=self.verbose,
-            )
-        else:
-            embedding = optimize_layout_generic(
-                embedding,
-                self.embedding_.astype(np.float32, copy=True),  # Fixes #179 & #217
-                head,
-                tail,
-                n_epochs,
-                graph.shape[1],
-                epochs_per_sample,
-                self._a,
-                self._b,
-                rng_state,
-                self.repulsion_strength,
-                self._initial_alpha / 4.0,
-                self.negative_sample_rate,
-                self._output_distance_func,
-                tuple(self._output_metric_kwds.values()),
-                verbose=self.verbose,
-            )
-
-        return embedding
-
-    def inverse_transform(self, X):
-        """Transform X in the existing embedded space back into the input
-        data space and return that transformed output.
-
-        Parameters
-        ----------
-        X : array, shape (n_samples, n_components)
-            New points to be inverse transformed.
-
-        Returns
-        -------
-        X_new : array, shape (n_samples, n_features)
-            Generated data points new data in data space.
-        """
-
-        if self._sparse_data:
-            raise ValueError("Inverse transform not available for sparse input.")
-        elif self._inverse_distance_func is None:
-            raise ValueError("Inverse transform not available for given metric.")
-        elif self.n_components >= 8:
-            warn(
-                "Inverse transform works best with low dimensional embeddings."
-                " Results may be poor, or this approach to inverse transform"
-                " may fail altogether! If you need a high dimensional latent"
-                " space and inverse transform operations consider using an"
-                " autoencoder."
-            )
-
-        X = check_array(X, dtype=np.float32, order="C")
-        random_state = check_random_state(self.transform_seed)
-        rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
-
-        # build Delaunay complex (Does this not assume a roughly euclidean output metric)?
-        deltri = scipy.spatial.Delaunay(
-            self.embedding_, incremental=True, qhull_options="QJ"
-        )
-        neighbors = deltri.simplices[deltri.find_simplex(X)]
-        adjmat = scipy.sparse.lil_matrix(
-            (self.embedding_.shape[0], self.embedding_.shape[0]), dtype=int
-        )
-        for i in np.arange(0, deltri.simplices.shape[0]):
-            for j in deltri.simplices[i]:
-                if j < self.embedding_.shape[0]:
-                    idx = deltri.simplices[i][
-                        deltri.simplices[i] < self.embedding_.shape[0]
-                    ]
-                    adjmat[j, idx] = 1
-                    adjmat[idx, j] = 1
-
-        adjmat = scipy.sparse.csr_matrix(adjmat)
-
-        min_vertices = min(self._raw_data.shape[-1], self._raw_data.shape[0])
-
-        neighborhood = [
-            breadth_first_search(adjmat, v[0], min_vertices=min_vertices)
-            for v in neighbors
-        ]
-        if callable(self.output_metric):
-            # need to create another numba.jit-able wrapper for callable
-            # output_metrics that return a tuple (already checked that it does
-            # during param validation in `fit` method)
-            _out_m = self.output_metric
-
-            @numba.njit(fastmath=True)
-            def _output_dist_only(x, y, *kwds):
-                return _out_m(x, y, *kwds)[0]
-
-            dist_only_func = _output_dist_only
-        elif self.output_metric in dist.named_distances.keys():
-            dist_only_func = dist.named_distances[self.output_metric]
-        else:
-            # shouldn't really ever get here because of checks already performed,
-            # but works as a failsafe in case attr was altered manually after fitting
-            raise ValueError(
-                "Unrecognized output metric: {}".format(self.output_metric)
-            )
-
-        dist_args = tuple(self._output_metric_kwds.values())
-        distances = [
-            np.array(
-                [
-                    dist_only_func(X[i], self.embedding_[nb], *dist_args)
-                    for nb in neighborhood[i]
-                ]
-            )
-            for i in range(X.shape[0])
-        ]
-        idx = np.array([np.argsort(e)[:min_vertices] for e in distances])
-
-        dists_output_space = np.array(
-            [distances[i][idx[i]] for i in range(len(distances))]
-        )
-        indices = np.array([neighborhood[i][idx[i]] for i in range(len(neighborhood))])
-
-        rows, cols, distances = np.array(
-            [
-                [i, indices[i, j], dists_output_space[i, j]]
-                for i in range(indices.shape[0])
-                for j in range(min_vertices)
-            ]
-        ).T
-
-        # calculate membership strength of each edge
-        weights = 1 / (1 + self._a * distances ** (2 * self._b))
-
-        # compute 1-skeleton
-        # convert 1-skeleton into coo_matrix adjacency matrix
-        graph = scipy.sparse.coo_matrix(
-            (weights, (rows, cols)), shape=(X.shape[0], self._raw_data.shape[0])
-        )
-
-        # That lets us do fancy unpacking by reshaping the csr matrix indices
-        # and data. Doing so relies on the constant degree assumption!
-        # csr_graph = graph.tocsr()
-        csr_graph = normalize(graph.tocsr(), norm="l1")
-        inds = csr_graph.indices.reshape(X.shape[0], min_vertices)
-        weights = csr_graph.data.reshape(X.shape[0], min_vertices)
-        inv_transformed_points = init_transform(inds, weights, self._raw_data)
-
-        if self.n_epochs is None:
-            # For smaller datasets we can use more epochs
-            if graph.shape[0] <= 10000:
-                n_epochs = 100
-            else:
-                n_epochs = 30
-        else:
-            n_epochs = int(self.n_epochs // 3.0)
-
-        # graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
-        # graph.eliminate_zeros()
-
-        epochs_per_sample = make_epochs_per_sample(graph.data, n_epochs)
-
-        head = graph.row
-        tail = graph.col
-        weight = graph.data
-
-        inv_transformed_points = optimize_layout_inverse(
-            inv_transformed_points,
-            self._raw_data,
-            head,
-            tail,
-            weight,
-            self._sigmas,
-            self._rhos,
-            n_epochs,
-            graph.shape[1],
-            epochs_per_sample,
-            self._a,
-            self._b,
-            rng_state,
-            self.repulsion_strength,
-            self._initial_alpha / 4.0,
-            self.negative_sample_rate,
-            self._inverse_distance_func,
-            tuple(self._metric_kwds.values()),
-            verbose=self.verbose,
-        )
-
-        return inv_transformed_points
-
-
-class DataFrameUMATO(BaseEstimator):
-    def __init__(
-        self,
-        metrics,
-        n_neighbors=15,
-        n_components=2,
-        output_metric="euclidean",
-        output_metric_kwds=None,
-        n_epochs=None,
-        learning_rate=1.0,
-        init="spectral",
-        min_dist=0.1,
-        spread=1.0,
-        set_op_mix_ratio=1.0,
-        local_connectivity=1.0,
-        repulsion_strength=1.0,
-        negative_sample_rate=5,
-        transform_queue_size=4.0,
-        a=None,
-        b=None,
-        random_state=None,
-        angular_rp_forest=False,
-        target_n_neighbors=-1,
-        target_metric="categorical",
-        target_metric_kwds=None,
-        target_weight=0.5,
-        transform_seed=42,
-        verbose=False,
-    ):
-        self.metrics = metrics
-        self.n_neighbors = n_neighbors
-        self.output_metric = output_metric
-        self.output_metric_kwds = output_metric_kwds
-        self.n_epochs = n_epochs
-        self.init = init
-        self.n_components = n_components
-        self.repulsion_strength = repulsion_strength
-        self.learning_rate = learning_rate
-
-        self.spread = spread
-        self.min_dist = min_dist
-        self.set_op_mix_ratio = set_op_mix_ratio
-        self.local_connectivity = local_connectivity
-        self.negative_sample_rate = negative_sample_rate
-        self.random_state = random_state
-        self.angular_rp_forest = angular_rp_forest
-        self.transform_queue_size = transform_queue_size
-        self.target_n_neighbors = target_n_neighbors
-        self.target_metric = target_metric
-        self.target_metric_kwds = target_metric_kwds
-        self.target_weight = target_weight
-        self.transform_seed = transform_seed
-        self.verbose = verbose
-
-        self.a = a
-        self.b = b
-
-    def _validate_parameters(self):
-        if self.set_op_mix_ratio < 0.0 or self.set_op_mix_ratio > 1.0:
-            raise ValueError("set_op_mix_ratio must be between 0.0 and 1.0")
-        if self.repulsion_strength < 0.0:
-            raise ValueError("repulsion_strength cannot be negative")
-        if self.min_dist > self.spread:
-            raise ValueError("min_dist must be less than or equal to spread")
-        if self.min_dist < 0.0:
-            raise ValueError("min_dist must be greater than 0.0")
-        if not isinstance(self.init, str) and not isinstance(self.init, np.ndarray):
-            raise ValueError("init must be a string or ndarray")
-        if isinstance(self.init, str) and self.init not in ("spectral", "random"):
-            raise ValueError('string init values must be "spectral" or "random"')
-        if (
-            isinstance(self.init, np.ndarray)
-            and self.init.shape[1] != self.n_components
-        ):
-            raise ValueError("init ndarray must match n_components value")
-        if self.negative_sample_rate < 0:
-            raise ValueError("negative sample rate must be positive")
-        if self.learning_rate < 0.0:
-            raise ValueError("learning_rate must be positive")
-        if self.n_neighbors < 2:
-            raise ValueError("n_neighbors must be greater than 2")
-        if self.target_n_neighbors < 2 and self.target_n_neighbors != -1:
-            raise ValueError("target_n_neighbors must be greater than 2")
-        if not isinstance(self.n_components, int):
-            raise ValueError("n_components must be an int")
-        if self.n_components < 1:
-            raise ValueError("n_components must be greater than 0")
-        if self.n_epochs is not None and (
-            self.n_epochs <= 10 or not isinstance(self.n_epochs, int)
-        ):
-            raise ValueError("n_epochs must be a positive integer " "larger than 10")
-        if self.output_metric_kwds is None:
-            self._output_metric_kwds = {}
-        else:
-            self._output_metric_kwds = self.output_metric_kwds
-
-        if callable(self.output_metric):
-            self._output_distance_func = self.output_metric
-        elif (
-            self.output_metric in dist.named_distances
-            and self.output_metric in dist.named_distances_with_gradients
-        ):
-            self._output_distance_func = dist.named_distances_with_gradients[
-                self.output_metric
-            ]
-        elif self.output_metric == "precomputed":
-            raise ValueError("output_metric cannnot be 'precomputed'")
-        else:
-            if self.output_metric in dist.named_distances:
-                raise ValueError(
-                    "gradient function is not yet implemented for "
-                    + repr(self.output_metric)
-                    + "."
-                )
-            else:
-                raise ValueError(
-                    "output_metric is neither callable, " + "nor a recognised string"
-                )
-
-        # validate metrics argument
-        assert isinstance(self.metrics, list) or self.metrics == "infer"
-        if self.metrics != "infer":
-            for item in self.metrics:
-                assert isinstance(item, tuple) and len(item) == 3
-                assert isinstance(item[0], str)
-                assert item[1] in dist.named_distances
-                assert isinstance(item[2], list) and len(item[2]) >= 1
-
-                for col in item[2]:
-                    assert isinstance(col, str) or isinstance(col, int)
-
-    def fit(self, X, y=None):
-
-        self._validate_parameters()
-
-        # X should be a pandas dataframe, or np.array; check
-        # how column transformer handles this.
-        self._raw_data = X
-
-        # Handle all the optional arguments, setting default
-        if self.a is None or self.b is None:
-            self._a, self._b = find_ab_params(self.spread, self.min_dist)
-        else:
-            self._a = self.a
-            self._b = self.b
-
-        if isinstance(self.init, np.ndarray):
-            init = check_array(self.init, dtype=np.float32, accept_sparse=False)
-        else:
-            init = self.init
-
-        self._initial_alpha = self.learning_rate
-
-        # Error check n_neighbors based on data size
-        if X.shape[0] <= self.n_neighbors:
-            if X.shape[0] == 1:
-                self.embedding_ = np.zeros(
-                    (1, self.n_components)
-                )  # needed to sklearn comparability
-                return self
-
-            warn(
-                "n_neighbors is larger than the dataset size; truncating to "
-                "X.shape[0] - 1"
-            )
-            self._n_neighbors = X.shape[0] - 1
-        else:
-            self._n_neighbors = self.n_neighbors
-
-        if self.metrics == "infer":
-            raise NotImplementedError("Metric inference not implemented yet")
-
-        random_state = check_random_state(self.random_state)
-
-        self.metric_graphs_ = {}
-        self._sigmas = {}
-        self._rhos = {}
-        self._knn_indices = {}
-        self._knn_dists = {}
-        self._rp_forest = {}
-        self.graph_ = None
-
-        def is_discrete_metric(metric_data):
-            return metric_data[1] in dist.DISCRETE_METRICS
-
-        for metric_data in sorted(self.metrics, key=is_discrete_metric):
-            name, metric, columns = metric_data
-            print(name, metric, columns)
-
-            if metric in dist.DISCRETE_METRICS:
-                self.metric_graphs_[name] = None
-                for col in columns:
-
-                    discrete_space = X[col].values
-                    metric_kws = dist.get_discrete_params(discrete_space, metric)
-
-                    self.graph_ = discrete_metric_simplicial_set_intersection(
-                        self.graph_,
-                        discrete_space,
-                        metric=metric,
-                        metric_kws=metric_kws,
-                    )
-            else:
-                # Sparse not supported yet
-                sub_data = check_array(
-                    X[columns], dtype=np.float32, accept_sparse=False
-                )
-
-                if X.shape[0] < 4096:
-                    # small case
-                    self._small_data = True
-                    # TODO: metric keywords not supported yet!
-                    if metric in ("ll_dirichlet", "hellinger"):
-                        dmat = dist.pairwise_special_metric(sub_data, metric=metric)
-                    else:
-                        dmat = pairwise_distances(sub_data, metric=metric)
-
-                    (
-                        self.metric_graphs_[name],
-                        self._sigmas[name],
-                        self._rhos[name],
-                    ) = fuzzy_simplicial_set(
-                        dmat,
-                        self._n_neighbors,
-                        random_state,
-                        "precomputed",
-                        {},
-                        None,
-                        None,
-                        self.angular_rp_forest,
-                        self.set_op_mix_ratio,
-                        self.local_connectivity,
-                        False,
-                        self.verbose,
-                    )
-                else:
-                    self._small_data = False
-                    # Standard case
-                    # TODO: metric keywords not supported yet!
-                    (
-                        self._knn_indices[name],
-                        self._knn_dists[name],
-                        self._rp_forest[name],
-                    ) = nearest_neighbors(
-                        sub_data,
-                        self._n_neighbors,
-                        metric,
-                        {},
-                        self.angular_rp_forest,
-                        random_state,
-                        use_pynndescent=True,
-                        verbose=self.verbose,
-                    )
-
-                    (
-                        self.metric_graphs_[name],
-                        self._sigmas[name],
-                        self._rhos[name],
-                    ) = fuzzy_simplicial_set(
-                        sub_data,
-                        self.n_neighbors,
-                        random_state,
-                        metric,
-                        {},
-                        self._knn_indices[name],
-                        self._knn_dists[name],
-                        self.angular_rp_forest,
-                        self.set_op_mix_ratio,
-                        self.local_connectivity,
-                        False,
-                        self.verbose,
-                    )
-                    # TODO: set up transform data
-
-                if self.graph_ is None:
-                    self.graph_ = self.metric_graphs_[name]
-                else:
-                    self.graph_ = general_simplicial_set_intersection(
-                        self.graph_, self.metric_graphs_[name], 0.5
-                    )
-
-            print(self.graph_.data)
-            self.graph_ = reset_local_connectivity(
-                self.graph_, reset_local_metrics=True
-            )
-
-        if self.n_epochs is None:
-            n_epochs = 0
-        else:
-            n_epochs = self.n_epochs
-
-        if self.verbose:
-            print("Construct embedding")
-
-        # TODO: Handle connected component issues properly
-        # For now we just use manhattan and hope.
-        self.embedding_ = simplicial_set_embedding(
-            self._raw_data,
-            self.graph_,
-            self.n_components,
-            self._initial_alpha,
-            self._a,
-            self._b,
-            self.repulsion_strength,
-            self.negative_sample_rate,
-            n_epochs,
-            init,
-            random_state,
-            "manhattan",
-            {},
-            self._output_distance_func,
-            self.output_metric_kwds,
-            self.output_metric in ("euclidean", "l2"),
-            self.random_state is None,
-            self.verbose,
-        )
-
-        self._input_hash = joblib.hash(self._raw_data)
-
-        return self

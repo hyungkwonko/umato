@@ -1438,12 +1438,71 @@ def remove_from_graph(data, array, array2, hub_info, remove_target):
 
     return data
 
+
 @numba.njit()
 def change_graph_ix(array, hubs):
     result = array.copy()
     for i, hub in enumerate(hubs):
         result[array == i] = hub
     return result
+
+
+@numba.njit(parallel=True)
+def fast_knn_indices_for_hub(X, n_neighbors, hub_info):
+    """A fast computation of knn indices.
+
+    Parameters
+    ----------
+    X: array of shape (n_samples, n_features)
+        The input data to compute the k-neighbor indices of.
+
+    n_neighbors: int
+        The number of nearest neighbors to compute for each sample in ``X``.
+
+    Returns
+    -------
+    knn_indices: array of shape (n_samples, n_neighbors)
+        The indices on the ``n_neighbors`` closest points in the dataset.
+    """
+    dists = []
+    for nn in nns:
+        for hub in hubs:
+            dist = 0.0
+            for d in range(X.shape[1]):
+                dist += (X[nn][d] - X[hub][d]) ** 2
+            dists.append(dist)
+        
+
+
+    knn_indices = np.empty((X.shape[0], n_neighbors), dtype=np.int32)
+    for row in numba.prange(X.shape[0]):
+        vs = []
+        # v = np.argsort(X[row])  # Need to call argsort this way for numba
+        v_cand = X[row].argsort(kind="quicksort")
+        for _, v in enumerate(v_cand):
+            if hub_info[v] == 2:
+                vs.append(v)
+            if len(vs) >= n_neighbors:
+                break
+        knn_indices[row] = vs
+    return knn_indices
+
+
+def compute_hub_nn_graph(data, hub_info,):
+    hubs = np.where(hub_info == 0)[0]
+    nns = np.where(hub_info == 1)[0]
+
+    knn_indices = fast_knn_indices(X, n_neighbors, hub_info)
+    return graph_hubs
+
+        rows, cols, vals = compute_membership_strengths(
+            knn_indices, knn_dists, sigmas, rhos
+        )
+
+        result = scipy.sparse.coo_matrix(
+            (vals, (rows, cols)), shape=(X.shape[0], X.shape[0])
+        )
+        result.eliminate_zeros()
 
 def local_optimize_nn(
     data,
@@ -1465,7 +1524,7 @@ def local_optimize_nn(
     label=None,
 ):
 
-    # graph = graph.tocoo()
+    graph = graph.tocoo()
     graph.sum_duplicates()
     n_vertices = graph.shape[1]
 
@@ -1477,7 +1536,7 @@ def local_optimize_nn(
             n_epochs = 200
 
     # remove outlier-related values from graph
-    graph.data = remove_from_graph(graph.data, graph.row, graph.col, hub_info, remove_target=np.array([0]))
+    # graph.data = remove_from_graph(graph.data, graph.row, graph.col, hub_info, remove_target=np.array([0]))
     # graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
 
     # remove zero values
@@ -2559,61 +2618,54 @@ class UMATO(BaseEstimator):
 
 
 
-        print("building graph2")
+        # (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
+        #     X[hubs],
+        #     self._n_neighbors,
+        #     nn_metric,
+        #     self._metric_kwds,
+        #     self.angular_rp_forest,
+        #     random_state,
+        #     self.low_memory,
+        #     use_pynndescent=True,
+        #     verbose=True,
+        # )
 
-        (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
-            X[hubs],
-            self._n_neighbors,
-            nn_metric,
-            self._metric_kwds,
-            self.angular_rp_forest,
-            random_state,
-            self.low_memory,
-            use_pynndescent=True,
-            verbose=True,
-        )
-        print("building graph2-2")
-
-        graph_hubs, _, _ = fuzzy_simplicial_set(
-            X[hubs],
-            self.n_neighbors,
-            random_state,
-            nn_metric,
-            self._metric_kwds,
-            _knn_indices2,
-            _knn_dists2,
-            self.angular_rp_forest,
-            self.set_op_mix_ratio,
-            self.local_connectivity,
-            True,
-            True,
-        )
-
-        print("building graph2-3")
-
-        print(graph_hubs)
-        graph_hubs = graph_hubs.tocoo()
-        graph_hubs.sum_duplicates()
-
-        hubs = sorted(hubs)
+        # graph_hubs, _, _ = fuzzy_simplicial_set(
+        #     X[hubs],
+        #     self.n_neighbors,
+        #     random_state,
+        #     nn_metric,
+        #     self._metric_kwds,
+        #     _knn_indices2,
+        #     _knn_dists2,
+        #     self.angular_rp_forest,
+        #     self.set_op_mix_ratio,
+        #     self.local_connectivity,
+        #     True,
+        #     True,
+        # )
+        # print("building graph2-3")
+        # graph_hubs = graph_hubs.tocoo()
+        # graph_hubs.sum_duplicates()
+        # hubs = sorted(hubs)
+        # hubs = np.array(hubs)
         # print(len(hubs) == len(np.unique(graph_hubs.row)))
-        # tracking = np.ones(len(graph_hubs.row))
-        # for ii in range(len(hubs)):
-        #     ixz = graph_hubs.row == ii
-        #     ixz = ixz * tracking
-        #     tindex = np.where(ixz==1)[0]
-        #     tracking[tindex] = 0
-        #     graph_hubs.row[tindex] = hubs[ii]
+        # graph_hubs.row = change_graph_ix(graph_hubs.row, hubs)
+        # print(len(hubs) == len(np.unique(graph_hubs.col)))
+        # graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
 
-        t1 = time.time()
-        hubs = np.array(hubs)
-        print(len(hubs) == len(np.unique(graph_hubs.row)))
-        graph_hubs.row = change_graph_ix(graph_hubs.row, hubs)
-        print(len(hubs) == len(np.unique(graph_hubs.col)))
-        graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
+        graph_hubs = compute_hub_nn_graph(data=X, hub_info=hub_info,)
+        rows, cols, vals = compute_membership_strengths(
+            knn_indices, knn_dists, sigmas, rhos
+        )
+        result = scipy.sparse.coo_matrix(
+            (vals, (rows, cols)), shape=(X.shape[0], X.shape[0])
+        )
+        result.eliminate_zeros()
 
-        t2 = time.time()
-        print(t2-t1)
+
+        if self.verbose:
+            print(ts(), "Construct local structure")
 
         init = local_optimize_nn(
             data=X,
@@ -2635,8 +2687,6 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        exit()
-
         self.embedding_ = embed_others_disjoint(
             data=X,
             init=init,
@@ -2646,41 +2696,35 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-
-        return self
-
-        #######
-
-        if self.verbose:
-            print(ts(), "Construct local structure")
-
-        self.embedding_ = simplicial_set_embedding(
-            self._raw_data[index],  # JH why raw data?
-            self.graph_,
-            self.n_components,
-            self._initial_alpha,
-            self._a,
-            self._b,
-            self.repulsion_strength,
-            self.negative_sample_rate,
-            n_epochs,
-            init,
-            random_state,
-            self._input_distance_func,
-            self._metric_kwds,
-            self._output_distance_func,
-            self._output_metric_kwds,
-            self.output_metric in ("euclidean", "l2"),
-            self.random_state is None,
-            self.verbose,
-        )[inverse]
-
         if self.verbose:
             print(ts() + " Finished embedding")
 
         self._input_hash = joblib.hash(self._raw_data)
 
         return self
+
+        #######
+        # self.embedding_ = simplicial_set_embedding(
+        #     self._raw_data[index],  # JH why raw data?
+        #     self.graph_,
+        #     self.n_components,
+        #     self._initial_alpha,
+        #     self._a,
+        #     self._b,
+        #     self.repulsion_strength,
+        #     self.negative_sample_rate,
+        #     n_epochs,
+        #     init,
+        #     random_state,
+        #     self._input_distance_func,
+        #     self._metric_kwds,
+        #     self._output_distance_func,
+        #     self._output_metric_kwds,
+        #     self.output_metric in ("euclidean", "l2"),
+        #     self.random_state is None,
+        #     self.verbose,
+        # )[inverse]
+
 
     def fit_transform(self, X, y=None):
         """Fit X into an embedded space and return that transformed

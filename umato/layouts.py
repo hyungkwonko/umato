@@ -629,12 +629,82 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig
     return Z
 
 
+def nn_layout_optimize(
+    head_embedding,
+    tail_embedding,
+    head,
+    tail,
+    hub_info,
+    n_epochs,
+    n_vertices,
+    epochs_per_sample,
+    a,
+    b,
+    rng_state,
+    gamma=1.0,
+    initial_alpha=1.0,
+    negative_sample_rate=5.0,
+    parallel=False,
+    verbose=False,
+    label=None,
+):
+
+    dim = head_embedding.shape[1]
+    move_other = head_embedding.shape[0] == tail_embedding.shape[0]
+    alpha = initial_alpha
+
+    hubs = np.where(hub_info == 2)[0]
+    n_vertices = sum(hub_info == 2)
+
+    epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
+    epoch_of_next_negative_sample = epochs_per_negative_sample.copy()
+    epoch_of_next_sample = epochs_per_sample.copy()
+
+    optimize_fn = numba.njit(
+        _nn_layout_optimize_single_epoch, fastmath=True, parallel=parallel
+    )
+    for n in range(n_epochs):
+        optimize_fn(
+            head_embedding,
+            tail_embedding,
+            head,
+            tail,
+            hub_info,
+            hubs,
+            n_vertices,
+            epochs_per_sample,
+            a,
+            b,
+            rng_state,
+            gamma,
+            dim,
+            move_other,
+            alpha,
+            epochs_per_negative_sample,
+            epoch_of_next_negative_sample,
+            epoch_of_next_sample,
+            n,
+        )
+
+        alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
+
+        if verbose and n % int(n_epochs / 10) == 0:
+            from umato.umato_ import plot_tmptmp
+            plot_tmptmp(data=head_embedding, label=label, name=f"pic3_local{n}")
+
+        if verbose and n % int(n_epochs / 10) == 0:
+            print("\tcompleted ", n, " / ", n_epochs, "epochs")
+
+    return head_embedding
+
+
 def _nn_layout_optimize_single_epoch(
     head_embedding,
     tail_embedding,
     head,
     tail,
     hub_info,
+    hubs,
     n_vertices,
     epochs_per_sample,
     a,
@@ -687,6 +757,7 @@ def _nn_layout_optimize_single_epoch(
 
             for p in range(n_neg_samples):
                 k = tau_rand_int(rng_state) % n_vertices
+                k = hubs[k]
 
                 other = tail_embedding[k]
 
@@ -714,67 +785,3 @@ def _nn_layout_optimize_single_epoch(
                 n_neg_samples * epochs_per_negative_sample[i]
             )
 
-
-def nn_layout_optimize(
-    head_embedding,
-    tail_embedding,
-    head,
-    tail,
-    hub_info,
-    n_epochs,
-    n_vertices,
-    epochs_per_sample,
-    a,
-    b,
-    rng_state,
-    gamma=1.0,
-    initial_alpha=1.0,
-    negative_sample_rate=5.0,
-    parallel=False,
-    verbose=False,
-    label=None,
-):
-
-    dim = head_embedding.shape[1]
-    move_other = head_embedding.shape[0] == tail_embedding.shape[0]
-    alpha = initial_alpha
-
-    epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
-    epoch_of_next_negative_sample = epochs_per_negative_sample.copy()
-    epoch_of_next_sample = epochs_per_sample.copy()
-
-    optimize_fn = numba.njit(
-        _nn_layout_optimize_single_epoch, fastmath=True, parallel=parallel
-    )
-    for n in range(n_epochs):
-        optimize_fn(
-            head_embedding,
-            tail_embedding,
-            head,
-            tail,
-            hub_info,
-            n_vertices,
-            epochs_per_sample,
-            a,
-            b,
-            rng_state,
-            gamma,
-            dim,
-            move_other,
-            alpha,
-            epochs_per_negative_sample,
-            epoch_of_next_negative_sample,
-            epoch_of_next_sample,
-            n,
-        )
-
-        alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
-
-        if verbose and n % int(n_epochs / 10) == 0:
-            from umato.umato_ import plot_tmptmp
-            plot_tmptmp(data=head_embedding, label=label, name=f"pic3_local{n}")
-
-        if verbose and n % int(n_epochs / 10) == 0:
-            print("\tcompleted ", n, " / ", n_epochs, "epochs")
-
-    return head_embedding

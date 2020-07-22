@@ -18,4 +18,4 @@ if __name__ == "__main__":
     print(t2-t1)
 
     plot_tmptmp(embedding, label, "pic5_fin")
-    save_csv('./', alg_name="umato", data=embedding, label=label)
+    # save_csv('./', alg_name="umato", data=embedding, label=label)
