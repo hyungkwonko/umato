@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 @numba.njit()
-def clip(val):
+def clip(val, cutoff):
     """Standard clamping of a value into a fixed range (in this case -4.0 to
     4.0)
 
@@ -20,10 +20,10 @@ def clip(val):
     -------
     The clamped value, now fixed to be in the range -4.0 to 4.0.
     """
-    if val > 4.0:
-        return 4.0
-    elif val < -4.0:
-        return -4.0
+    if val > cutoff:
+        return cutoff
+    elif val < -cutoff:
+        return -cutoff
     else:
         return val
 
@@ -572,27 +572,6 @@ def calc_DTM(adj, sigma):
     return density / density.sum()
 
 
-def shaking(Z, num=-1):
-
-    if num < 0:
-        num = Z.shape[0] // 10
-
-    centre = Z.mean(axis=0)
-    distances = []
-    for i in range(Z.shape[0]):
-        distance = 0.0
-        for d in range(Z.shape[1]):
-            distance += (Z[i][d] - centre[d]) ** 2
-        distances.append(distance)
-    
-    distances = np.array(distances)
-
-    indices = np.argsort(distances)[-num:]
-    for j in indices:
-        Z[j] = centre + np.random.random(2) * 0.1
-
-    return Z
-
 def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig=False, label=None):
 
     CE_array = []
@@ -629,12 +608,64 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig
     return Z
 
 
+
+def shaking(Z, num=-1):
+
+    if num < 0:
+        num = Z.shape[0] // 10
+
+    centre = Z.mean(axis=0)
+    distances = []
+    for i in range(Z.shape[0]):
+        distance = 0.0
+        for d in range(Z.shape[1]):
+            distance += (Z[i][d] - centre[d]) ** 2
+        distances.append(distance)
+    
+    distances = np.array(distances)
+
+    indices = np.argsort(distances)[-num:]
+    for j in indices:
+        Z[j] = centre + np.random.random(2) * 0.1
+
+    return Z
+
+
+def get_max_hub(Z):
+    centre = Z.mean(axis=0)
+    cutoff = 0.0
+    for i in range(Z.shape[0]):
+        distance = 0.0
+        for d in range(Z.shape[1]):
+            distance += (Z[i][d] - centre[d]) ** 2
+        if distance > cutoff:
+            cutoff = distance
+    return np.sqrt(cutoff)
+
+def shaking2(Z, cutoff):
+
+    centre = Z.mean(axis=0)
+    for i in range(Z.shape[0]):
+        distance = 0.0
+        for d in range(Z.shape[1]):
+            distance += (Z[i][d] - centre[d]) ** 2
+        distance = np.sqrt(distance)
+        if distance > cutoff:
+            Z[i] = (Z[i] / distance * cutoff / 3) + np.random.random(2) * 0.2 + (centre / 2)
+
+    return Z
+
+
+
+
+
 def nn_layout_optimize(
     head_embedding,
     tail_embedding,
     head,
     tail,
     hub_info,
+    hub_knn_indices,
     n_epochs,
     n_vertices,
     epochs_per_sample,
@@ -654,7 +685,11 @@ def nn_layout_optimize(
     alpha = initial_alpha
 
     hubs = np.where(hub_info == 2)[0]
-    n_vertices = sum(hub_info == 2)
+    # n_vertices = len(hubs)
+    alpha = 1.0
+
+    cutoff = get_max_hub(head_embedding[hubs])
+
 
     epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
     epoch_of_next_negative_sample = epochs_per_negative_sample.copy()
@@ -670,6 +705,7 @@ def nn_layout_optimize(
             head,
             tail,
             hub_info,
+            hub_knn_indices,
             hubs,
             n_vertices,
             epochs_per_sample,
@@ -686,13 +722,23 @@ def nn_layout_optimize(
             n,
         )
 
+        # shaking for stable positioning
+        if (n > 0) and (n % 30 == 0):
+            head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
+
+
+
         alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
 
-        if verbose and n % int(n_epochs / 10) == 0:
+        if n > 100:
+            exit()
+
+        if verbose and n % 10 == 0:
             from umato.umato_ import plot_tmptmp
             plot_tmptmp(data=head_embedding, label=label, name=f"pic3_local{n}")
+            # plot_tmptmp(data=tail_embedding, label=label, name=f"pic3_tail{n}")
 
-        if verbose and n % int(n_epochs / 10) == 0:
+        if verbose and n % 5 == 0:
             print("\tcompleted ", n, " / ", n_epochs, "epochs")
 
     return head_embedding
@@ -704,6 +750,7 @@ def _nn_layout_optimize_single_epoch(
     head,
     tail,
     hub_info,
+    hub_knn_indices,
     hubs,
     n_vertices,
     epochs_per_sample,
@@ -719,6 +766,8 @@ def _nn_layout_optimize_single_epoch(
     epoch_of_next_sample,
     n,
 ):
+    grad_clip = 4.0
+    gamma = 0.05
     for i in numba.prange(epochs_per_sample.shape[0]):
         if epoch_of_next_sample[i] <= n:
             j = head[i]  # j == source index
@@ -736,28 +785,26 @@ def _nn_layout_optimize_single_epoch(
                 grad_coeff = 0.0
 
             for d in range(dim):
-                grad_d = clip(grad_coeff * (current[d] - other[d]))
+                grad_d = clip(grad_coeff * (current[d] - other[d]), grad_clip)
 
-                grad_hub = 1.0  # grad coefficient for hub nodes (DO NOT move)
-                if hub_info[j] == 2:
-                    grad_hub = 0.001
-                current[d] += grad_d * alpha * grad_hub
+                current[d] += grad_d * alpha
 
-                grad_other = 1.0  # grad coefficient for the opponent
-                if hub_info[k] == 2:
-                    grad_other = 0.001
-                if move_other:
-                    other[d] += -grad_d * alpha * grad_other
+                # grad_other = 0.0  # grad coefficient for the opponent
+                # if hub_info[k] == 1:
+                #     grad_other = 1.0
+                # if move_other:
+                #     other[d] += -grad_d * alpha # * grad_other
 
             epoch_of_next_sample[i] += epochs_per_sample[i]
 
             n_neg_samples = int(
                 (n - epoch_of_next_negative_sample[i]) / epochs_per_negative_sample[i]
             )
+            # n_neg_samples = 100
 
             for p in range(n_neg_samples):
                 k = tau_rand_int(rng_state) % n_vertices
-                k = hubs[k]
+                # k = hubs[k]
 
                 other = tail_embedding[k]
 
@@ -775,13 +822,35 @@ def _nn_layout_optimize_single_epoch(
 
                 for d in range(dim):
                     if grad_coeff > 0.0:
-                        grad_d = clip(grad_coeff * (current[d] - other[d]))
+                        grad_d = clip(grad_coeff * (current[d] - other[d]), grad_clip)
                     else:
-                        grad_d = 4.0
+                        grad_d = grad_clip
+                        # grad_d = 4.0
 
-                    current[d] += grad_d * alpha * grad_hub
+                    current[d] += grad_d * alpha
 
-            epoch_of_next_negative_sample[i] += (
-                n_neg_samples * epochs_per_negative_sample[i]
-            )
+            # considering hub nodes
+            for p2 in hub_knn_indices[j]:
+                other = tail_embedding[p2]
 
+                dist_squared = rdist(current, other)
+
+                if dist_squared > 0.0:
+                    grad_coeff = -2.0 * a * b * pow(dist_squared, b - 1.0)
+                    grad_coeff /= a * pow(dist_squared, b) + 1.0
+                elif j == k:
+                    continue
+                else:
+                    grad_coeff = 0.0
+
+                for d in range(dim):
+                    if grad_coeff > 0.0:
+                        grad_d = clip(grad_coeff * (current[d] - other[d]), 0.0005)
+                    else:
+                        grad_d = 0.0005
+                        # grad_d = 4.0
+
+                    current[d] += grad_d * alpha
+
+                    # if move_other:
+                    #     other[d] += -grad_d * alpha # * grad_other

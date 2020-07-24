@@ -1421,7 +1421,7 @@ def check_nn_accuracy(
 
 
 @numba.njit()
-def remove_from_graph(data, array, array2, hub_info, remove_target):
+def remove_from_graph(data, array, hub_info, remove_target):
     """
     remove_target == 0: outliers
     remove_target == 1: NNs
@@ -1429,12 +1429,11 @@ def remove_from_graph(data, array, array2, hub_info, remove_target):
     """
     for target in remove_target:
         if target not in [0, 1, 2]:
-            raise ValueError("remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs")
+            raise ValueError("remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs)")
 
         for i, e in enumerate(array):
             if hub_info[e] == target:
-                if hub_info[array2[i]] == target:
-                    data[i] = 0
+                data[i] = 0
 
     return data
 
@@ -1447,62 +1446,99 @@ def change_graph_ix(array, hubs):
     return result
 
 
-@numba.njit(parallel=True)
-def fast_knn_indices_for_hub(X, n_neighbors, hub_info):
-    """A fast computation of knn indices.
+# @numba.njit(
+#     locals={
+#         "sigmas": numba.types.float32[::1],
+#         "rhos": numba.types.float32[::1],
+#         "vals": numba.types.float32[::1],
+#         "dists": numba.types.float32[::1],
+#     },
+#     parallel=True,
+#     fastmath=True,
+# )
+# def fast_knn_indices_hub(X, n_neighbors, hubs, nns):
+#     """A fast computation of knn indices.
 
-    Parameters
-    ----------
-    X: array of shape (n_samples, n_features)
-        The input data to compute the k-neighbor indices of.
+#     Parameters
+#     ----------
+#     X: array of shape (n_samples, n_features)
+#         The input data to compute the k-neighbor indices of.
 
-    n_neighbors: int
-        The number of nearest neighbors to compute for each sample in ``X``.
+#     n_neighbors: int
+#         The number of nearest neighbors to compute for each sample in ``X``.
 
-    Returns
-    -------
-    knn_indices: array of shape (n_samples, n_neighbors)
-        The indices on the ``n_neighbors`` closest points in the dataset.
-    """
-    dists = []
-    for nn in nns:
-        for hub in hubs:
+#     Returns
+#     -------
+#     knn_indices: array of shape (n_samples, n_neighbors)
+#         The indices on the ``n_neighbors`` closest points in the dataset.
+#     """
+
+#     nn_num = len(nns)
+#     hub_num = len(hubs)
+
+#     rows = np.zeros(n_neighbors * nn_num, dtype=np.int32)
+#     cols = np.zeros(n_neighbors * nn_num, dtype=np.int32)
+#     vals = np.zeros(n_neighbors * nn_num, dtype=np.float32)
+
+#     for i in numba.prange(nn_num):
+#         dists = np.zeros(hub_num, dtype=np.float32)
+#         for j in numba.prange(hub_num):
+#             dist = 0.0
+#             for d in numba.prange(X.shape[1]):
+#                 dist += (X[nns[i]][d] - X[hubs[j]][d]) ** 2
+#             dists[j] = np.sqrt(dist)
+
+#         sorted_dists = dists.argsort(kind="quicksort")
+#         neighbors = sorted_dists[:n_neighbors]
+
+#         rows[i * n_neighbors:(i+1) * n_neighbors] = nns[i]
+#         cols[i * n_neighbors:(i+1) * n_neighbors] = neighbors
+#         vals[i * n_neighbors:(i+1) * n_neighbors] = dists[neighbors]
+
+#     return rows, cols, vals
+
+@numba.njit(
+    locals={
+        "rows": numba.types.int32[::1],
+        "cols": numba.types.int32[::1],
+        "vals": numba.types.float32[::1],
+        "dists": numba.types.float32[::1],
+        "knn_indices": numba.types.int32[:, ::1],
+    },
+    parallel=True,
+    fastmath=True,
+)
+def fast_knn_indices_hub(data, n_neighbors, hubs, nns):
+
+    nn_num = len(nns)
+    hub_num = len(hubs)
+
+    knn_indices = np.zeros((data.shape[0], n_neighbors), dtype=np.int32)
+
+    for i in numba.prange(nn_num):
+        dists = np.zeros(hub_num, dtype=np.float32)
+        for j in numba.prange(hub_num):
             dist = 0.0
-            for d in range(X.shape[1]):
-                dist += (X[nn][d] - X[hub][d]) ** 2
-            dists.append(dist)
-        
+            for d in numba.prange(data.shape[1]):
+                dist += (data[nns[i]][d] - data[hubs[j]][d]) ** 2
+            dists[j] = np.sqrt(dist)
 
+        sorted_dists = dists.argsort(kind="quicksort")
+        neighbors = sorted_dists[:n_neighbors]
 
-    knn_indices = np.empty((X.shape[0], n_neighbors), dtype=np.int32)
-    for row in numba.prange(X.shape[0]):
-        vs = []
-        # v = np.argsort(X[row])  # Need to call argsort this way for numba
-        v_cand = X[row].argsort(kind="quicksort")
-        for _, v in enumerate(v_cand):
-            if hub_info[v] == 2:
-                vs.append(v)
-            if len(vs) >= n_neighbors:
-                break
-        knn_indices[row] = vs
+        knn_indices[nns[i]] = hubs[neighbors]
+
     return knn_indices
 
 
-def compute_hub_nn_graph(data, hub_info,):
-    hubs = np.where(hub_info == 0)[0]
+def compute_hub_nn_graph(data, n_neighbors, hub_info,):
+
+    hubs = np.where(hub_info == 2)[0]
     nns = np.where(hub_info == 1)[0]
+    knn_indices = fast_knn_indices_hub(data, n_neighbors, hubs, nns)    
 
-    knn_indices = fast_knn_indices(X, n_neighbors, hub_info)
-    return graph_hubs
+    return knn_indices
 
-        rows, cols, vals = compute_membership_strengths(
-            knn_indices, knn_dists, sigmas, rhos
-        )
-
-        result = scipy.sparse.coo_matrix(
-            (vals, (rows, cols)), shape=(X.shape[0], X.shape[0])
-        )
-        result.eliminate_zeros()
 
 def local_optimize_nn(
     data,
@@ -1536,12 +1572,18 @@ def local_optimize_nn(
             n_epochs = 200
 
     # remove outlier-related values from graph
-    # graph.data = remove_from_graph(graph.data, graph.row, graph.col, hub_info, remove_target=np.array([0]))
-    # graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
+    graph.data = remove_from_graph(graph.data, graph.row, hub_info, remove_target=np.array([0, 2]))
+    graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
 
     # remove zero values
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
     graph.eliminate_zeros()
+
+    hubs = np.where(hub_info == 2)[0]
+    nns = np.where(hub_info == 1)[0]
+    hub_knn_indices = fast_knn_indices_hub(data, n_neighbors=5, hubs=hubs, nns=nns)
+
+    check_nn_accuracy(indices_info=hub_knn_indices, label=label)
 
     init_data = np.array(init)
     if len(init_data.shape) == 2:
@@ -1575,6 +1617,7 @@ def local_optimize_nn(
         head,
         tail,
         hub_info,
+        hub_knn_indices,
         n_epochs,
         n_vertices,
         epochs_per_sample,
@@ -2599,6 +2642,7 @@ class UMATO(BaseEstimator):
             random_state=random_state,
             alpha=0.005,
             max_iter=10,
+            # verbose=False,
             verbose=True,
             label=self.ll,
         )
@@ -2654,22 +2698,18 @@ class UMATO(BaseEstimator):
         # print(len(hubs) == len(np.unique(graph_hubs.col)))
         # graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
 
-        graph_hubs = compute_hub_nn_graph(data=X, hub_info=hub_info,)
-        rows, cols, vals = compute_membership_strengths(
-            knn_indices, knn_dists, sigmas, rhos
-        )
-        result = scipy.sparse.coo_matrix(
-            (vals, (rows, cols)), shape=(X.shape[0], X.shape[0])
-        )
-        result.eliminate_zeros()
+        # graph_hubs = compute_hub_nn_graph(data=X, n_neighbors=self.n_neighbors, hub_info=hub_info,)
 
+        # check_nn_accuracy(
+        #     indices_info=graph_hubs, label=self.ll,
+        # )
 
         if self.verbose:
             print(ts(), "Construct local structure")
 
         init = local_optimize_nn(
             data=X,
-            graph=graph_hubs,
+            graph=self.graph_,
             hub_info=hub_info,
             n_components=self.n_components,
             initial_alpha=self._initial_alpha,
