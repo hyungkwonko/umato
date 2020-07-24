@@ -651,7 +651,7 @@ def shaking2(Z, cutoff):
             distance += (Z[i][d] - centre[d]) ** 2
         distance = np.sqrt(distance)
         if distance > cutoff:
-            Z[i] = (Z[i] / distance * cutoff / 3) + np.random.random(2) * 0.2 + (centre / 2)
+            Z[i] = ((Z[i] - centre) / 2.0 / distance * cutoff) + np.random.random(2) * 0.5 + centre
 
     return Z
 
@@ -723,7 +723,7 @@ def nn_layout_optimize(
         )
 
         # shaking for stable positioning
-        if (n > 0) and (n % 30 == 0):
+        if (n > 0) and (n % 40 == 0):
             head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
 
 
@@ -766,7 +766,7 @@ def _nn_layout_optimize_single_epoch(
     epoch_of_next_sample,
     n,
 ):
-    grad_clip = 4.0
+    grad_clip = 0.02
     gamma = 0.05
     for i in numba.prange(epochs_per_sample.shape[0]):
         if epoch_of_next_sample[i] <= n:
@@ -789,11 +789,11 @@ def _nn_layout_optimize_single_epoch(
 
                 current[d] += grad_d * alpha
 
-                # grad_other = 0.0  # grad coefficient for the opponent
-                # if hub_info[k] == 1:
-                #     grad_other = 1.0
-                # if move_other:
-                #     other[d] += -grad_d * alpha # * grad_other
+                grad_other = 0.0  # grad coefficient for the opponent
+                if hub_info[k] == 1:
+                    grad_other = 1.0
+                if move_other:
+                    other[d] += -grad_d * alpha * grad_other
 
             epoch_of_next_sample[i] += epochs_per_sample[i]
 
@@ -803,7 +803,10 @@ def _nn_layout_optimize_single_epoch(
             # n_neg_samples = 100
 
             for p in range(n_neg_samples):
-                k = tau_rand_int(rng_state) % n_vertices
+                while(True):
+                    k = tau_rand_int(rng_state) % n_vertices
+                    if hub_info[k] > 0:
+                        break
                 # k = hubs[k]
 
                 other = tail_embedding[k]
@@ -830,27 +833,28 @@ def _nn_layout_optimize_single_epoch(
                     current[d] += grad_d * alpha
 
             # considering hub nodes
-            for p2 in hub_knn_indices[j]:
-                other = tail_embedding[p2]
+            # for p2 in hub_knn_indices[j]:
+            # p2 = hub_knn_indices[j][0]
+            # other = tail_embedding[p2]
 
-                dist_squared = rdist(current, other)
+            # dist_squared = rdist(current, other)
 
-                if dist_squared > 0.0:
-                    grad_coeff = -2.0 * a * b * pow(dist_squared, b - 1.0)
-                    grad_coeff /= a * pow(dist_squared, b) + 1.0
-                elif j == k:
-                    continue
-                else:
-                    grad_coeff = 0.0
+            # if dist_squared > 0.0:
+            #     grad_coeff = -2.0 * a * b * pow(dist_squared, b - 1.0)
+            #     grad_coeff /= a * pow(dist_squared, b) + 1.0
+            # elif j == k:
+            #     continue
+            # else:
+            #     grad_coeff = 0.0
 
-                for d in range(dim):
-                    if grad_coeff > 0.0:
-                        grad_d = clip(grad_coeff * (current[d] - other[d]), 0.0005)
-                    else:
-                        grad_d = 0.0005
-                        # grad_d = 4.0
+            # for d in range(dim):
+            #     if grad_coeff > 0.0:
+            #         grad_d = clip(grad_coeff * (current[d] - other[d]), 0.0015)
+            #     else:
+            #         grad_d = 0.0015
+            #         # grad_d = 4.0
 
-                    current[d] += grad_d * alpha
+            #     current[d] += grad_d * alpha
 
-                    # if move_other:
-                    #     other[d] += -grad_d * alpha # * grad_other
+                # if move_other:
+                #     other[d] += -grad_d * alpha # * grad_other
