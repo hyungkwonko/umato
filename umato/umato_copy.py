@@ -1421,7 +1421,7 @@ def check_nn_accuracy(
 
 
 @numba.njit()
-def remove_from_graph(data, array, array2, hub_info, remove_target):
+def remove_from_graph(data, array, hub_info, remove_target):
     """
     remove_target == 0: outliers
     remove_target == 1: NNs
@@ -1429,12 +1429,11 @@ def remove_from_graph(data, array, array2, hub_info, remove_target):
     """
     for target in remove_target:
         if target not in [0, 1, 2]:
-            raise ValueError("remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs")
+            raise ValueError("remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs)")
 
         for i, e in enumerate(array):
             if hub_info[e] == target:
-                if hub_info[array2[i]] == target:
-                    data[i] = 0
+                data[i] = 0
 
     return data
 
@@ -1447,19 +1446,97 @@ def change_graph_ix(array, hubs):
     return result
 
 
-# def compute_hub_nn_graph(data=X, hub_info=hub_info,):
-#     hubs = np.where(hub_info == 0)[0]
-#     nns = np.where(hub_info == 1)[0]
-#     return graph_hubs
+@numba.njit(
+    locals={
+        "sigmas": numba.types.float32[::1],
+        "rhos": numba.types.float32[::1],
+        "vals": numba.types.float32[::1],
+        "dists": numba.types.float32[::1],
+    },
+    parallel=True,
+    fastmath=True,
+)
+def fast_knn_indices_hub(X, n_neighbors, hubs, nns):
+    """A fast computation of knn indices.
 
-#         rows, cols, vals = compute_membership_strengths(
-#             knn_indices, knn_dists, sigmas, rhos
-#         )
+    Parameters
+    ----------
+    X: array of shape (n_samples, n_features)
+        The input data to compute the k-neighbor indices of.
 
-#         result = scipy.sparse.coo_matrix(
-#             (vals, (rows, cols)), shape=(X.shape[0], X.shape[0])
-#         )
-#         result.eliminate_zeros()
+    n_neighbors: int
+        The number of nearest neighbors to compute for each sample in ``X``.
+
+    Returns
+    -------
+    knn_indices: array of shape (n_samples, n_neighbors)
+        The indices on the ``n_neighbors`` closest points in the dataset.
+    """
+
+    nn_num = len(nns)
+    hub_num = len(hubs)
+
+    rows = np.zeros(n_neighbors * nn_num, dtype=np.int32)
+    cols = np.zeros(n_neighbors * nn_num, dtype=np.int32)
+    vals = np.zeros(n_neighbors * nn_num, dtype=np.float32)
+
+    for i in numba.prange(nn_num):
+        dists = np.zeros(hub_num, dtype=np.float32)
+        for j in numba.prange(hub_num):
+            dist = 0.0
+            for d in numba.prange(X.shape[1]):
+                dist += (X[nns[i]][d] - X[hubs[j]][d]) ** 2
+            dists[j] = np.sqrt(dist)
+
+        sorted_dists = dists.argsort(kind="quicksort")
+        neighbors = sorted_dists[:n_neighbors]
+
+        rows[i * n_neighbors:(i+1) * n_neighbors] = nns[i]
+        cols[i * n_neighbors:(i+1) * n_neighbors] = neighbors
+        vals[i * n_neighbors:(i+1) * n_neighbors] = 0.25
+        # vals[i * n_neighbors:(i+1) * n_neighbors] = dists[neighbors]
+
+    return rows, cols, vals
+
+# @numba.njit(
+#     locals={
+#         "dists": numba.types.float32[::1],
+#         "knn_indices": numba.types.int32[:, ::1],
+#     },
+#     parallel=True,
+#     fastmath=True,
+# )
+# def fast_knn_indices_hub(X, n_neighbors, hubs, nns):
+
+#     nn_num = len(nns)
+#     hub_num = len(hubs)
+
+#     knn_indices = np.zeros((X.shape[0], n_neighbors), dtype=np.int32)
+
+#     for i in numba.prange(nn_num):
+#         dists = np.zeros(hub_num, dtype=np.float32)
+#         for j in numba.prange(hub_num):
+#             dist = 0.0
+#             for d in numba.prange(X.shape[1]):
+#                 dist += (X[nns[i]][d] - X[hubs[j]][d]) ** 2
+#             dists[j] = np.sqrt(dist)
+
+#         sorted_dists = dists.argsort(kind="quicksort")
+#         neighbors = sorted_dists[:n_neighbors]
+
+#         knn_indices[nns[i]] = hubs[neighbors]
+
+#     return knn_indices
+
+
+def compute_hub_nn_graph(data, n_neighbors, hub_info,):
+
+    hubs = np.where(hub_info == 2)[0]
+    nns = np.where(hub_info == 1)[0]
+    knn_indices = fast_knn_indices_hub(data, n_neighbors, hubs, nns)    
+
+    return knn_indices
+
 
 def local_optimize_nn(
     data,
@@ -1481,7 +1558,7 @@ def local_optimize_nn(
     label=None,
 ):
 
-    # graph = graph.tocoo()
+    graph = graph.tocoo()
     graph.sum_duplicates()
     n_vertices = graph.shape[1]
 
@@ -1493,12 +1570,31 @@ def local_optimize_nn(
             n_epochs = 200
 
     # remove outlier-related values from graph
-    # graph.data = remove_from_graph(graph.data, graph.row, graph.col, hub_info, remove_target=np.array([0]))
-    # graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
+    graph.data = remove_from_graph(graph.data, graph.row, hub_info, remove_target=np.array([0, 2]))
+    graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
 
     # remove zero values
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
     graph.eliminate_zeros()
+
+    print(len(graph.row))
+
+    hubs = np.where(hub_info == 2)[0]
+    nns = np.where(hub_info == 1)[0]
+    # hub_knn_indices = fast_knn_indices_hub(data, n_neighbors=5, hubs=hubs, nns=nns)
+    rr, cc, dd = fast_knn_indices_hub(X=data, n_neighbors=5, hubs=hubs, nns=nns)
+    graph.row = np.append(graph.row, rr)
+    graph.col = np.append(graph.col, cc)
+    graph.data = np.append(graph.data, dd)
+
+
+    print(len(graph.row))
+
+    hub_knn_indices = 0
+
+    
+
+    # check_nn_accuracy(indices_info=hub_knn_indices, label=label)
 
     init_data = np.array(init)
     if len(init_data.shape) == 2:
@@ -1521,7 +1617,7 @@ def local_optimize_nn(
     rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
 
     embedding = (
-        10.0
+        20.0
         * (embedding - np.min(embedding, 0))
         / (np.max(embedding, 0) - np.min(embedding, 0))
     ).astype(np.float32, order="C")
@@ -1532,6 +1628,7 @@ def local_optimize_nn(
         head,
         tail,
         hub_info,
+        hub_knn_indices,
         n_epochs,
         n_vertices,
         epochs_per_sample,
@@ -2515,10 +2612,6 @@ class UMATO(BaseEstimator):
         # sorted_index = index[freq.argsort(kind="stable")]  # sorted index in increasing order
         sorted_index = index[freq.argsort(kind="stable")[::-1]]  # sorted index in decreasing order
 
-        # import pandas as pd
-        # dataset = pd.DataFrame({'index': index, 'freq': freq, 'label': self.ll})
-        # dataset.to_csv("./zz_random.csv", index=False)
-
         # get disjoint NN matrix
         disjoints = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
 
@@ -2531,21 +2624,8 @@ class UMATO(BaseEstimator):
         hubs = pick_hubs(
             disjoints=disjoints,
             random_state=random_state,
-            # popular=True,
+            popular=True,
         )
-
-        # hub_idx, leaf_list = hub_leaf_indices(
-        #     data=X,
-        #     random_state=random_state,
-        #     n_trees=-1,
-        #     hub_num=300,
-        #     verbose=False,
-        #     angular=False,
-        #     # debug=False,
-        #     debug=True,
-        # )
-
-        print(np.unique(self.ll[hubs], return_counts=True))  # get count per class
 
         global_optimized = build_global_structure(
             data=X,
@@ -2554,8 +2634,9 @@ class UMATO(BaseEstimator):
             a=self._a,
             b=self._b,
             random_state=random_state,
-            alpha=0.005,
+            alpha=0.01,
             max_iter=10,
+            # verbose=False,
             verbose=True,
             label=self.ll,
         )
@@ -2575,58 +2656,54 @@ class UMATO(BaseEstimator):
 
 
 
-        (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
-            X[hubs],
-            self._n_neighbors,
-            nn_metric,
-            self._metric_kwds,
-            self.angular_rp_forest,
-            random_state,
-            self.low_memory,
-            use_pynndescent=True,
-            verbose=True,
-        )
-
-        graph_hubs, _, _ = fuzzy_simplicial_set(
-            X[hubs],
-            self.n_neighbors,
-            random_state,
-            nn_metric,
-            self._metric_kwds,
-            _knn_indices2,
-            _knn_dists2,
-            self.angular_rp_forest,
-            self.set_op_mix_ratio,
-            self.local_connectivity,
-            True,
-            True,
-        )
-
-        # graph_hubs = compute_hub_nn_graph(data=X, hub_info=hub_info,)
-        # rows, cols, vals = compute_membership_strengths(
-        #     knn_indices, knn_dists, sigmas, rhos
+        # (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
+        #     X[hubs],
+        #     self._n_neighbors,
+        #     nn_metric,
+        #     self._metric_kwds,
+        #     self.angular_rp_forest,
+        #     random_state,
+        #     self.low_memory,
+        #     use_pynndescent=True,
+        #     verbose=True,
         # )
-        # result = scipy.sparse.coo_matrix(
-        #     (vals, (rows, cols)), shape=(X.shape[0], X.shape[0])
-        # )
-        # result.eliminate_zeros()
 
-        print("building graph2-3")
-        graph_hubs = graph_hubs.tocoo()
-        graph_hubs.sum_duplicates()
-        hubs = sorted(hubs)
-        hubs = np.array(hubs)
-        print(len(hubs) == len(np.unique(graph_hubs.row)))
-        graph_hubs.row = change_graph_ix(graph_hubs.row, hubs)
-        print(len(hubs) == len(np.unique(graph_hubs.col)))
-        graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
+        # graph_hubs, _, _ = fuzzy_simplicial_set(
+        #     X[hubs],
+        #     self.n_neighbors,
+        #     random_state,
+        #     nn_metric,
+        #     self._metric_kwds,
+        #     _knn_indices2,
+        #     _knn_dists2,
+        #     self.angular_rp_forest,
+        #     self.set_op_mix_ratio,
+        #     self.local_connectivity,
+        #     True,
+        #     True,
+        # )
+        # print("building graph2-3")
+        # graph_hubs = graph_hubs.tocoo()
+        # graph_hubs.sum_duplicates()
+        # hubs = sorted(hubs)
+        # hubs = np.array(hubs)
+        # print(len(hubs) == len(np.unique(graph_hubs.row)))
+        # graph_hubs.row = change_graph_ix(graph_hubs.row, hubs)
+        # print(len(hubs) == len(np.unique(graph_hubs.col)))
+        # graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
+
+        # graph_hubs = compute_hub_nn_graph(data=X, n_neighbors=self.n_neighbors, hub_info=hub_info,)
+
+        # check_nn_accuracy(
+        #     indices_info=graph_hubs, label=self.ll,
+        # )
 
         if self.verbose:
             print(ts(), "Construct local structure")
 
         init = local_optimize_nn(
             data=X,
-            graph=graph_hubs,
+            graph=self.graph_,
             hub_info=hub_info,
             n_components=self.n_components,
             initial_alpha=self._initial_alpha,

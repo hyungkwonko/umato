@@ -1217,7 +1217,7 @@ def embed_others_nn(
     init[hubs] = global_optimized
 
     # generate random normal distribution
-    random_normal = random_state.normal(scale=0.005, size=list(init.shape)).astype(
+    random_normal = random_state.normal(scale=0.05, size=list(init.shape)).astype(
         np.float32
     )
 
@@ -1493,7 +1493,7 @@ def fast_knn_indices_hub(X, n_neighbors, hubs, nns):
 
         rows[i * n_neighbors:(i+1) * n_neighbors] = nns[i]
         cols[i * n_neighbors:(i+1) * n_neighbors] = neighbors
-        vals[i * n_neighbors:(i+1) * n_neighbors] = 0.25
+        vals[i * n_neighbors:(i+1) * n_neighbors] = 1.0
         # vals[i * n_neighbors:(i+1) * n_neighbors] = dists[neighbors]
 
     return rows, cols, vals
@@ -1559,6 +1559,15 @@ def local_optimize_nn(
 ):
 
     graph = graph.tocoo()
+
+    hubs = np.where(hub_info == 2)[0]
+    nns = np.where(hub_info == 1)[0]
+    # hub_knn_indices = fast_knn_indices_hub(data, n_neighbors=5, hubs=hubs, nns=nns)
+    rr, cc, dd = fast_knn_indices_hub(X=data, n_neighbors=5, hubs=hubs, nns=nns)
+    graph.row = np.append(graph.row, rr)
+    graph.col = np.append(graph.col, cc)
+    graph.data = np.append(graph.data, dd)
+
     graph.sum_duplicates()
     n_vertices = graph.shape[1]
 
@@ -1572,25 +1581,15 @@ def local_optimize_nn(
     # remove outlier-related values from graph
     graph.data = remove_from_graph(graph.data, graph.row, hub_info, remove_target=np.array([0, 2]))
     graph.data = remove_from_graph(graph.data, graph.col, hub_info, remove_target=np.array([0]))
+    print(len(graph.data))
 
-    # remove zero values
+    graph.data[graph.data > 1.0] = 1.0
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
+    # graph.data[graph.data < 0.2] = 0.0
     graph.eliminate_zeros()
 
-    print(len(graph.row))
+    print(len(graph.data))
 
-    hubs = np.where(hub_info == 2)[0]
-    nns = np.where(hub_info == 1)[0]
-    # hub_knn_indices = fast_knn_indices_hub(data, n_neighbors=5, hubs=hubs, nns=nns)
-    rr, cc, dd = fast_knn_indices_hub(X=data, n_neighbors=5, hubs=hubs, nns=nns)
-    graph.row = np.append(graph.row, rr)
-    graph.col = np.append(graph.col, cc)
-    graph.data = np.append(graph.data, dd)
-
-
-    print(len(graph.row))
-
-    hub_knn_indices = 0
 
     
 
@@ -1612,7 +1611,6 @@ def local_optimize_nn(
 
     head = graph.row
     tail = graph.col
-    weight = graph.data
 
     rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
 
@@ -1628,7 +1626,6 @@ def local_optimize_nn(
         head,
         tail,
         hub_info,
-        hub_knn_indices,
         n_epochs,
         n_vertices,
         epochs_per_sample,
@@ -2530,6 +2527,7 @@ class UMATO(BaseEstimator):
                     nn_metric = self._input_distance_func
             else:
                 nn_metric = self._input_distance_func
+
             (self._knn_indices, self._knn_dists, self._rp_forest) = nearest_neighbors(
                 X[index],
                 self._n_neighbors,
@@ -2557,41 +2555,6 @@ class UMATO(BaseEstimator):
                 self.verbose,
             )
 
-            if not _HAVE_PYNNDESCENT:
-                self._search_graph = scipy.sparse.lil_matrix(
-                    (X[index].shape[0], X[index].shape[0]), dtype=np.int8
-                )
-                _rows = []
-                _data = []
-                for i in self._knn_indices:
-                    _non_neg = i[i >= 0]
-                    _rows.append(_non_neg)
-                    _data.append(np.ones(_non_neg.shape[0], dtype=np.int8))
-
-                self._search_graph.rows = _rows
-                self._search_graph.data = _data
-                self._search_graph = self._search_graph.maximum(
-                    self._search_graph.transpose()
-                ).tocsr()
-
-                if (self.metric != "precomputed") and (len(self._metric_kwds) > 0):
-                    # Create a partial function for distances with arguments
-                    _distance_func = self._input_distance_func
-                    _dist_args = tuple(self._metric_kwds.values())
-                    if self._sparse_data:
-
-                        @numba.njit()
-                        def _partial_dist_func(ind1, data1, ind2, data2):
-                            return _distance_func(ind1, data1, ind2, data2, *_dist_args)
-
-                        self._input_distance_func = _partial_dist_func
-                    else:
-
-                        @numba.njit()
-                        def _partial_dist_func(x, y):
-                            return _distance_func(x, y, *_dist_args)
-
-                        self._input_distance_func = _partial_dist_func
 
         if self.n_epochs is None:
             n_epochs = 0
@@ -2605,16 +2568,12 @@ class UMATO(BaseEstimator):
         ###### Hyung-Kwon Ko
         ###### Hyung-Kwon Ko
 
-        hub_num = 300
+        hub_num = 200
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
         # sorted_index = index[freq.argsort(kind="stable")]  # sorted index in increasing order
         sorted_index = index[freq.argsort(kind="stable")[::-1]]  # sorted index in decreasing order
-
-        # import pandas as pd
-        # dataset = pd.DataFrame({'index': index, 'freq': freq, 'label': self.ll})
-        # dataset.to_csv("./zz_random.csv", index=False)
 
         # get disjoint NN matrix
         disjoints = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
@@ -2631,19 +2590,6 @@ class UMATO(BaseEstimator):
             # popular=True,
         )
 
-        # hub_idx, leaf_list = hub_leaf_indices(
-        #     data=X,
-        #     random_state=random_state,
-        #     n_trees=-1,
-        #     hub_num=300,
-        #     verbose=False,
-        #     angular=False,
-        #     # debug=False,
-        #     debug=True,
-        # )
-
-        print(np.unique(self.ll[hubs], return_counts=True))  # get count per class
-
         global_optimized = build_global_structure(
             data=X,
             hubs=hubs,
@@ -2651,7 +2597,7 @@ class UMATO(BaseEstimator):
             a=self._a,
             b=self._b,
             random_state=random_state,
-            alpha=0.0075,
+            alpha=0.007,
             max_iter=10,
             # verbose=False,
             verbose=True,
@@ -2666,12 +2612,6 @@ class UMATO(BaseEstimator):
             random_state=random_state,
             label=self.ll,
         )
-
-        # init, hub_idx = rpleaf_embedding(
-        #     data=X, init=init, hub_idx=hub_idx, leaf_list=leaf_list,
-        # )
-
-
 
         # (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
         #     X[hubs],

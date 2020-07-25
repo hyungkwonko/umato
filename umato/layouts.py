@@ -577,20 +577,18 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig
     CE_array = []
     index = np.arange(len(Z))
 
+    gamma = 1.0
+
     for i in range(max_iter):
         d_squared = np.square(euclidean_distances(Z, Z))
         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
         d_inverse = np.expand_dims(pow(1 + a * d_squared ** b, -1), axis=2)
 
-        # shaking for stable positioning
-        # if i % 5 == 0:
-        #     Z = shaking(Z=Z)
-
         Q = np.dot(1 - P, pow(0.001 + d_squared, -1))
         np.fill_diagonal(Q, 0)
         Q /= np.sum(Q, axis=1, keepdims=True)
 
-        grad = np.expand_dims(2 * a * b * P * (1e-12 + d_squared) ** (b-1) - 2 * b * Q, axis=2)
+        grad = np.expand_dims(2 * a * b * P * (1e-12 + d_squared) ** (b-1) - 2 * gamma * b * Q, axis=2)
         dZ = np.sum(grad * z_diff * d_inverse, axis=1)
         Z -= alpha * dZ
 
@@ -665,7 +663,6 @@ def nn_layout_optimize(
     head,
     tail,
     hub_info,
-    hub_knn_indices,
     n_epochs,
     n_vertices,
     epochs_per_sample,
@@ -685,10 +682,28 @@ def nn_layout_optimize(
     alpha = initial_alpha
 
     hubs = np.where(hub_info == 2)[0]
-    # n_vertices = len(hubs)
-    alpha = 1.0
-
     cutoff = get_max_hub(head_embedding[hubs])
+
+    # # spheres
+    # alpha = 1.0
+    # gamma = 0.02
+    # grad_clip = 0.2
+    # negative_sample_rate=25.0
+    # n_epochs = 50
+
+    # spheres2
+    alpha = 1.0
+    gamma = 1.0
+    grad_clip = 4.0
+    negative_sample_rate=35.0
+    n_epochs = 50
+
+    # # fmnist
+    # alpha = 1.0
+    # gamma = 0.5
+    # grad_clip = 0.05
+    # negative_sample_rate=35.0
+    # n_epochs = 50
 
 
     epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
@@ -705,14 +720,13 @@ def nn_layout_optimize(
             head,
             tail,
             hub_info,
-            hub_knn_indices,
-            hubs,
             n_vertices,
             epochs_per_sample,
             a,
             b,
             rng_state,
             gamma,
+            grad_clip,
             dim,
             move_other,
             alpha,
@@ -723,15 +737,10 @@ def nn_layout_optimize(
         )
 
         # shaking for stable positioning
-        if (n > 0) and (n % 40 == 0):
-            head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
-
-
+        # if (n > 0) and (n % 30 == 0):
+        #     head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
 
         alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
-
-        if n > 100:
-            exit()
 
         if verbose and n % 10 == 0:
             from umato.umato_ import plot_tmptmp
@@ -750,14 +759,13 @@ def _nn_layout_optimize_single_epoch(
     head,
     tail,
     hub_info,
-    hub_knn_indices,
-    hubs,
     n_vertices,
     epochs_per_sample,
     a,
     b,
     rng_state,
     gamma,
+    grad_clip,
     dim,
     move_other,
     alpha,
@@ -766,8 +774,6 @@ def _nn_layout_optimize_single_epoch(
     epoch_of_next_sample,
     n,
 ):
-    grad_clip = 0.02
-    gamma = 0.05
     for i in numba.prange(epochs_per_sample.shape[0]):
         if epoch_of_next_sample[i] <= n:
             j = head[i]  # j == source index
@@ -791,7 +797,9 @@ def _nn_layout_optimize_single_epoch(
 
                 grad_other = 0.0  # grad coefficient for the opponent
                 if hub_info[k] == 1:
-                    grad_other = 1.0
+                    grad_other = 2.0
+                elif hub_info[k] == 2:
+                    grad_other = 0.05
                 if move_other:
                     other[d] += -grad_d * alpha * grad_other
 
@@ -800,17 +808,14 @@ def _nn_layout_optimize_single_epoch(
             n_neg_samples = int(
                 (n - epoch_of_next_negative_sample[i]) / epochs_per_negative_sample[i]
             )
-            # n_neg_samples = 100
 
             for p in range(n_neg_samples):
                 while(True):
                     k = tau_rand_int(rng_state) % n_vertices
                     if hub_info[k] > 0:
                         break
-                # k = hubs[k]
 
                 other = tail_embedding[k]
-
                 dist_squared = rdist(current, other)
 
                 if dist_squared > 0.0:
@@ -832,29 +837,6 @@ def _nn_layout_optimize_single_epoch(
 
                     current[d] += grad_d * alpha
 
-            # considering hub nodes
-            # for p2 in hub_knn_indices[j]:
-            # p2 = hub_knn_indices[j][0]
-            # other = tail_embedding[p2]
-
-            # dist_squared = rdist(current, other)
-
-            # if dist_squared > 0.0:
-            #     grad_coeff = -2.0 * a * b * pow(dist_squared, b - 1.0)
-            #     grad_coeff /= a * pow(dist_squared, b) + 1.0
-            # elif j == k:
-            #     continue
-            # else:
-            #     grad_coeff = 0.0
-
-            # for d in range(dim):
-            #     if grad_coeff > 0.0:
-            #         grad_d = clip(grad_coeff * (current[d] - other[d]), 0.0015)
-            #     else:
-            #         grad_d = 0.0015
-            #         # grad_d = 4.0
-
-            #     current[d] += grad_d * alpha
-
-                # if move_other:
-                #     other[d] += -grad_d * alpha # * grad_other
+            epoch_of_next_negative_sample[i] += (
+                n_neg_samples * epochs_per_negative_sample[i]
+            )
