@@ -71,24 +71,21 @@ References
     - Gracia, A., González, S., Robles, V., & Menasalvas, E. (2014).
     A methodology to compare dimensionality reduction algorithms in terms of loss of quality. Information Sciences, 270, 1-27.
 
-
 """
 
 import numpy as np
 from scipy.stats import spearmanr
 from sklearn import metrics
+import numba
 
 
-class Measure:
-    def __init__(self, x, z, k):
-        self.k = k  # number of nearest neighbors
+class GlobalMeasure:
+    def __init__(self, x, z):
         self.n_data = x.shape[0]  # number of data
+
+        # euclidean_distances: much faster than scipy.spatial.distance.squareform(pdist(x))
         self.adjacency_matrix_z = metrics.pairwise.euclidean_distances(z)
-        self.adjacency_matrix_x = metrics.pairwise.euclidean_distances(
-            x
-        )  # much faster than scipy.spatial.distance.squareform(pdist(x))
-        self.nnidx_z, self.rank_z = self.get_nnidx_rank(self.adjacency_matrix_z)
-        self.nnidx_x, self.rank_x = self.get_nnidx_rank(self.adjacency_matrix_x)
+        self.adjacency_matrix_x = metrics.pairwise.euclidean_distances(x)
 
     def rmse(self):
         """
@@ -132,12 +129,95 @@ class Measure:
         )
         return numerator.sum() / self.adjacency_matrix_x.sum()
 
-    def get_nnidx_rank(self, arr):
+    def dtm(self, sigma=0.1):
         """
-        Get the index of NNs and ranks
+        Distance To a Measure (DTM)
+
+        Compare normal distribution density between the original and embedding space
+        - Lower is BETTER
+        - Global
+
+        Parameters
+        ----------
+        sigma : float
+            sigma for normalization
         """
-        idx = arr.argsort()
-        return idx[:, 1 : self.k + 1], idx.argsort()
+        density_x = self.dtm_calculation(self.adjacency_matrix_x, sigma=sigma)
+        density_z = self.dtm_calculation(self.adjacency_matrix_z, sigma=sigma)
+        return np.abs(density_x - density_z).sum()
+
+    def dtm_kl(self, sigma=0.1):
+        """
+        KL Divergence between density distributions
+
+        KL Divergence between normal distribution density of the original and embedding space
+        - Lower is BETTER
+        - Global
+
+        Parameters
+        ----------
+        sigma : float
+            sigma for normalization
+        """
+        density_x = self.dtm_calculation(self.adjacency_matrix_x, sigma=sigma)
+        density_z = self.dtm_calculation(self.adjacency_matrix_z, sigma=sigma)
+        density_kl = density_x * (np.log(density_x) - np.log(density_z))
+        return density_kl.sum()
+
+    @staticmethod
+    def dtm_calculation(adjacency_matrix, sigma):
+        # normalization using max value
+        x = adjacency_matrix / adjacency_matrix.max()
+
+        # get normalized density
+        density_x = np.sum(np.exp(-(x ** 2) / sigma), axis=-1)
+        return density_x / density_x.sum()
+
+
+@numba.njit(parallel=True)
+def get_fast_knn(arr, n_neighbors):
+    """
+    requires much less memory && much less time for big data
+    """
+    knn_indices = np.empty((arr.shape[0], n_neighbors), dtype=np.int32)
+    knn_ranks = np.empty((arr.shape[0], arr.shape[0]), dtype=np.int32)
+
+    for i in numba.prange(arr.shape[0]):
+        dists = np.empty(arr.shape[0], dtype=np.float32)
+        for j in numba.prange(arr.shape[0]):
+            dist = 0.0
+            for d in numba.prange(arr.shape[1]):
+                dist += (arr[i][d] - arr[j][d]) ** 2
+            dists[j] = dist
+
+        v = dists.argsort(kind="quicksort")
+        knn_ranks[i] = v.argsort(kind="quicksort")
+        knn_indices[i] = v[1 : n_neighbors + 1]
+
+    return knn_indices, knn_ranks
+
+
+def get_nnidx_rank(arr, n_neighbors):
+    """
+    Brute force wau to get the index of NNs and ranks
+    """
+    adj_matrix = metrics.pairwise.euclidean_distances(arr)
+    idx = adj_matrix.argsort()
+    return idx[:, 1 : n_neighbors + 1], idx.argsort()
+
+
+class LocalMeasure:
+    def __init__(self, x, z, k=5):
+        self.k = k  # number of nearest neighbors
+        self.n_data = x.shape[0]  # number of data
+
+        # slow && requires a lot of memory
+        # self.nnidx_z, self.rank_z = get_nnidx_rank(z, k)
+        # self.nnidx_x, self.rank_x = get_nnidx_rank(x, k)
+
+        # fast && requires less memory
+        self.nnidx_z, self.rank_z = get_fast_knn(z, k)
+        self.nnidx_x, self.rank_x = get_fast_knn(x, k)
 
     def spearmans_rho(self):
         """
@@ -237,47 +317,3 @@ class Measure:
         # normalizing constant
         c = n_data * sum([abs(n_data - 2 * i + 1) / i for i in range(1, k + 1)])
         return 1 - mrre_temp / c
-
-    def dtm(self, sigma=0.1):
-        """
-        Distance To a Measure (DTM)
-
-        Compare normal distribution density between the original and embedding space
-        - Lower is BETTER
-        - Global
-
-        Parameters
-        ----------
-        sigma : float
-            sigma for normalization
-        """
-        density_x = self.dtm_calculation(self.adjacency_matrix_x, sigma=sigma)
-        density_z = self.dtm_calculation(self.adjacency_matrix_z, sigma=sigma)
-        return np.abs(density_x - density_z).sum()
-
-    def dtm_kl(self, sigma=0.1):
-        """
-        KL Divergence between density distributions
-
-        KL Divergence between normal distribution density of the original and embedding space
-        - Lower is BETTER
-        - Global
-
-        Parameters
-        ----------
-        sigma : float
-            sigma for normalization
-        """
-        density_x = self.dtm_calculation(self.adjacency_matrix_x, sigma=sigma)
-        density_z = self.dtm_calculation(self.adjacency_matrix_z, sigma=sigma)
-        density_kl = density_x * (np.log(density_x) - np.log(density_z))
-        return density_kl.sum()
-
-    @staticmethod
-    def dtm_calculation(adjacency_matrix, sigma):
-        # normalization using max value
-        x = adjacency_matrix / adjacency_matrix.max()
-
-        # get normalized density
-        density_x = np.sum(np.exp(-(x ** 2) / sigma), axis=-1)
-        return density_x / density_x.sum()

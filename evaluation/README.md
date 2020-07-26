@@ -60,7 +60,7 @@ Likewise, we can compare the embedding result quantitatively. We use measures su
 
 ```python
 # see table result
-python -m evaluation.comparison
+python -m evaluation.comparison --algo=all --data=spheres --measure=all
 ```
 
 ## References
