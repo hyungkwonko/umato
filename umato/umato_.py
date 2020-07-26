@@ -2568,7 +2568,7 @@ class UMATO(BaseEstimator):
         ###### Hyung-Kwon Ko
         ###### Hyung-Kwon Ko
 
-        hub_num = 200
+        hub_num = 300
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
@@ -2587,7 +2587,7 @@ class UMATO(BaseEstimator):
         hubs = pick_hubs(
             disjoints=disjoints,
             random_state=random_state,
-            # popular=True,
+            popular=True,
         )
 
         global_optimized = build_global_structure(

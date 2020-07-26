@@ -640,7 +640,7 @@ def get_max_hub(Z):
             cutoff = distance
     return np.sqrt(cutoff)
 
-def shaking2(Z, cutoff):
+def shaking2(Z, cutoff, times=2.0):
 
     centre = Z.mean(axis=0)
     for i in range(Z.shape[0]):
@@ -648,7 +648,7 @@ def shaking2(Z, cutoff):
         for d in range(Z.shape[1]):
             distance += (Z[i][d] - centre[d]) ** 2
         distance = np.sqrt(distance)
-        if distance > cutoff:
+        if distance > (cutoff * times):
             Z[i] = ((Z[i] - centre) / 2.0 / distance * cutoff) + np.random.random(2) * 0.5 + centre
 
     return Z
@@ -684,26 +684,14 @@ def nn_layout_optimize(
     hubs = np.where(hub_info == 2)[0]
     cutoff = get_max_hub(head_embedding[hubs])
 
-    # # spheres
-    # alpha = 1.0
-    # gamma = 0.02
-    # grad_clip = 0.2
-    # negative_sample_rate=25.0
-    # n_epochs = 50
 
-    # spheres2
+    # spheres
     alpha = 1.0
-    gamma = 1.0
+    gamma = 0.5
     grad_clip = 4.0
-    negative_sample_rate=35.0
+    negative_sample_rate=1.0  # spheres
+    negative_sample_rate=1.0  # mnist, fmnist
     n_epochs = 50
-
-    # # fmnist
-    # alpha = 1.0
-    # gamma = 0.5
-    # grad_clip = 0.05
-    # negative_sample_rate=35.0
-    # n_epochs = 50
 
 
     epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
@@ -737,8 +725,8 @@ def nn_layout_optimize(
         )
 
         # shaking for stable positioning
-        # if (n > 0) and (n % 30 == 0):
-        #     head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
+        if n == 30:
+            head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
 
         alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
 
@@ -750,6 +738,7 @@ def nn_layout_optimize(
         if verbose and n % 5 == 0:
             print("\tcompleted ", n, " / ", n_epochs, "epochs")
 
+    plot_tmptmp(data=head_embedding, label=label, name=f"pic3_local{n}")
     return head_embedding
 
 
@@ -793,13 +782,18 @@ def _nn_layout_optimize_single_epoch(
             for d in range(dim):
                 grad_d = clip(grad_coeff * (current[d] - other[d]), grad_clip)
 
-                current[d] += grad_d * alpha
-
                 grad_other = 0.0  # grad coefficient for the opponent
+                grad_current = 0.0
+
                 if hub_info[k] == 1:
-                    grad_other = 2.0
+                    grad_other = 1.0
+                    grad_current = 0.03
                 elif hub_info[k] == 2:
-                    grad_other = 0.05
+                    grad_other = 0.03
+                    grad_current = 1.0
+
+                current[d] += grad_d * alpha * grad_current
+
                 if move_other:
                     other[d] += -grad_d * alpha * grad_other
 
