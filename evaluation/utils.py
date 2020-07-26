@@ -80,23 +80,31 @@ import numba
 
 
 class GlobalMeasure:
-    def __init__(self, x, z):
+    def __init__(self, x, z, dtype=np.float32):
         self.n_data = x.shape[0]  # number of data
+        self.dtype = dtype
 
         # euclidean_distances: much faster than scipy.spatial.distance.squareform(pdist(x))
         self.adjacency_matrix_z = metrics.pairwise.euclidean_distances(z)
         self.adjacency_matrix_x = metrics.pairwise.euclidean_distances(x)
 
+        if self.dtype:
+            self.adjacency_matrix_z = self.adjacency_matrix_z.astype(self.dtype)
+            self.adjacency_matrix_x = self.adjacency_matrix_x.astype(self.dtype)
+
+        self.squared_differences = np.square(
+            self.adjacency_matrix_x - self.adjacency_matrix_z, dtype=self.dtype
+        )
+        
     def rmse(self):
         """
         Root Mean Squared Error (RMSE)
         - Lower is BETTER
         - Global
         """
-        sum_of_squared_differences = np.square(
-            self.adjacency_matrix_x - self.adjacency_matrix_z
-        ).sum()
-        return np.sqrt(sum_of_squared_differences / self.n_data)
+        sum_of_squared_differences = self.squared_differences.sum()
+
+        return np.sqrt(sum_of_squared_differences / self.n_data, dtype=self.dtype)
 
     def kruskal_stress_measure(self):
         """
@@ -106,11 +114,10 @@ class GlobalMeasure:
         - Lower is BETTER
         - Global
         """
-        sum_of_squared_diff = np.square(
-            self.adjacency_matrix_x - self.adjacency_matrix_z
-        ).sum()
-        sum_of_squares_z = np.square(self.adjacency_matrix_z).sum()
-        return np.sqrt(sum_of_squared_diff / sum_of_squares_z)
+        sum_of_squared_differences = self.squared_differences.sum()
+        sum_of_squares_z = np.square(self.adjacency_matrix_z, dtype=self.dtype).sum()
+
+        return np.sqrt(sum_of_squared_differences / sum_of_squares_z, dtype=self.dtype)
 
     def sammon_stress(self):
         """
@@ -120,11 +127,10 @@ class GlobalMeasure:
         - Lower is BETTER
         - Global
         """
-        squared_diff = np.square(self.adjacency_matrix_x - self.adjacency_matrix_z)
         numerator = np.divide(
-            squared_diff,
+            self.squared_differences,
             self.adjacency_matrix_x,
-            out=np.zeros(squared_diff.shape, dtype=float),
+            out=np.zeros(self.squared_differences.shape, dtype=float),
             where=self.adjacency_matrix_x != 0,
         )
         return numerator.sum() / self.adjacency_matrix_x.sum()
