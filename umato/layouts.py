@@ -640,7 +640,7 @@ def get_max_hub(Z):
             cutoff = distance
     return np.sqrt(cutoff)
 
-def shaking2(Z, cutoff, times=2.0):
+def shaking2(Z, cutoff, times=1.25):
 
     centre = Z.mean(axis=0)
     for i in range(Z.shape[0]):

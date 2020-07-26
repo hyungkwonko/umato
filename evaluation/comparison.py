@@ -25,7 +25,7 @@ MEASURE_LOCAL_LIST = [
 ]
 
 ALGO_LIST = ["pca", "tsne", "umap", "topoae", "umato"]  # (TODO) add umato
-ALGO_LIST = ["umato",]  # (TODO) add umato
+# ALGO_LIST = ["umato",]  # (TODO) add umato
 DATA_LIST = ["spheres"]
 
 
@@ -109,11 +109,11 @@ if __name__ == "__main__":
                 [spearman_val, trust_val, conti_val, mrre_val,]
             )
 
-    print(f"[INFO] dataset [{args.data}] - Quantitative result")
-    result = pd.DataFrame(
-        {"measure": measures, "algorithm": algorithms, "values": values}
-    )
-    result = result.pivot(index="measure", columns="algorithm", values="values").fillna(
-        "NA"
-    )
-    print(f"{result}\n")
+        print(f"[INFO] dataset [{args.data}] - Quantitative result")
+        result = pd.DataFrame(
+            {"measure": measures, "algorithm": algorithms, "values": values}
+        )
+        result = result.pivot(index="measure", columns="algorithm", values="values").fillna(
+            "NA"
+        )
+        print(f"{result}\n")
