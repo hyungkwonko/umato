@@ -576,10 +576,14 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig
 
     CE_array = []
     index = np.arange(len(Z))
+    init_alpha = alpha
 
     gamma = 1.0
 
     for i in range(max_iter):
+
+        alpha = init_alpha - alpha * (i / max_iter)
+
         d_squared = np.square(euclidean_distances(Z, Z))
         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
         d_inverse = np.expand_dims(pow(1 + a * d_squared ** b, -1), axis=2)
@@ -596,7 +600,7 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig
             CE_current = get_CE(P, Z, d_squared, a, b)
             # CE_current = get_DTM(P, Q, sigma=0.1)
             CE_array.append(CE_current)
-            print(f"[INFO] Current loss: {CE_current:.6f}, @ iteration: {i+1}/{max_iter}")
+            print(f"[INFO] Current loss: {CE_current:.6f}, @ iteration: {i+1}/{max_iter}, alpha: {alpha}")
 
         if savefig:
             if i % 2 == 1:
@@ -725,7 +729,7 @@ def nn_layout_optimize(
         )
 
         # shaking for stable positioning
-        if n == 30:
+        if n == 35:
             head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
 
         alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))

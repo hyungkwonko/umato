@@ -2597,7 +2597,7 @@ class UMATO(BaseEstimator):
             a=self._a,
             b=self._b,
             random_state=random_state,
-            alpha=0.007,
+            alpha=0.01,
             max_iter=10,
             # verbose=False,
             verbose=True,
@@ -2612,6 +2612,9 @@ class UMATO(BaseEstimator):
             random_state=random_state,
             label=self.ll,
         )
+
+        print("hubs: ")
+        print(hubs)
 
         # (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
         #     X[hubs],
