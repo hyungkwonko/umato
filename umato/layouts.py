@@ -691,8 +691,8 @@ def nn_layout_optimize(
     gamma = 0.5
     grad_clip = 4.0
     # negative_sample_rate=1.0  # spheres
-    # negative_sample_rate=5.0  # mnist, fmnist
-    negative_sample_rate=35.0  # mnist, fmnist
+    negative_sample_rate=5.0  # mnist, fmnist
+    # negative_sample_rate=35.0  # mnist, fmnist
     n_epochs = 50
 
 
@@ -788,11 +788,11 @@ def _nn_layout_optimize_single_epoch(
                 grad_current = 0.0
 
                 if hub_info[k] == 1:
-                    grad_other = 1.0
-                    grad_current = 0.03
+                    grad_other = 0.05
+                    grad_current = 0.01
                 elif hub_info[k] == 2:
-                    grad_other = 0.03
-                    grad_current = 1.0
+                    grad_other = 0.01
+                    grad_current = 0.05
 
                 current[d] += grad_d * alpha * grad_current
 
@@ -830,7 +830,7 @@ def _nn_layout_optimize_single_epoch(
                     else:
                         grad_d = grad_clip
 
-                    current[d] += grad_d * alpha
+                    current[d] += grad_d * alpha * 0.05
 
             epoch_of_next_negative_sample[i] += (
                 n_neg_samples * epochs_per_negative_sample[i]
