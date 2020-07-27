@@ -2613,9 +2613,6 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        print("hubs: ")
-        print(hubs)
-
         # (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
         #     X[hubs],
         #     self._n_neighbors,
