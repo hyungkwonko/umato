@@ -1224,6 +1224,13 @@ def embed_others_nn(
     while True:
         val = len(hubs)
 
+        hubs = nn_initialize_num(
+            data=data,
+            hubs=hubs,
+            knn_indices=knn_indices,
+            nn_consider=10,
+        )
+
         # # append other nodes using NN information
         # init, hubs = nn_initialize(
         #     data=data,
@@ -1234,24 +1241,20 @@ def embed_others_nn(
         #     nn_consider=10,
         # )
 
-        # append other nodes using only hub information
-        init, hubs = nn_initialize(
-            data=data,
-            init=init,
-            original_hubs=original_hubs,
-            hubs=hubs,
-            knn_indices=knn_indices,
-            random=random_normal,
-            nn_consider=10,
-        )
-
-        # save figure2
-        plot_tmptmp(data=init[hubs], label=label[hubs], name=f"pic2_{val}")
-
         if val == len(hubs):
             if len(init) > len(hubs):
                 print(f"len(hubs) {len(hubs)} is smaller than len(init) {len(init)}")
             break
+
+    # append other nodes using only hub information
+    init = nn_initialize(
+        data=data,
+        init=init,
+        original_hubs=original_hubs,
+        hubs=hubs,
+        random=random_normal,
+        nn_consider=10,
+    )
 
     hub_info = np.zeros(data.shape[0])
     hub_info[hubs] = 1
@@ -1355,8 +1358,29 @@ def disjoint_initialize(
 #     return init, np.array(list(hubs_fin))
 
 @numba.njit()
+def nn_initialize_num(
+    data, hubs, knn_indices, nn_consider=10,
+):
+    print("[INFO] get hub_nn indices")
+
+    num_log = np.zeros(data.shape[0])
+    num_log[hubs] = -1
+
+    hubs = set(hubs)
+    hubs_fin = hubs.copy()
+
+    for i in hubs:
+        for j, e in enumerate(knn_indices[i]):
+            if j > nn_consider:
+                break
+            if num_log[e] > -1:
+                hubs_fin.add(e)
+
+    return np.array(list(hubs_fin))
+
+@numba.njit()
 def nn_initialize(
-    data, init, original_hubs, hubs, knn_indices, random, nn_consider=10,
+    data, init, original_hubs, hubs, random, nn_consider=10,
 ):
     print("[INFO] Embedding other nodes using NN information using only original hub information")
     print("originalhub length: ", len(original_hubs))
@@ -1365,36 +1389,29 @@ def nn_initialize(
     num_log[hubs] = -1
 
     hubs = set(hubs)
-    hubs_fin = hubs.copy()
-
+    hubs -= set(original_hubs)
 
     for i in hubs:
-        for j, e in enumerate(knn_indices[i]):
+        dists = np.zeros(len(original_hubs), dtype=np.float32)
+        for j, e in enumerate(original_hubs):
+            dist = 0.0
+            for d in range(data.shape[1]):
+                dist += (data[e][d] - data[i][d]) ** 2
+            dists[j] = dist
 
-            dists = np.zeros(len(original_hubs), dtype=np.float32)
-            for k, original_hub in enumerate(original_hubs):
-                dist = 0.0
-                for d in range(data.shape[1]):
-                    dist += (data[e][d] - data[original_hub][d]) ** 2
-                dists[k] = dist
+        # sorted hub indices
+        dists_arg = dists.argsort(kind="quicksort")
 
-            # sorted hub indices
-            dists_arg = dists.argsort(kind="quicksort")
-
-            if j > nn_consider:  # use at most 10 neighbors by default
-                init[e] += random[e]  # add random value before break
-                break
-            if num_log[e] > -1:
-                init[e] += init[original_hubs[dists_arg[j]]]
-                num_log[e] += 1
-                hubs_fin.add(e)
-                # break
+        for k in range(nn_consider):
+            init[i] += init[original_hubs[dists_arg[k]]]
+            num_log[i] += 1
+        init[i] += random[i]  # add random value before break
 
     for l in range(data.shape[0]):
         if num_log[l] > 0:
             init[l] /= num_log[l]
 
-    return init, np.array(list(hubs_fin))
+    return init
 
 @numba.njit()
 def rpleaf_embedding(
