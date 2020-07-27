@@ -49,6 +49,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--measure", type=str, help="choose measures: all, global, local", default="all"
     )
+    parser.add_argument(
+        "--load", type=bool, help="load hubs", default=False
+    )
     args = parser.parse_args()
 
     measures = []
@@ -64,8 +67,12 @@ if __name__ == "__main__":
 
         # read data & embedding result
         x, z, label = read_data(args.data, alg)
-        # x = x[:100]
-        # z = z[:100]
+
+        if args.load:
+            with open('./hubs.npy', 'rb') as f:
+                hubs = np.load(f)
+                x = x[hubs]
+                z = z[hubs]
 
         if args.measure == "all" or args.measure == "global":
 

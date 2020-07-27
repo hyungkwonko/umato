@@ -2613,41 +2613,44 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        # (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
-        #     X[hubs],
-        #     self._n_neighbors,
-        #     nn_metric,
-        #     self._metric_kwds,
-        #     self.angular_rp_forest,
-        #     random_state,
-        #     self.low_memory,
-        #     use_pynndescent=True,
-        #     verbose=True,
-        # )
+        with open('./hubs.npy', 'wb') as f:
+            np.save(f, hubs)
 
-        # graph_hubs, _, _ = fuzzy_simplicial_set(
-        #     X[hubs],
-        #     self.n_neighbors,
-        #     random_state,
-        #     nn_metric,
-        #     self._metric_kwds,
-        #     _knn_indices2,
-        #     _knn_dists2,
-        #     self.angular_rp_forest,
-        #     self.set_op_mix_ratio,
-        #     self.local_connectivity,
-        #     True,
-        #     True,
-        # )
-        # print("building graph2-3")
-        # graph_hubs = graph_hubs.tocoo()
-        # graph_hubs.sum_duplicates()
-        # hubs = sorted(hubs)
-        # hubs = np.array(hubs)
-        # print(len(hubs) == len(np.unique(graph_hubs.row)))
-        # graph_hubs.row = change_graph_ix(graph_hubs.row, hubs)
-        # print(len(hubs) == len(np.unique(graph_hubs.col)))
-        # graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
+        (_knn_indices2, _knn_dists2, _) = nearest_neighbors(
+            X[hubs],
+            self._n_neighbors,
+            nn_metric,
+            self._metric_kwds,
+            self.angular_rp_forest,
+            random_state,
+            self.low_memory,
+            use_pynndescent=True,
+            verbose=True,
+        )
+
+        graph_hubs, _, _ = fuzzy_simplicial_set(
+            X[hubs],
+            self.n_neighbors,
+            random_state,
+            nn_metric,
+            self._metric_kwds,
+            _knn_indices2,
+            _knn_dists2,
+            self.angular_rp_forest,
+            self.set_op_mix_ratio,
+            self.local_connectivity,
+            True,
+            True,
+        )
+        print("building graph2-3")
+        graph_hubs = graph_hubs.tocoo()
+        graph_hubs.sum_duplicates()
+        hubs = sorted(hubs)
+        hubs = np.array(hubs)
+        print(len(hubs) == len(np.unique(graph_hubs.row)))
+        graph_hubs.row = change_graph_ix(graph_hubs.row, hubs)
+        print(len(hubs) == len(np.unique(graph_hubs.col)))
+        graph_hubs.col = change_graph_ix(graph_hubs.col, hubs)
 
         # graph_hubs = compute_hub_nn_graph(data=X, n_neighbors=self.n_neighbors, hub_info=hub_info,)
 

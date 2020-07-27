@@ -691,8 +691,8 @@ def nn_layout_optimize(
     gamma = 0.5
     grad_clip = 4.0
     # negative_sample_rate=1.0  # spheres
-    # negative_sample_rate=5.0  # mnist, fmnist
-    negative_sample_rate=35.0  # mnist, fmnist
+    negative_sample_rate=5.0  # mnist, fmnist
+    # negative_sample_rate=35.0  # mnist, fmnist
     n_epochs = 50
 
 
@@ -727,8 +727,8 @@ def nn_layout_optimize(
         )
 
         # shaking for stable positioning
-        # if n == 35:
-        #     head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
+        if n == 35:
+            head_embedding = shaking2(Z=head_embedding, cutoff=cutoff)
 
         alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
 
@@ -789,9 +789,9 @@ def _nn_layout_optimize_single_epoch(
 
                 if hub_info[k] == 1:
                     grad_other = 1.0
-                    grad_current = 0.025
+                    grad_current = 0.03
                 elif hub_info[k] == 2:
-                    grad_other = 0.025
+                    grad_other = 0.03
                     grad_current = 1.0
 
                 current[d] += grad_d * alpha * grad_current
@@ -829,7 +829,6 @@ def _nn_layout_optimize_single_epoch(
                         grad_d = clip(grad_coeff * (current[d] - other[d]), grad_clip)
                     else:
                         grad_d = grad_clip
-                        # grad_d = 4.0
 
                     current[d] += grad_d * alpha
 
