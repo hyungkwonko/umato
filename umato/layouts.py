@@ -582,7 +582,7 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig
 
     for i in range(max_iter):
 
-        alpha = init_alpha - alpha * (i / max_iter)
+        # alpha = init_alpha * (1.0 - (float(i) / float(max_iter)))
 
         d_squared = np.square(euclidean_distances(Z, Z))
         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
@@ -603,9 +603,9 @@ def global_optimize(P, Z, a, b, alpha=0.005, max_iter=15, verbose=False, savefig
             print(f"[INFO] Current loss: {CE_current:.6f}, @ iteration: {i+1}/{max_iter}, alpha: {alpha}")
 
         if savefig:
-            if i % 2 == 1:
-                from umato.umato_ import plot_tmptmp
-                plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
+            # if i % 2 == 1:
+            from umato.umato_ import plot_tmptmp
+            plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
 
     return Z
 
@@ -693,8 +693,9 @@ def nn_layout_optimize(
     alpha = 1.0
     gamma = 0.5
     grad_clip = 4.0
-    negative_sample_rate=1.0  # spheres
-    negative_sample_rate=1.0  # mnist, fmnist
+    # negative_sample_rate=1.0  # spheres
+    negative_sample_rate=5.0  # mnist, fmnist
+    # negative_sample_rate=35.0  # mnist, fmnist
     n_epochs = 50
 
 
@@ -791,9 +792,9 @@ def _nn_layout_optimize_single_epoch(
 
                 if hub_info[k] == 1:
                     grad_other = 1.0
-                    grad_current = 0.03
+                    grad_current = 0.01
                 elif hub_info[k] == 2:
-                    grad_other = 0.03
+                    grad_other = 0.01
                     grad_current = 1.0
 
                 current[d] += grad_d * alpha * grad_current
