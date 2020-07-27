@@ -2663,7 +2663,8 @@ class UMATO(BaseEstimator):
 
         init = local_optimize_nn(
             data=X,
-            graph=self.graph_,
+            # graph=self.graph_,
+            graph=graph_hubs,
             hub_info=hub_info,
             n_components=self.n_components,
             initial_alpha=self._initial_alpha,

@@ -6,6 +6,7 @@ from .models.dataset import read_data
 from .utils import GlobalMeasure, LocalMeasure
 import pandas as pd
 import argparse
+import numpy as np
 
 MEASURE_GLOBAL_LIST = [
     "RMSE",
@@ -70,9 +71,11 @@ if __name__ == "__main__":
 
         if args.load:
             with open('./hubs.npy', 'rb') as f:
+                print("loading hubs")
                 hubs = np.load(f)
                 x = x[hubs]
                 z = z[hubs]
+                print(f"xlen: {len(x)}")
 
         if args.measure == "all" or args.measure == "global":
 
