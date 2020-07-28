@@ -2073,7 +2073,7 @@ class UMATO(BaseEstimator):
         (self._knn_indices, self._knn_dists, _) = nearest_neighbors(
             X[index],
             self._n_neighbors,
-            # int(self._n_neighbors * 1.2),
+            # int(self._n_neighbors * 1.2),  # we can use more neighbors 
             nn_metric,
             self._metric_kwds,
             self.angular_rp_forest,
