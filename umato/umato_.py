@@ -54,9 +54,8 @@ from umato.spectral import spectral_layout
 from umato.utils import deheap_sort, submatrix
 from umato.layouts import (
     optimize_layout_euclidean,
-    optimize_layout_generic,
-    optimize_layout_inverse,
     global_optimize,
+    optimize_global_layout,
     nn_layout_optimize,
 )
 
@@ -1062,7 +1061,6 @@ def disjoint_nn(
 def pick_hubs(
     disjoints, random_state, popular=False,
 ):
-
     if popular:
         return disjoints[:, 0]
     else:
@@ -1265,22 +1263,43 @@ def build_global_structure(
     # local connectivity for global optimization
     P = remove_local_connect(P, random_state)
 
-    if verbose:
-        result = global_optimize(
-            P=P,
-            Z=Z,
-            a=a,
-            b=b,
-            alpha=alpha,
-            max_iter=max_iter,
-            verbose=True,
-            savefig=True,
-            label=label[hubs],
-        )
-    else:
-        result = global_optimize(
-            P, Z, a, b, alpha=alpha, max_iter=max_iter
-        )  # (TODO) how to optimize max_iter & alpha?
+    # if verbose:
+    #     result = global_optimize(
+    #         P=P,
+    #         Z=Z,
+    #         a=a,
+    #         b=b,
+    #         alpha=alpha,
+    #         max_iter=max_iter,
+    #         verbose=True,
+    #         savefig=True,
+    #         label=label[hubs],
+    #     )
+    # else:
+    #     result = global_optimize(
+    #         P, Z, a, b, alpha=alpha, max_iter=max_iter
+    #     )  # (TODO) how to optimize max_iter & alpha?
+
+    Z = (
+        20.0
+        * (Z - np.min(Z, 0))
+        / (np.max(Z, 0) - np.min(Z, 0))
+    ).astype(np.float32, order="C")
+
+    optimize_global_layout(
+        P,
+        Z,
+        a,
+        b,
+        gamma=1.0,
+        initial_alpha=1.0,
+        n_epochs=10,
+        verbose=True,
+        savefig=True,
+        label=label[hubs],
+        parallel=False,
+    )
+    exit()
 
     return result
 
