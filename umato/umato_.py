@@ -54,7 +54,6 @@ from umato.spectral import spectral_layout
 from umato.utils import deheap_sort, submatrix
 from umato.layouts import (
     optimize_layout_euclidean,
-    global_optimize,
     optimize_global_layout,
     nn_layout_optimize,
 )
@@ -1220,12 +1219,12 @@ def hub_leaf_indices(
     return hub_idx, leaf_list
 
 
-def remove_local_connect(array, random_state, num=-1):
+def remove_local_connect(array, random_state, loc=0.05, num=-1):
     if num < 0:
         num = array.shape[0] // 10  # use 10 % of the hub nodes
-
-    normal = random_state.normal(loc=0.1, scale=0.1, size=num).astype(np.float32)
-    normal = np.clip(normal, a_min=0.0, a_max=0.1)
+    
+    normal = random_state.normal(loc=loc, scale=loc, size=num).astype(np.float32)
+    normal = np.clip(normal, a_min=0.0, a_max=loc*2)
 
     for _, e in enumerate(array):
         indices = np.argsort(e)[:num]
@@ -1241,7 +1240,7 @@ def build_global_structure(
     a,
     b,
     random_state,
-    alpha=0.005,
+    alpha=0.0055,
     max_iter=10,
     verbose=False,
     label=None,
@@ -1258,48 +1257,34 @@ def build_global_structure(
         raise ValueError("Check hub node initializing method!")
 
     P = euclidean_distances(data[hubs])
+    # P /= np.sum(P, axis=1, keepdims=True)
     P /= P.max()
 
     # local connectivity for global optimization
-    P = remove_local_connect(P, random_state)
-
-    # if verbose:
-    #     result = global_optimize(
-    #         P=P,
-    #         Z=Z,
-    #         a=a,
-    #         b=b,
-    #         alpha=alpha,
-    #         max_iter=max_iter,
-    #         verbose=True,
-    #         savefig=True,
-    #         label=label[hubs],
-    #     )
-    # else:
-    #     result = global_optimize(
-    #         P, Z, a, b, alpha=alpha, max_iter=max_iter
-    #     )  # (TODO) how to optimize max_iter & alpha?
+    # P = remove_local_connect(P, random_state)
 
     Z = (
-        20.0
+        1.0
         * (Z - np.min(Z, 0))
         / (np.max(Z, 0) - np.min(Z, 0))
     ).astype(np.float32, order="C")
 
-    optimize_global_layout(
-        P,
-        Z,
-        a,
-        b,
-        gamma=1.0,
-        initial_alpha=1.0,
-        n_epochs=10,
-        verbose=True,
-        savefig=True,
-        label=label[hubs],
-        parallel=False,
-    )
-    exit()
+    if verbose:
+        result = optimize_global_layout(
+            P=P,
+            Z=Z,
+            a=a,
+            b=b,
+            alpha=alpha,
+            max_iter=max_iter,
+            verbose=True,
+            savefig=True,
+            label=label[hubs],
+        )
+    else:
+        result = optimize_global_layout(
+            P, Z, a, b, alpha=alpha, max_iter=max_iter
+        )  # (TODO) how to optimize max_iter & alpha?
 
     return result
 
@@ -2141,7 +2126,7 @@ class UMATO(BaseEstimator):
             a=self._a,
             b=self._b,
             random_state=random_state,
-            alpha=0.01,
+            alpha=0.007,
             max_iter=10,
             # verbose=False,
             verbose=True,

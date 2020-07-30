@@ -248,104 +248,6 @@ def optimize_layout_euclidean(
 # hyung-kwon ko
 # hyung-kwon ko
 
-def _optimize_global_layout_single_epoch(
-    P,
-    Z,
-    a,
-    b,
-    gamma,
-    dim,
-    grad_clip,
-    alpha,
-    n,
-):
-    for i in numba.prange(P.shape[0]):
-        for j in numba.prange(P.shape[1]):
-            current = Z[i]
-            other = Z[j]
-
-            dist_squared = rdist(current, other)
-
-            # calculate attractive gradient
-            if dist_squared > 0.0:
-                grad_attract = -2.0 * a * b * pow(dist_squared, b - 1.0)
-                grad_attract /= a * pow(dist_squared, b) + 1.0
-                grad_attract *= P[i][j]
-            else:
-                grad_attract = 0.0
-
-            # apply attractive gradient
-            for d in range(dim):
-                grad_d = clip(grad_attract * (current[d] - other[d]), grad_clip)
-                current[d] += grad_d * alpha
-
-            # calculate repulsive gradient
-            if dist_squared > 0.0:
-                grad_repulse = 2.0 * gamma * b
-                grad_repulse /= (0.001 + dist_squared) * (
-                    a * pow(dist_squared, b) + 1
-                )
-                grad_repulse *= (1 - P[i][j])
-            elif i == j:
-                continue
-            else:
-                grad_repulse = 0.0
-
-            # apply repulsive gradient
-            for d in range(dim):
-                if grad_repulse > 0.0:
-                    grad_d = clip(grad_repulse * (current[d] - other[d]), grad_clip)
-                else:
-                    grad_d = 4.0
-                current[d] += grad_d * alpha
-
-
-def optimize_global_layout(
-    P,
-    Z,
-    a,
-    b,
-    gamma=1.0,
-    initial_alpha=1.0,
-    n_epochs=10,
-    verbose=False,
-    savefig=False,
-    label=None,
-    parallel=False,
-):
-
-    dim = Z.shape[1]
-    alpha = initial_alpha
-    grad_clip = 4.0
-
-    optimize_fn = numba.njit(
-        _optimize_global_layout_single_epoch, fastmath=True, parallel=parallel
-    )
-    for n in range(n_epochs):
-        optimize_fn(
-            P=P,
-            Z=Z,
-            a=a,
-            b=b,
-            gamma=gamma,
-            dim=dim,
-            grad_clip=grad_clip,
-            alpha=alpha,
-            n=n,
-        )
-
-        alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
-
-        if verbose and n % int(n_epochs / 1) == 0:
-            print("\tcompleted ", n, " / ", n_epochs, "epochs")
-
-        if savefig:
-            from umato.umato_ import plot_tmptmp
-            plot_tmptmp(data=Z, label=label, name=f"pic1_global{n}")
-
-    return Z
-
-
 def get_CE(P, Y, d_squared, a, b):
     Q = pow(1 + a * d_squared ** b, -1)
     loss = -P * np.log(Q + 0.001) - (1 - P) * np.log(1 - Q + 0.001)
@@ -363,12 +265,12 @@ def calc_DTM(adj, sigma):
     return density / density.sum()
 
 
-def global_optimize(
+def optimize_global_layout(
     P,
     Z,
     a,
     b,
-    alpha=0.005,
+    alpha=0.01,
     max_iter=10,
     verbose=False,
     savefig=False,
@@ -383,10 +285,11 @@ def global_optimize(
         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
         d_inverse = np.expand_dims(pow(1 + a * d_squared ** b, -1), axis=2)
 
-        # Q is the normalized distance in low dimensional space
+        # Q is the normalized distance in low dimensional space 
         Q = np.dot(1 - P, pow(0.001 + d_squared, -1))
         np.fill_diagonal(Q, 0)
         Q /= np.sum(Q, axis=1, keepdims=True)
+        # Q /= Q.max()
 
         grad = np.expand_dims(
             2 * a * b * P * (1e-12 + d_squared) ** (b - 1) - 2 * gamma * b * Q, axis=2
