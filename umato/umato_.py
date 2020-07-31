@@ -1031,6 +1031,7 @@ def check_nn_accuracy(
 #         distance += (data[source][d] - data[target][d]) ** 2
 #     return np.sqrt(distance)
 
+
 @numba.njit(
     # parallel=True,  # can SABOTAGE the array order (should be used with care)
     fastmath=True,
@@ -1038,6 +1039,7 @@ def check_nn_accuracy(
 def disjoint_nn(
     data, sorted_index, hub_num,
 ):
+    sorted_index_c = sorted_index.copy()
 
     leaf_num = int(np.ceil(data.shape[0] / hub_num))
     disjoints = []
@@ -1048,22 +1050,22 @@ def disjoint_nn(
         disjoint = []
 
         # append the first element
-        for j in range(len(sorted_index)):
-            if sorted_index[j] > -1:
-                source = sorted_index[j]
+        for j in range(len(sorted_index_c)):
+            if sorted_index_c[j] > -1:
+                source = sorted_index_c[j]
                 disjoint.append(source)
-                sorted_index[j] = -1
+                sorted_index_c[j] = -1
                 tmp += 1
                 break
         if source == -1:
             break  # break if all indices == -1
 
         # get distance for each element
-        distances = np.ones(len(sorted_index)) * np.inf
-        for k in range(len(sorted_index)):
+        distances = np.ones(len(sorted_index_c)) * np.inf
+        for k in range(len(sorted_index_c)):
             distance = 0.0
-            if sorted_index[k] > -1:
-                target = sorted_index[k]
+            if sorted_index_c[k] > -1:
+                target = sorted_index_c[k]
                 for d in range(data.shape[1]):
                     distance += (data[source][d] - data[target][d]) ** 2
                 distances[target] = np.sqrt(distance)
@@ -1078,7 +1080,7 @@ def disjoint_nn(
                 min_index = np.argmin(distances)
                 disjoint.append(min_index)
                 distances[min_index] = np.inf
-                sorted_index[sorted_index == min_index] = -1
+                sorted_index_c[sorted_index_c == min_index] = -1
                 tmp += 1
 
         disjoints.append(disjoint)
@@ -1110,48 +1112,24 @@ def pick_hubs(
         if hub_num != len(hubs):
             ValueError(f"hub_num({hub_num}) is not the same as hubs({hubs})!")
 
-        return np.array(hubs)
+        return hubs
 
 
-def hub_leaf_candidates(
-    data, random_state, hub_num, iter_num=5, n_trees=-1, angular=False,
+def hub_candidates(
+    data, sorted_index, random_state, hub_num, iter_num=5,
 ):
+    hubs_list = []
+    disjoints = disjoint_nn(data=data, sorted_index=sorted_index, hub_num=hub_num,)
 
-    hub_idxs = []
-    leaf_arrays = []
+    for i in range(iter_num):
+        hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=False,)
+        hubs_list.append(hubs)
 
-    for _ in range(iter_num):
-
-        if n_trees < 0:
-            n_trees = 5 + int(
-                round((data.shape[0]) ** 0.5 / 20.0)
-            )  # (TODO) how to optimize this?
-
-        rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(
-            np.int64
-        )  # hub node extraction using RP-forest
-        rp_forest = make_forest(
-            data, data.shape[0] // (hub_num // n_trees), n_trees, rng_state, angular
-        )  ######### RP FOREST
-        leaf_array = rptree_leaf_array(rp_forest)  # stacked rp_tree indices
-        leaf_arrays.append(leaf_array)
-
-        hub_idx = []
-        for candidate in leaf_array:
-            val = random_state.choice(candidate)
-            if val > -1:
-                if val not in hub_idx:  # prevent duplicates
-                    hub_idx.append(val)
-            if len(hub_idx) >= hub_num:
-                break
-
-        hub_idxs.append(hub_idx)
-
-    return hub_idxs, leaf_arrays
+    return hubs_list, disjoints
 
 
 def get_homology(data, local_knum, top_num, random_state):
-    dist = pairwise_distances(data, data)
+    dist = euclidean_distances(data, data)
     dist /= dist.max()
 
     nn_index = np.argpartition(dist, kth=local_knum - 1, axis=-1)[
@@ -1174,65 +1152,49 @@ def get_homology(data, local_knum, top_num, random_state):
     return hom1[hom1_max_ix]
 
 
-def hub_leaf_indices(
+def select_hubs_homology(
     data,
     random_state,
-    n_trees=-1,
+    sorted_index,
     hub_num=50,
-    verbose=False,
-    angular=False,
-    debug=False,
+    iter_num=5,
+    interval=50,
+    top_num=30,
+    cutoff=0.05,
+    local_knum=7,
 ):
-    """
-    build the global structure 
-    """
-
-    print("[INFO]: Calculating hub nodes and RP-forest leaf indices")
-
-    interval = 50
-    top_num = 30
-    iter_num = 5
-    cutoff = 0.05
-    local_knum = 7
-
-    if debug:
-        hub_list_1, leaf_list_1 = hub_leaf_candidates(
-            data, random_state, hub_num, iter_num, n_trees, angular
-        )
-        choice = random_state.choice(iter_num)
-        hub_idx = hub_list_1[choice]
-        leaf_list = leaf_list_1[choice]
-        return hub_idx, leaf_list
+    print("[INFO]: Select hub nodes using homology")
 
     while True:
         results = []
         k1_list = []
         k2_list = []
 
-        hub_list_1, leaf_list_1 = hub_leaf_candidates(
-            data, random_state, hub_num, iter_num, n_trees, angular
+        hubs_list, disjoints = hub_candidates(
+            data, sorted_index, random_state, hub_num, iter_num
         )
-        hub_list_2, _ = hub_leaf_candidates(
-            data, random_state, hub_num + interval, iter_num, n_trees, angular
+
+        hubs_list2, _ = hub_candidates(
+            data, sorted_index, random_state, hub_num + interval, iter_num
         )
 
         for i in range(iter_num):
-            d1 = data[hub_list_1[i]]
+            d1 = data[hubs_list[i]]
             k1 = get_homology(d1, local_knum, top_num, random_state)
             k1_list.append(k1)
 
-            d2 = data[hub_list_2[i]]
+            d2 = data[hubs_list2[i]]
             k2 = get_homology(d2, local_knum, top_num, random_state)
             k2_list.append(k2)
 
         for _k1 in k1_list:
             for _k2 in k2_list:
-                # result = gd.bottleneck_distance(_k1, _k2, 0.01)
+                # result = gd.bottleneck_distance(_k1, _k2, 0.01)  # approximation
                 result = gd.bottleneck_distance(_k1, _k2)
                 results.append(result)
 
         val = np.mean(results)
-        print("val: ", val)
+        print(f"val: {val}")
 
         if val < cutoff:
             break
@@ -1242,11 +1204,9 @@ def hub_leaf_indices(
         else:
             hub_num += interval
 
-    choice = random_state.choice(iter_num)
+    hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
 
-    hub_idx = hub_list_1[choice]
-    leaf_list = leaf_list_1[choice]
-    return hub_idx, leaf_list
+    return hubs, disjoints
 
 
 def remove_local_connect(array, random_state, loc=0.05, num=-1):
@@ -1293,9 +1253,9 @@ def build_global_structure(
     # local connectivity for global optimization
     # P = remove_local_connect(P, random_state)
 
-    Z = (1.0 * (Z - np.min(Z, 0)) / (np.max(Z, 0) - np.min(Z, 0))).astype(
-        np.float32, order="C"
-    )
+    # Z = (1.0 * (Z - np.min(Z, 0)) / (np.max(Z, 0) - np.min(Z, 0))).astype(
+    #     np.float32, order="C"
+    # )
 
     if verbose:
         result = optimize_global_layout(
@@ -1336,9 +1296,9 @@ def embed_others_nn(
             break
 
     # generate random normal distribution
-    random_normal = random_state.normal(scale=0.05, size=list(init.shape)).astype(
-        np.float32
-    )
+    random_normal = random_state.normal(
+        loc=0.0, scale=0.05, size=list(init.shape)
+    ).astype(np.float32)
 
     hub_nn = set(hubs) - set(original_hubs)
     hub_nn = np.array(list(hub_nn))
@@ -1486,7 +1446,7 @@ def nn_initialize(
             index = original_hubs[dists_arg[k]]
             init[hub_nn[i]] += init[index]
             num_log[hub_nn[i]] += 1
-        
+
         # add random value before break
         init[hub_nn[i]] += random[hub_nn[i]]
 
@@ -1497,25 +1457,24 @@ def nn_initialize(
     return init
 
 
-@numba.njit()
-def remove_from_graph(data, array, hub_info, remove_target):
-    """
-    remove_target == 0: outliers
-    remove_target == 1: NNs
-    remove_target == 2: hubs    
-    """
-    for target in remove_target:
-        if target not in [0, 1, 2]:
-            raise ValueError(
-                "remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs)"
-            )
+# @numba.njit()
+# def remove_from_graph(data, array, hub_info, remove_target):
+#     """
+#     remove_target == 0: outliers
+#     remove_target == 1: NNs
+#     remove_target == 2: hubs
+#     """
+#     for target in remove_target:
+#         if target not in [0, 1, 2]:
+#             raise ValueError(
+#                 "remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs)"
+#             )
 
-        for i, e in enumerate(array):
-            if hub_info[e] == target:
-                data[i] = 0
+#         for i, e in enumerate(array):
+#             if hub_info[e] == target:
+#                 data[i] = 0
 
-    return data
-
+#     return data
 
 # @numba.njit()
 # def change_graph_ix(array, hubs):
@@ -1523,7 +1482,6 @@ def remove_from_graph(data, array, hub_info, remove_target):
 #     for i, hub in enumerate(hubs):
 #         result[array == i] = hub
 #     return result
-
 
 # @numba.njit(
 #     locals={
@@ -1560,7 +1518,6 @@ def remove_from_graph(data, array, hub_info, remove_target):
 #         vals[i * n_neighbors : (i + 1) * n_neighbors] = 1.0
 
 #     return rows, cols, vals
-
 
 # def compute_hub_nn_graph(
 #     data, n_neighbors, hub_info,
@@ -1762,7 +1719,7 @@ class UMATO(BaseEstimator):
         self,
         n_neighbors=15,
         n_components=2,
-        hub_num=None,
+        hub_num=-1,
         metric="euclidean",
         metric_kwds=None,
         output_metric="euclidean",
@@ -1853,8 +1810,8 @@ class UMATO(BaseEstimator):
             raise ValueError("learning_rate must be positive")
         if self.n_neighbors < 2:
             raise ValueError("n_neighbors must be greater than 1")
-        if (self.hub_num is not None) and (self.hub_num < 0):
-            raise ValueError("hub_num must be a positive integer or None")
+        if not isinstance(self.hub_num, int) or self.hub_num < -1:
+            raise ValueError("hub_num must be a positive integer or -1 (None)")
         if self.target_n_neighbors < 2 and self.target_n_neighbors != -1:
             raise ValueError("target_n_neighbors must be greater than 1")
         if not isinstance(self.n_components, int):
@@ -2159,19 +2116,22 @@ class UMATO(BaseEstimator):
 
         t1 = time.time()
 
-        # get disjoint NN matrix
-        disjoints = disjoint_nn(
-            data=X, sorted_index=sorted_index, hub_num=self.hub_num,
-        )
-
-        t2 = time.time()
-        print(t2-t1)
-
-        print(disjoints[-3])
-        print(disjoints[-2])
-        print(disjoints[-1])
-        print(disjoints.shape)
-        exit()
+        if self.hub_num < 0:
+            hubs, disjoints = select_hubs_homology(
+                data=X,
+                random_state=random_state,
+                sorted_index=sorted_index,
+                hub_num=50,
+            )
+        else:
+            # get disjoint NN matrix
+            disjoints = disjoint_nn(
+                data=X, sorted_index=sorted_index, hub_num=self.hub_num,
+            )
+            # get hub indices from disjoint set
+            hubs = pick_hubs(
+                disjoints=disjoints, random_state=random_state, popular=True,
+            )
 
         print("3: ", ts())
 
@@ -2179,9 +2139,6 @@ class UMATO(BaseEstimator):
         # check_nn_accuracy(
         #     indices_info=disjoints, label=self.ll,
         # )
-
-        # get hub indices from disjoint set
-        hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
 
         print("4: ", ts())
 
@@ -2209,10 +2166,6 @@ class UMATO(BaseEstimator):
             random_state=random_state,
             label=self.ll,
         )
-
-        print(len(np.where(hub_info == 2)[0]))
-        print(len(np.where(hub_info == 1)[0]))
-        print(len(np.where(hub_info == 0)[0]))
 
         print("6: ", ts())
 

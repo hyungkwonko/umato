@@ -9,7 +9,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description="test umato")
 parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, cifar10", default="spheres")
-parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=300)
+parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=200)
 args = parser.parse_args()
 
 if __name__ == "__main__":
