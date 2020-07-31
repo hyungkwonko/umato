@@ -1006,7 +1006,10 @@ def check_nn_accuracy(
     return 0
 
 
-@numba.njit()
+@numba.njit(
+    parallel=True,
+    fastmath=True,
+)
 def disjoint_nn(
     data, sorted_index, hub_num,
 ):
@@ -1032,12 +1035,12 @@ def disjoint_nn(
 
         # get distance for each element
         distances = np.ones(len(sorted_index)) * np.inf
-        for k in range(len(sorted_index)):
+        for k in numba.prange(len(sorted_index)):
             distance = 0.0
             if sorted_index[k] > -1:
                 target = sorted_index[k]
-                for dim in range(data.shape[1]):
-                    distance += (data[source][dim] - data[target][dim]) ** 2
+                for d in numba.prange(data.shape[1]):
+                    distance += (data[source][d] - data[target][d]) ** 2
                 distances[target] = np.sqrt(distance)
 
         # append other elements
@@ -1325,9 +1328,9 @@ def embed_others_nn(
         nn_consider=10,
     )
 
-    # np.array of hub information (hubs = 2, nns = 1, outliers = 0)
+    # np.array of hub information (hubs = 2, hub_nn = 1, outliers = 0)
     hub_info = np.zeros(data.shape[0])
-    hub_info[hubs] = 1
+    hub_info[hub_nn] = 1
     hub_info[original_hubs] = 2
 
     # save figure2
@@ -1448,7 +1451,7 @@ def nn_initialize(
             dist = 0.0
             for d in numba.prange(data.shape[1]):
                 e = original_hubs[j]
-                dist += (data[e][d] - data[i][d]) ** 2
+                dist += (data[e][d] - data[hub_nn[i]][d]) ** 2
             dists[j] = dist
 
         # sorted hub indices
