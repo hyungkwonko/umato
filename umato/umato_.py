@@ -1006,8 +1006,33 @@ def check_nn_accuracy(
     return 0
 
 
+# @numba.njit(
+#     parallel=True,
+#     fastmath=True,
+# )
+# def distance_calculation(data, sorted_index, source):
+#     distances = np.ones(len(sorted_index)) * np.inf
+#     for k in numba.prange(len(sorted_index)):
+#         distance = 0.0
+#         if sorted_index[k] > -1:
+#             target = sorted_index[k]
+#             for d in numba.prange(data.shape[1]):
+#                 distance += (data[source][d] - data[target][d]) ** 2
+#             distances[target] = np.sqrt(distance)
+#     return distances
+
+# @numba.njit(
+#     parallel=True,
+#     fastmath=True,
+# )
+# def dim_calculation(data, source, target):
+#     distance = 0.0
+#     for d in numba.prange(data.shape[1]):
+#         distance += (data[source][d] - data[target][d]) ** 2
+#     return np.sqrt(distance)
+
 @numba.njit(
-    parallel=True,
+    # parallel=True,  # can SABOTAGE the array order (should be used with care)
     fastmath=True,
 )
 def disjoint_nn(
@@ -1035,11 +1060,11 @@ def disjoint_nn(
 
         # get distance for each element
         distances = np.ones(len(sorted_index)) * np.inf
-        for k in numba.prange(len(sorted_index)):
+        for k in range(len(sorted_index)):
             distance = 0.0
             if sorted_index[k] > -1:
                 target = sorted_index[k]
-                for d in numba.prange(data.shape[1]):
+                for d in range(data.shape[1]):
                     distance += (data[source][d] - data[target][d]) ** 2
                 distances[target] = np.sqrt(distance)
 
@@ -1348,13 +1373,13 @@ def embed_others_disjoint(
     )
 
     # append other nodes using NN disjoint information
-    init, outliers = disjoint_initialize(
+    init, nodes_number = disjoint_initialize(
         data=data, init=init, hubs=hubs, disjoints=disjoints, random=random_normal,
     )
 
-    if len(init) != len(outliers):
+    if len(init) != len(nodes_number):
         raise ValueError(
-            f"total data # ({len(init)}) != total embedded # ({len(outliers)})!"
+            f"total data # ({len(init)}) != total embedded # ({len(nodes_number)})!"
         )
 
     # save figure3
@@ -2121,6 +2146,8 @@ class UMATO(BaseEstimator):
         ###### Hyung-Kwon Ko
         ###### Hyung-Kwon Ko
 
+        print("1: ", ts())
+
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
         # sorted_index = index[freq.argsort(kind="stable")]  # sorted index in increasing order
@@ -2128,10 +2155,25 @@ class UMATO(BaseEstimator):
             freq.argsort(kind="stable")[::-1]
         ]  # sorted index in decreasing order
 
+        print("2: ", ts())
+
+        t1 = time.time()
+
         # get disjoint NN matrix
         disjoints = disjoint_nn(
             data=X, sorted_index=sorted_index, hub_num=self.hub_num,
         )
+
+        t2 = time.time()
+        print(t2-t1)
+
+        print(disjoints[-3])
+        print(disjoints[-2])
+        print(disjoints[-1])
+        print(disjoints.shape)
+        exit()
+
+        print("3: ", ts())
 
         # # check NN accuracy
         # check_nn_accuracy(
@@ -2140,6 +2182,8 @@ class UMATO(BaseEstimator):
 
         # get hub indices from disjoint set
         hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
+
+        print("4: ", ts())
 
         init_global = build_global_structure(
             data=X,
@@ -2155,6 +2199,8 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
+        print("5: ", ts())
+
         init, hub_info, hubs = embed_others_nn(
             data=X,
             init_global=init_global,
@@ -2164,7 +2210,11 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        exit()
+        print(len(np.where(hub_info == 2)[0]))
+        print(len(np.where(hub_info == 1)[0]))
+        print(len(np.where(hub_info == 0)[0]))
+
+        print("6: ", ts())
 
         self._knn_indices, self._knn_dists, counts = select_from_knn(
             knn_indices=self._knn_indices,
@@ -2173,6 +2223,8 @@ class UMATO(BaseEstimator):
             n_neighbors=self.n_neighbors,
             n=X.shape[0],
         )
+
+        print("7: ", ts())
 
         counts_hub = counts[hubs]
         counts_sum = len(counts_hub[counts_hub < self.n_neighbors])
@@ -2199,6 +2251,8 @@ class UMATO(BaseEstimator):
         #     indices_info=self._knn_indices[hubs], label=self.ll,
         # )
 
+        print("8: ", ts())
+
         self.graph_, _, _ = fuzzy_simplicial_set(
             X[hubs],
             self.n_neighbors,
@@ -2214,6 +2268,8 @@ class UMATO(BaseEstimator):
             True,
             True,
         )
+
+        print("9: ", ts())
 
         if self.verbose:
             print(ts(), "Construct local structure")
@@ -2241,6 +2297,8 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
+        print("10: ", ts())
+
         self.embedding_ = embed_others_disjoint(
             data=X,
             init=init,
@@ -2249,6 +2307,10 @@ class UMATO(BaseEstimator):
             random_state=random_state,
             label=self.ll,
         )
+
+        print("11: ", ts())
+
+        exit()
 
         if self.verbose:
             print(ts() + " Finished embedding")

@@ -394,8 +394,8 @@ def nn_layout_optimize(
     gamma = 0.5
     grad_clip = 4.0
     # negative_sample_rate=1.0  # spheres
-    # negative_sample_rate=5.0  # mnist, fmnist
-    negative_sample_rate = 50.0  # mnist, fmnist
+    negative_sample_rate=5.0  # mnist, fmnist
+    # negative_sample_rate = 50.0  # mnist, fmnist
     n_epochs = 50
 
     epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
