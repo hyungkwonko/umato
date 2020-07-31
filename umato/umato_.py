@@ -718,220 +718,6 @@ def fast_intersection(rows, cols, values, target, unknown_dist=1.0, far_dist=5.0
     return
 
 
-@numba.jit()
-def fast_metric_intersection(
-    rows, cols, values, discrete_space, metric, metric_args, scale
-):
-    """Under the assumption of categorical distance for the intersecting
-    simplicial set perform a fast intersection.
-
-    Parameters
-    ----------
-    rows: array
-        An array of the row of each non-zero in the sparse matrix
-        representation.
-
-    cols: array
-        An array of the column of each non-zero in the sparse matrix
-        representation.
-
-    values: array of shape
-        An array of the values of each non-zero in the sparse matrix
-        representation.
-
-    discrete_space: array of shape (n_samples, n_features)
-        The vectors of categorical labels to use in the intersection.
-
-    metric: numba function
-        The function used to calculate distance over the target array.
-
-    scale: float
-        A scaling to apply to the metric.
-
-    Returns
-    -------
-    None
-    """
-    for nz in range(rows.shape[0]):
-        i = rows[nz]
-        j = cols[nz]
-        dist = metric(discrete_space[i], discrete_space[j], *metric_args)
-        values[nz] *= np.exp(-(scale * dist))
-
-    return
-
-
-@numba.njit()
-def reprocess_row(probabilities, k=15, n_iters=32):
-    target = np.log2(k)
-
-    lo = 0.0
-    hi = NPY_INFINITY
-    mid = 1.0
-
-    for n in range(n_iters):
-
-        psum = 0.0
-        for j in range(probabilities.shape[0]):
-            psum += pow(probabilities[j], mid)
-
-        if np.fabs(psum - target) < SMOOTH_K_TOLERANCE:
-            break
-
-        if psum < target:
-            hi = mid
-            mid = (lo + hi) / 2.0
-        else:
-            lo = mid
-            if hi == NPY_INFINITY:
-                mid *= 2
-            else:
-                mid = (lo + hi) / 2.0
-
-    return np.power(probabilities, mid)
-
-
-@numba.njit()
-def reset_local_metrics(simplicial_set_indptr, simplicial_set_data):
-    for i in range(simplicial_set_indptr.shape[0] - 1):
-        simplicial_set_data[
-            simplicial_set_indptr[i] : simplicial_set_indptr[i + 1]
-        ] = reprocess_row(
-            simplicial_set_data[simplicial_set_indptr[i] : simplicial_set_indptr[i + 1]]
-        )
-    return
-
-
-def reset_local_connectivity(simplicial_set, reset_local_metric=False):
-    """Reset the local connectivity requirement -- each data sample should
-    have complete confidence in at least one 1-simplex in the simplicial set.
-    We can enforce this by locally rescaling confidences, and then remerging the
-    different local simplicial sets together.
-
-    Parameters
-    ----------
-    simplicial_set: sparse matrix
-        The simplicial set for which to recalculate with respect to local
-        connectivity.
-
-    Returns
-    -------
-    simplicial_set: sparse_matrix
-        The recalculated simplicial set, now with the local connectivity
-        assumption restored.
-    """
-    simplicial_set = normalize(simplicial_set, norm="max")
-    if reset_local_metric:
-        simplicial_set = simplicial_set.tocsr()
-        reset_local_metrics(simplicial_set.indptr, simplicial_set.data)
-        simplicial_set = simplicial_set.tocoo()
-    transpose = simplicial_set.transpose()
-    prod_matrix = simplicial_set.multiply(transpose)
-    simplicial_set = simplicial_set + transpose - prod_matrix
-    simplicial_set.eliminate_zeros()
-
-    return simplicial_set
-
-
-def discrete_metric_simplicial_set_intersection(
-    simplicial_set,
-    discrete_space,
-    unknown_dist=1.0,
-    far_dist=5.0,
-    metric=None,
-    metric_kws={},
-    metric_scale=1.0,
-):
-    """Combine a fuzzy simplicial set with another fuzzy simplicial set
-    generated from discrete metric data using discrete distances. The target
-    data is assumed to be categorical label data (a vector of labels),
-    and this will update the fuzzy simplicial set to respect that label data.
-
-    TODO: optional category cardinality based weighting of distance
-
-    Parameters
-    ----------
-    simplicial_set: sparse matrix
-        The input fuzzy simplicial set.
-
-    discrete_space: array of shape (n_samples)
-        The categorical labels to use in the intersection.
-
-    unknown_dist: float (optional, default 1.0)
-        The distance an unknown label (-1) is assumed to be from any point.
-
-    far_dist: float (optional, default 5.0)
-        The distance between unmatched labels.
-
-    metric: str (optional, default None)
-        If not None, then use this metric to determine the
-        distance between values.
-
-    metric_scale: float (optional, default 1.0)
-        If using a custom metric scale the distance values by
-        this value -- this controls the weighting of the
-        intersection. Larger values weight more toward target.
-
-    Returns
-    -------
-    simplicial_set: sparse matrix
-        The resulting intersected fuzzy simplicial set.
-    """
-    simplicial_set = simplicial_set.tocoo()
-
-    if metric is not None:
-        # We presume target is now a 2d array, with each row being a
-        # vector of target info
-        if metric in dist.named_distances:
-            metric_func = dist.named_distances[metric]
-        else:
-            raise ValueError("Discrete intersection metric is not recognized")
-
-        fast_metric_intersection(
-            simplicial_set.row,
-            simplicial_set.col,
-            simplicial_set.data,
-            discrete_space,
-            metric_func,
-            tuple(metric_kws.values()),
-            metric_scale,
-        )
-    else:
-        fast_intersection(
-            simplicial_set.row,
-            simplicial_set.col,
-            simplicial_set.data,
-            discrete_space,
-            unknown_dist,
-            far_dist,
-        )
-
-    simplicial_set.eliminate_zeros()
-
-    return reset_local_connectivity(simplicial_set)
-
-
-def general_simplicial_set_intersection(simplicial_set1, simplicial_set2, weight):
-
-    result = (simplicial_set1 + simplicial_set2).tocoo()
-    left = simplicial_set1.tocsr()
-    right = simplicial_set2.tocsr()
-
-    sparse.general_sset_intersection(
-        left.indptr,
-        left.indices,
-        left.data,
-        right.indptr,
-        right.indices,
-        right.data,
-        result.row,
-        result.col,
-        result.data,
-        weight,
-    )
-
-    return result
-
 
 def make_epochs_per_sample(weights, n_epochs):
     """Given a set of weights and number of epochs generate the number of
@@ -1006,32 +792,6 @@ def check_nn_accuracy(
     return 0
 
 
-# @numba.njit(
-#     parallel=True,
-#     fastmath=True,
-# )
-# def distance_calculation(data, sorted_index, source):
-#     distances = np.ones(len(sorted_index)) * np.inf
-#     for k in numba.prange(len(sorted_index)):
-#         distance = 0.0
-#         if sorted_index[k] > -1:
-#             target = sorted_index[k]
-#             for d in numba.prange(data.shape[1]):
-#                 distance += (data[source][d] - data[target][d]) ** 2
-#             distances[target] = np.sqrt(distance)
-#     return distances
-
-# @numba.njit(
-#     parallel=True,
-#     fastmath=True,
-# )
-# def dim_calculation(data, source, target):
-#     distance = 0.0
-#     for d in numba.prange(data.shape[1]):
-#         distance += (data[source][d] - data[target][d]) ** 2
-#     return np.sqrt(distance)
-
-
 @numba.njit(
     # parallel=True,  # can SABOTAGE the array order (should be used with care)
     fastmath=True,
@@ -1088,7 +848,6 @@ def disjoint_nn(
     return np.array(disjoints)
 
 
-# @numba.njit()
 def pick_hubs(
     disjoints, random_state, popular=False,
 ):
@@ -1284,6 +1043,8 @@ def embed_others_nn(
     original_hubs = hubs.copy()
     init[original_hubs] = init_global
 
+    print("[INFO] get hub_nn indices")
+
     while True:
         val = len(hubs)
         hubs = hub_nn_num(
@@ -1390,8 +1151,6 @@ def disjoint_initialize(
 def hub_nn_num(
     data, hubs, knn_indices, nn_consider=10,
 ):
-    print("[INFO] get hub_nn indices")
-
     num_log = np.zeros(data.shape[0])
     num_log[hubs] = -1
 
@@ -1561,7 +1320,9 @@ def select_from_knn(
 
 
 @numba.njit(
-    locals={"dists": numba.types.float32[::1],}, parallel=True, fastmath=True,
+    # locals={"dists": numba.types.float32[::1],},
+    parallel=True,
+    fastmath=True,
 )
 def apppend_knn(
     data, knn_indices, knn_dists, hub_info, n_neighbors, counts, counts_sum,
@@ -1569,15 +1330,12 @@ def apppend_knn(
     for i in numba.prange(data.shape[0]):
         num = n_neighbors - counts[i]
         if hub_info[i] > 0 and num > 0:
-            neighbors = knn_indices[i][
-                : counts[i]
-            ]  # found neighbors (# of neighbors < n_neighbors)
+            # found neighbors (# of neighbors < n_neighbors)
+            neighbors = knn_indices[i][:counts[i]]
 
             # find unique target indices
             indices = set()
-            for ci in range(
-                counts[i]
-            ):  # cannot use numba.prange; malloc error occurs... don't know why
+            for ci in range(counts[i]):  # cannot use numba.prange; malloc error occurs
                 cx = neighbors[ci]
                 for cy in range(counts[cx]):
                     indices.add(knn_indices[cx][cy])
@@ -2227,8 +1985,8 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Construct local structure")
 
-        with open("./hubs.npy", "wb") as f:
-            np.save(f, hubs)
+        # with open("./hubs.npy", "wb") as f:
+        #     np.save(f, hubs)
 
         init = local_optimize_nn(
             data=X,
