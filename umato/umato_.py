@@ -655,7 +655,9 @@ def fuzzy_simplicial_set(
             knn_indices, knn_dists, sigmas, rhos
         )
 
-    result = scipy.sparse.coo_matrix((vals, (rows, cols)))  # (TODO) do I need to set the shape ?
+    result = scipy.sparse.coo_matrix(
+        (vals, (rows, cols))
+    )  # (TODO) do I need to set the shape ?
     result.eliminate_zeros()
 
     if apply_set_operations:
@@ -1222,9 +1224,9 @@ def hub_leaf_indices(
 def remove_local_connect(array, random_state, loc=0.05, num=-1):
     if num < 0:
         num = array.shape[0] // 10  # use 10 % of the hub nodes
-    
+
     normal = random_state.normal(loc=loc, scale=loc, size=num).astype(np.float32)
-    normal = np.clip(normal, a_min=0.0, a_max=loc*2)
+    normal = np.clip(normal, a_min=0.0, a_max=loc * 2)
 
     for _, e in enumerate(array):
         indices = np.argsort(e)[:num]
@@ -1263,11 +1265,9 @@ def build_global_structure(
     # local connectivity for global optimization
     # P = remove_local_connect(P, random_state)
 
-    Z = (
-        1.0
-        * (Z - np.min(Z, 0))
-        / (np.max(Z, 0) - np.min(Z, 0))
-    ).astype(np.float32, order="C")
+    Z = (1.0 * (Z - np.min(Z, 0)) / (np.max(Z, 0) - np.min(Z, 0))).astype(
+        np.float32, order="C"
+    )
 
     if verbose:
         result = optimize_global_layout(
@@ -1312,12 +1312,15 @@ def embed_others_nn(
         np.float32
     )
 
-    # append other nodes using only hub information
+    hub_nn = set(hubs) - set(original_hubs)
+    hub_nn = np.array(list(hub_nn))
+
+    # initialize other nodes' position using only hub information
     init = nn_initialize(
         data=data,
         init=init,
         original_hubs=original_hubs,
-        hubs=hubs,
+        hub_nn=hub_nn,
         random=random_normal,
         nn_consider=10,
     )
@@ -1417,37 +1420,49 @@ def hub_nn_num(
     return np.array(list(hubs_fin))
 
 
-@numba.njit()
+@numba.njit(
+    locals={
+        "num_log": numba.types.float32[::1],
+        "index": numba.types.int32,
+        "dists": numba.types.float32[::1],
+        "dist": numba.types.float32,
+    },
+    parallel=True,
+    fastmath=True,
+)
 def nn_initialize(
-    data, init, original_hubs, hubs, random, nn_consider=10,
+    data, init, original_hubs, hub_nn, random, nn_consider=10,
 ):
     print(
         "[INFO] Embedding other nodes using NN information using only original hub information"
     )
 
-    num_log = np.zeros(data.shape[0])
-    num_log[hubs] = -1
+    num_log = np.zeros(data.shape[0], dtype=np.float32)
+    num_log[original_hubs] = -1
+    num_log[hub_nn] = -1
 
-    hubs = set(hubs)
-    hubs -= set(original_hubs)
-
-    for i in hubs:
+    for i in numba.prange(len(hub_nn)):
+        # find nearest hub nodes
         dists = np.zeros(len(original_hubs), dtype=np.float32)
-        for j, e in enumerate(original_hubs):
+        for j in numba.prange(len(original_hubs)):
             dist = 0.0
-            for d in range(data.shape[1]):
+            for d in numba.prange(data.shape[1]):
+                e = original_hubs[j]
                 dist += (data[e][d] - data[i][d]) ** 2
             dists[j] = dist
 
         # sorted hub indices
         dists_arg = dists.argsort(kind="quicksort")
 
-        for k in range(nn_consider):
-            init[i] += init[original_hubs[dists_arg[k]]]
-            num_log[i] += 1
-        init[i] += random[i]  # add random value before break
+        for k in numba.prange(nn_consider):
+            index = original_hubs[dists_arg[k]]
+            init[hub_nn[i]] += init[index]
+            num_log[hub_nn[i]] += 1
+        
+        # add random value before break
+        init[hub_nn[i]] += random[hub_nn[i]]
 
-    for l in range(data.shape[0]):
+    for l in numba.prange(data.shape[0]):
         if num_log[l] > 0:
             init[l] /= num_log[l]
 
@@ -1719,6 +1734,7 @@ class UMATO(BaseEstimator):
         self,
         n_neighbors=15,
         n_components=2,
+        hub_num=None,
         metric="euclidean",
         metric_kwds=None,
         output_metric="euclidean",
@@ -1749,6 +1765,7 @@ class UMATO(BaseEstimator):
         ll=None,
     ):
         self.n_neighbors = n_neighbors
+        self.hub_num = hub_num
         self.metric = metric
         self.output_metric = output_metric
         self.target_metric = target_metric
@@ -1808,6 +1825,8 @@ class UMATO(BaseEstimator):
             raise ValueError("learning_rate must be positive")
         if self.n_neighbors < 2:
             raise ValueError("n_neighbors must be greater than 1")
+        if (self.hub_num is not None) and (self.hub_num < 0):
+            raise ValueError("hub_num must be a positive integer or None")
         if self.target_n_neighbors < 2 and self.target_n_neighbors != -1:
             raise ValueError("target_n_neighbors must be greater than 1")
         if not isinstance(self.n_components, int):
@@ -2077,7 +2096,7 @@ class UMATO(BaseEstimator):
         (self._knn_indices, self._knn_dists, _) = nearest_neighbors(
             X[index],
             self._n_neighbors,
-            # int(self._n_neighbors * 1.2),  # we can use more neighbors 
+            # int(self._n_neighbors * 1.2),  # we can use more neighbors
             nn_metric,
             self._metric_kwds,
             self.angular_rp_forest,
@@ -2099,8 +2118,6 @@ class UMATO(BaseEstimator):
         ###### Hyung-Kwon Ko
         ###### Hyung-Kwon Ko
 
-        hub_num = 300
-
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
         # sorted_index = index[freq.argsort(kind="stable")]  # sorted index in increasing order
@@ -2109,14 +2126,16 @@ class UMATO(BaseEstimator):
         ]  # sorted index in decreasing order
 
         # get disjoint NN matrix
-        disjoints = disjoint_nn(data=X, sorted_index=sorted_index, hub_num=hub_num,)
+        disjoints = disjoint_nn(
+            data=X, sorted_index=sorted_index, hub_num=self.hub_num,
+        )
 
         # # check NN accuracy
         # check_nn_accuracy(
         #     indices_info=disjoints, label=self.ll,
         # )
 
-        # get hub indices from disjoint
+        # get hub indices from disjoint set
         hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
 
         init_global = build_global_structure(
@@ -2126,7 +2145,7 @@ class UMATO(BaseEstimator):
             a=self._a,
             b=self._b,
             random_state=random_state,
-            alpha=0.007,
+            alpha=0.006,
             max_iter=10,
             # verbose=False,
             verbose=True,
@@ -2141,6 +2160,8 @@ class UMATO(BaseEstimator):
             random_state=random_state,
             label=self.ll,
         )
+
+        exit()
 
         self._knn_indices, self._knn_dists, counts = select_from_knn(
             knn_indices=self._knn_indices,

@@ -5,14 +5,20 @@ import os
 import numpy as np
 import time
 from umato.umato_ import plot_tmptmp
+import argparse
+
+parser = argparse.ArgumentParser(description="test umato")
+parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, cifar10", default="spheres")
+parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=300)
+args = parser.parse_args()
 
 if __name__ == "__main__":
     # x = load_digits()  # (1797, 64 dim)
-    x, label = get_data("fmnist")  # spheres, mnist, fmnist, cifar10
+    x, label = get_data(args.data)  # spheres, mnist, fmnist, cifar10
 
     # UMTO
     t1 = time.time()
-    embedding = umato.UMATO(verbose=True, ll=label).fit_transform(x)
+    embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num).fit_transform(x)
     t2 = time.time()
     print(t2-t1)
 
