@@ -390,12 +390,12 @@ def nn_layout_optimize(
     cutoff = get_max_hub(head_embedding[hubs])
 
     # spheres
-    alpha = 1.0
+    # alpha = 1.0
+    alpha = 0.01
     gamma = 0.5
     grad_clip = 4.0
-    # negative_sample_rate=1.0  # spheres
-    negative_sample_rate=5.0  # mnist, fmnist
-    # negative_sample_rate = 50.0  # mnist, fmnist
+    # negative_sample_rate=5.0  # spheres
+    negative_sample_rate = 30.0  # mnist, fmnist, cifar10
     n_epochs = 50
 
     epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
@@ -489,13 +489,14 @@ def _nn_layout_optimize_single_epoch(
 
                 grad_other = 0.0  # grad coefficient for the opponent
                 grad_current = 0.0
+                grad_neg = 0.05
 
                 if hub_info[k] == 1:
-                    grad_other = 0.05
                     grad_current = 0.01
+                    grad_other = 0.05
                 elif hub_info[k] == 2:
-                    grad_other = 0.01
                     grad_current = 0.05
+                    grad_other = 0.01
 
                 current[d] += grad_d * alpha * grad_current
 
@@ -533,7 +534,7 @@ def _nn_layout_optimize_single_epoch(
                     else:
                         grad_d = grad_clip
 
-                    current[d] += grad_d * alpha * 0.05
+                    current[d] += grad_d * alpha * grad_neg
 
             epoch_of_next_negative_sample[i] += (
                 n_neg_samples * epochs_per_negative_sample[i]

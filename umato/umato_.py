@@ -1985,8 +1985,8 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Construct local structure")
 
-        # with open("./hubs.npy", "wb") as f:
-        #     np.save(f, hubs)
+        with open("./hubs.npy", "wb") as f:
+            np.save(f, hubs)
 
         init = local_optimize_nn(
             data=X,
@@ -2021,7 +2021,7 @@ class UMATO(BaseEstimator):
 
         print("11: ", ts())
 
-        exit()
+        # exit()
 
         if self.verbose:
             print(ts() + " Finished embedding")
