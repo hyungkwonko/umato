@@ -1089,7 +1089,7 @@ def embed_others_disjoint(
     data, init, hubs, disjoints, random_state, label,
 ):
     # generate random normal distribution
-    random_normal = random_state.normal(scale=0.02, size=list(init.shape)).astype(
+    random_normal = random_state.normal(scale=0.05, size=list(init.shape)).astype(
         np.float32
     )
 
@@ -1109,9 +1109,46 @@ def embed_others_disjoint(
     return init
 
 
+# @numba.njit()
+# def disjoint_initialize(
+#     data, init, hubs, disjoints, random,
+# ):
+
+#     hubs_true = np.zeros(data.shape[0])
+#     hubs_true[hubs] = True
+#     hubs = set(hubs)
+
+#     nndist = np.sum(init[:, 1]) / len(hubs)
+
+#     for disjoint in disjoints:
+#         for j in disjoint:
+#             # j == -1 means we've run all the iteration
+#             if j == -1:
+#                 break
+#             # if it is not a hub node, we should embed this using NN in disjoint set
+#             if not hubs_true[j]:
+#                 distances = []
+#                 indices = []
+#                 # we use its neighbors
+#                 for k in disjoint:
+#                     if hubs_true[k]:
+#                         distance = 0.0
+#                         for l in range(data.shape[1]):
+#                             distance += (data[j][l] - data[k][l]) ** 2
+#                         distance = np.sqrt(distance)
+#                         distances.append(distance)
+#                         indices.append(k)
+#                 ix = np.array(distances).argsort()[0]  # argmin ??
+#                 target_ix = indices[ix]
+#                 init[j] = init[target_ix] + random[j]  # add random value
+
+#                 hubs.add(j)
+
+#     return init, hubs
+
 @numba.njit()
 def disjoint_initialize(
-    data, init, hubs, disjoints, random,
+    data, init, hubs, disjoints, random, nn_consider=5.0,
 ):
 
     hubs_true = np.zeros(data.shape[0])
@@ -1138,14 +1175,22 @@ def disjoint_initialize(
                         distance = np.sqrt(distance)
                         distances.append(distance)
                         indices.append(k)
-                ix = np.array(distances).argsort()[0]
-                target_ix = indices[ix]
-                init[j] = init[target_ix] + random[j]  # add random value
+                
+                nn_consider_tmp = nn_consider
+                if len(distances) < nn_consider:
+                    nn_consider_tmp = len(distances)
+
+                ixs = np.array(distances).argsort()[:nn_consider_tmp]
+                init[j] = np.zeros(init.shape[1])
+                for ix in ixs:
+                    target_ix = indices[ix]
+                    init[j] += init[target_ix]
+                init[j] /= nn_consider_tmp
+                init[j] += random[j]  # add random value
 
                 hubs.add(j)
 
     return init, hubs
-
 
 @numba.njit()
 def hub_nn_num(
@@ -1402,11 +1447,7 @@ def local_optimize_nn(
     n_vertices = graph.shape[1]
 
     if n_epochs <= 0:
-        # For smaller datasets we can use more epochs
-        if graph.shape[0] <= 10000:
-            n_epochs = 500
-        else:
-            n_epochs = 200
+        n_epochs = 50
 
     print(len(graph.data))
 
@@ -1461,9 +1502,9 @@ def local_optimize_nn(
         a,
         b,
         rng_state,
-        gamma,
-        initial_alpha,
-        negative_sample_rate,
+        gamma=gamma,
+        initial_alpha=initial_alpha,
+        negative_sample_rate=negative_sample_rate,
         parallel=parallel,
         verbose=verbose,
         label=label,
@@ -1490,7 +1531,7 @@ class UMATO(BaseEstimator):
         low_memory=False,
         set_op_mix_ratio=1.0,
         local_connectivity=1.0,
-        repulsion_strength=1.0,
+        repulsion_strength=0.5,
         negative_sample_rate=5,
         transform_queue_size=4.0,
         a=None,
@@ -1985,8 +2026,8 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Construct local structure")
 
-        with open("./hubs.npy", "wb") as f:
-            np.save(f, hubs)
+        # with open("./hubs.npy", "wb") as f:
+        #     np.save(f, hubs)
 
         init = local_optimize_nn(
             data=X,
