@@ -1037,7 +1037,7 @@ def build_global_structure(
 
 
 def embed_others_nn(
-    data, init_global, hubs, knn_indices, random_state, label,
+    data, init_global, hubs, knn_indices, nn_consider, random_state, label,
 ):
     init = np.zeros((data.shape[0], init_global.shape[1]))
     original_hubs = hubs.copy()
@@ -1071,7 +1071,7 @@ def embed_others_nn(
         original_hubs=original_hubs,
         hub_nn=hub_nn,
         random=random_normal,
-        nn_consider=10,
+        nn_consider=nn_consider,
     )
 
     # np.array of hub information (hubs = 2, hub_nn = 1, outliers = 0)
@@ -1962,6 +1962,7 @@ class UMATO(BaseEstimator):
             init_global=init_global,
             hubs=hubs,
             knn_indices=self._knn_indices,
+            nn_consider=self._n_neighbors,
             random_state=random_state,
             label=self.ll,
         )
