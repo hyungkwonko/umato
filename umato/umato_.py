@@ -1048,7 +1048,7 @@ def embed_others_nn(
     while True:
         val = len(hubs)
         hubs = hub_nn_num(
-            data=data, hubs=hubs, knn_indices=knn_indices, nn_consider=10,
+            data=data, hubs=hubs, knn_indices=knn_indices, nn_consider=nn_consider,
         )
 
         if val == len(hubs):
@@ -1071,7 +1071,7 @@ def embed_others_nn(
         original_hubs=original_hubs,
         hub_nn=hub_nn,
         random=random_normal,
-        nn_consider=nn_consider,
+        nn_consider=10,
     )
 
     # np.array of hub information (hubs = 2, hub_nn = 1, outliers = 0)
