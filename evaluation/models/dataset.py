@@ -4,6 +4,18 @@ import numpy as np
 import pandas as pd
 import gzip
 
+# Load Kuzushiji Japanese Handwritten dataset
+def load_kmnist(path, dtype="KMNIST", kind='train'):
+    images_path = os.path.join(path, f'{dtype}-{kind}-imgs.npz')
+    labels_path = os.path.join(path, f'{dtype}-{kind}-labels.npz')
+    images = np.load(images_path)
+    images = images.f.arr_0
+    images = images.reshape(images.shape[0], -1)
+    labels = np.load(labels_path)
+    labels = labels.f.arr_0
+    labels = labels.reshape(-1)
+    return images, labels
+
 # FASHION MNIST (60000+10000, 784), 26MB
 def load_mnist(path, kind="train"):  # train, t10k
 
@@ -78,6 +90,9 @@ def get_data(dname):
     elif dname == "fmnist":
         path = os.path.join(os.getcwd(), "data", "FashionMNIST", "raw")
         return load_mnist(path=path, kind="train")  # kind="t10k"
+    elif dname == "kmnist":
+        path = os.path.join(os.getcwd(), "data", "KMNIST", "raw")
+        return load_kmnist(path=path, kind="train")  # kind="t10k"
     elif dname == "cifar10":
         path = os.path.join(os.getcwd(), "data", "cifar-10-batches-py")
         x, label, _, _ = get_CIFAR10_data(path)

@@ -157,6 +157,7 @@ evaluation/models/topoae/trained_models/*
 data/spheres/*/*
 data/MNIST/*/*
 data/FashionMNIST/*/*
+data/KMNIST/*/*
 data/cifar-10-batches-py/*
 data/cifar-10-python.tar.gz
 !*.sh

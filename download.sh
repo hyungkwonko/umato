@@ -10,6 +10,10 @@ then
     bash download.sh $invalue
     cd ../../..
 
+    cd data/KMNIST/raw
+    bash download.sh $invalue
+    cd ../../..
+
     cd data/cifar-10-batches-py
     bash download.sh $invalue
     cd ../..
@@ -21,6 +25,10 @@ else
 
     cd data/FashionMNIST/raw
     bash download.sh
+    cd ../../..
+
+    cd data/KMNIST/raw
+    bash download.sh $invalue
     cd ../../..
 
     cd data/cifar-10-batches-py

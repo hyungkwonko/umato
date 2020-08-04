@@ -1148,7 +1148,7 @@ def embed_others_disjoint(
 
 @numba.njit()
 def disjoint_initialize(
-    data, init, hubs, disjoints, random, nn_consider=5.0,
+    data, init, hubs, disjoints, random, nn_consider=1.0,
 ):
 
     hubs_true = np.zeros(data.shape[0])
