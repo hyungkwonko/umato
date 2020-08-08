@@ -5,7 +5,7 @@ import pandas as pd
 import gzip
 
 # Load Kuzushiji Japanese Handwritten dataset
-def load_kmnist(path, dtype="KMNIST", kind='train'):
+def load_kmnist(path, dtype="kmnist", kind='train'):
     images_path = os.path.join(path, f'{dtype}-{kind}-imgs.npz')
     labels_path = os.path.join(path, f'{dtype}-{kind}-labels.npz')
     images = np.load(images_path)
@@ -91,7 +91,7 @@ def get_data(dname):
         path = os.path.join(os.getcwd(), "data", "FashionMNIST", "raw")
         return load_mnist(path=path, kind="train")  # kind="t10k"
     elif dname == "kmnist":
-        path = os.path.join(os.getcwd(), "data", "KMNIST", "raw")
+        path = os.path.join(os.getcwd(), "data", "KuzushijiMNIST", "raw")
         return load_kmnist(path=path, kind="train")  # kind="t10k"
     elif dname == "cifar10":
         path = os.path.join(os.getcwd(), "data", "cifar-10-batches-py")
@@ -108,6 +108,11 @@ def get_embed_data(dname, algo):
         return z
     elif dname == "mnist":
         path = os.path.join(os.getcwd(), "evaluation", "results", "mnist")
+        df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
+        z = df.drop(columns=['label']).to_numpy()
+        return z
+    elif dname == "kmnist":
+        path = os.path.join(os.getcwd(), "evaluation", "results", "kmnist")
         df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
         z = df.drop(columns=['label']).to_numpy()
         return z

@@ -32,6 +32,13 @@ def FashionMNIST():
     }
 
 @ingredient.named_config
+def KuzushijiMNIST():
+    """KuzushijiMNIST dataset."""
+    name = 'KuzushijiMNIST'
+    parameters = {
+    }
+
+@ingredient.named_config
 def CIFAR():
     """CIFAR10 dataset."""
     name = 'CIFAR'
