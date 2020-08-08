@@ -38,7 +38,7 @@ def cfg():
     weight_decay = 1e-5
     val_size = 0.15
     early_stopping = 10
-    device = 'cuda'
+    device = 'cpu'
     quiet = False
     evaluation = {
         'active': False,
@@ -46,9 +46,11 @@ def cfg():
         'k_max': 200,
         'k_step': 10,
         'evaluate_on': 'test',
-        'online_visualization': True,
-        'save_latents': True,
-        'save_training_latents': False
+        'online_visualization': False,
+        "save_latents": False,
+        "save_training_latents": False,
+        "save_loss": False,
+        "save_reconstuct": False
     }
 
 
