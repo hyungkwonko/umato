@@ -38,7 +38,8 @@ def cfg():
     weight_decay = 1e-5
     val_size = 0.15
     early_stopping = 10
-    device = 'cpu'
+    # device = 'cuda' # cuda, cpu
+    device = 'cpu' # cuda, cpu
     quiet = False
     evaluation = {
         'active': False,

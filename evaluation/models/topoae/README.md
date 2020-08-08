@@ -6,7 +6,7 @@ For further information on this work, you may refer to the original paper, [Topo
 
 ## Training topological autoencoders
 ```
-# dnames=[spheres, mnist, fmnist, cifar10]
+# dnames=[spheres, mnist, fmnist, kmnist cifar10]
 python -m exp.train_model with settings/{dname}.json
 ```
 
@@ -23,3 +23,11 @@ sh run-topoae.sh mnist
 # run for all datasets
 sh run-topoae.sh
 ```
+
+## Hyperparameter Tuning
+```
+python -m exp.hyperparameter_search with ./settings/kmnist_search.json
+```
+Should be careful of the `scikit-learn` & `scikit-optimize` version.
+- scikit-learn: 0.23.1
+- scikit-optimize: 0.7.4

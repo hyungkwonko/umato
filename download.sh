@@ -28,7 +28,7 @@ else
     cd ../../..
 
     cd data/KMNIST/raw
-    bash download.sh $invalue
+    bash download.sh
     cd ../../..
 
     cd data/cifar-10-batches-py
