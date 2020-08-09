@@ -1449,8 +1449,6 @@ def local_optimize_nn(
     if n_epochs <= 0:
         n_epochs = 50
 
-    print(len(graph.data))
-
     graph.data[
         hub_info[graph.col] == 2
     ] = 1.0  # current (NNs) -- other (hubs): 1.0 weight
@@ -1460,8 +1458,6 @@ def local_optimize_nn(
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
     # graph.data[graph.data < 0.2] = 0.0
     graph.eliminate_zeros()
-
-    print(len(graph.data))
 
     # check_nn_accuracy(indices_info=hub_knn_indices, label=label)
 
@@ -1485,7 +1481,7 @@ def local_optimize_nn(
     rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
 
     embedding = (
-        20.0
+        10.0
         * (embedding - np.min(embedding, 0))
         / (np.max(embedding, 0) - np.min(embedding, 0))
     ).astype(np.float32, order="C")

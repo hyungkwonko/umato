@@ -483,13 +483,12 @@ def _nn_layout_optimize_single_epoch(
 
                 grad_other = 0.0  # grad coefficient for the opponent
                 grad_current = 0.0
-                grad_neg = 0.3
 
                 if hub_info[k] == 1:
-                    grad_current = 0.3
-                    grad_other = 0.3
+                    grad_current = 1.0
+                    grad_other = 1.0
                 elif hub_info[k] == 2:
-                    grad_current = 0.3
+                    grad_current = 1.0
                     grad_other = 0.01
 
                 current[d] += grad_d * alpha * grad_current
@@ -504,9 +503,14 @@ def _nn_layout_optimize_single_epoch(
             )
 
             for p in range(n_neg_samples):
+                grad_neg = 0.0
                 while True:
                     k = tau_rand_int(rng_state) % n_vertices
                     if hub_info[k] > 0:
+                        if hub_info[k] == 1:
+                            grad_neg = 0.01
+                        else:
+                            grad_neg = 1.0
                         break
 
                 other = tail_embedding[k]
@@ -521,6 +525,7 @@ def _nn_layout_optimize_single_epoch(
                     continue
                 else:
                     grad_coeff = 0.0
+
 
                 for d in range(dim):
                     if grad_coeff > 0.0:
