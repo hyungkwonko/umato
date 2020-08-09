@@ -53,7 +53,6 @@ from umato.rp_tree import rptree_leaf_array, make_forest
 from umato.spectral import spectral_layout
 from umato.utils import deheap_sort, submatrix
 from umato.layouts import (
-    optimize_layout_euclidean,
     optimize_global_layout,
     nn_layout_optimize,
 )

@@ -10,8 +10,8 @@ import numpy as np
 
 MEASURE_GLOBAL_LIST = [
     "RMSE",
-    "Kruskal",
-    "Sammon",
+    # "Kruskal",
+    # "Sammon",
     "DTM",
     "DTM_KL1",
     "DTM_KL01",
@@ -19,7 +19,7 @@ MEASURE_GLOBAL_LIST = [
 ]
 
 MEASURE_LOCAL_LIST = [
-    "Spearman",
+    # "Spearman",
     "Trustworthiness",
     "Continuity",
     "MRRE",
@@ -85,8 +85,8 @@ if __name__ == "__main__":
             measures.extend(MEASURE_GLOBAL_LIST)
 
             rmse_val = gmeasure.rmse()
-            kruskal_val = gmeasure.kruskal_stress_measure()
-            sammon_val = gmeasure.sammon_stress()
+            # kruskal_val = gmeasure.kruskal_stress_measure()
+            # sammon_val = gmeasure.sammon_stress()
             dtm_val = gmeasure.dtm()
             dtmkl1_val = gmeasure.dtm_kl(sigma=1.0)
             dtmkl01_val = gmeasure.dtm_kl(sigma=0.1)
@@ -94,8 +94,8 @@ if __name__ == "__main__":
             values.extend(
                 [
                     rmse_val,
-                    kruskal_val,
-                    sammon_val,
+                    # kruskal_val,
+                    # sammon_val,
                     dtm_val,
                     dtmkl1_val,
                     dtmkl01_val,
@@ -110,13 +110,14 @@ if __name__ == "__main__":
             algorithms.extend([alg] * len(MEASURE_LOCAL_LIST))
             measures.extend(MEASURE_LOCAL_LIST)
 
-            spearman_val = lmeasure.spearmans_rho()
+            # spearman_val = lmeasure.spearmans_rho()
             trust_val = lmeasure.trustworthiness()
             conti_val = lmeasure.continuity()
             mrre_val = lmeasure.mrre()
 
             values.extend(
-                [spearman_val, trust_val, conti_val, mrre_val,]
+                # [spearman_val, trust_val, conti_val, mrre_val,]
+                [trust_val, conti_val, mrre_val,]
             )
 
         print(f"[INFO] dataset [{args.data}] - Quantitative result")

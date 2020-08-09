@@ -10,7 +10,7 @@ then
     bash download.sh $invalue
     cd ../../..
 
-    cd data/KMNIST/raw
+    cd data/KuzushijiMNIST/raw
     bash download.sh $invalue
     cd ../../..
 
@@ -27,7 +27,7 @@ else
     bash download.sh
     cd ../../..
 
-    cd data/KMNIST/raw
+    cd data/KuzushijiMNIST/raw
     bash download.sh
     cd ../../..
 
