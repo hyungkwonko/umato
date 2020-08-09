@@ -481,15 +481,38 @@ def _nn_layout_optimize_single_epoch(
             for d in range(dim):
                 grad_d = clip(grad_coeff * (current[d] - other[d]), 4.0)
 
-                grad_other = 0.0  # grad coefficient for the opponent
-                grad_current = 0.0
+                # mnist
+                # grad_other = 0.0  # grad coefficient for the opponent
+                # grad_current = 0.0
+                # grad_neg = 1.0
+                # if hub_info[k] == 1:
+                #     grad_current = 0.1
+                #     grad_other = 0.5
+                # elif hub_info[k] == 2:
+                #     grad_current = 0.5
+                #     grad_other = 0.1
 
+                # spheres
+                # grad_other = 0.0  # grad coefficient for the opponent
+                # grad_current = 0.0
+                # grad_neg = 0.2
+                # if hub_info[k] == 1:
+                #     grad_current = 0.1
+                #     grad_other = 1.0
+                # elif hub_info[k] == 2:
+                #     grad_current = 1.0
+                #     grad_other = 0.1
+
+
+                grad_other = 0.0
+                grad_current = 0.0
+                grad_neg = 0.2 # 1.0
                 if hub_info[k] == 1:
                     grad_current = 1.0
                     grad_other = 1.0
                 elif hub_info[k] == 2:
                     grad_current = 1.0
-                    grad_other = 0.01
+                    grad_other = 0.1
 
                 current[d] += grad_d * alpha * grad_current
 
@@ -503,14 +526,9 @@ def _nn_layout_optimize_single_epoch(
             )
 
             for p in range(n_neg_samples):
-                grad_neg = 0.0
                 while True:
                     k = tau_rand_int(rng_state) % n_vertices
                     if hub_info[k] > 0:
-                        if hub_info[k] == 1:
-                            grad_neg = 0.01
-                        else:
-                            grad_neg = 1.0
                         break
 
                 other = tail_embedding[k]
