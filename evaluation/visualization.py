@@ -3,7 +3,7 @@ This will include functions to visualize embedding result
 '''
 
 import numpy as np
-from evaluation.models.dataset import get_data, save_csv
+from evaluation.models.dataset import get_embed_data, save_csv, get_data
 
 def plot_tmptmp(data, label, name):
     import matplotlib.pyplot as plt
@@ -17,5 +17,6 @@ def plot_tmptmp(data, label, name):
 
 
 if __name__ == "__main__":
-    x, label = get_data('kmnist')  # spheres, mnist, fmnist, cifar10
+    _, label = get_data('kmnist')
+    x = get_embed_data('kmnist', 'topoae')  # spheres, mnist, fmnist, cifar10
     plot_tmptmp(x, label, 'zzz')

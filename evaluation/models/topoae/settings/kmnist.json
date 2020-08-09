@@ -1,6 +1,6 @@
 {
   "dname": "kmnist",
-  "batch_size": 126,
+  "batch_size": 100,
   "dataset": {
     "__doc__": "Dataset configuration.",
     "name": "KuzushijiMNIST",
@@ -27,7 +27,7 @@
     "name": "TopologicallyRegularizedAutoencoder",
     "parameters": {
       "autoencoder_model": "DeepAE",
-      "lam": 0.5002972000959738,
+      "lam": 0.22722535524893173,
       "toposig_kwargs": {
         "match_edges": "symmetric"
       }

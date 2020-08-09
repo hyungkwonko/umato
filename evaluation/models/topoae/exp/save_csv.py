@@ -37,7 +37,7 @@ def cfg():
     weight_decay = 1e-5
     val_size = 0.15
     early_stopping = 10
-    device = 'cuda'
+    device = 'cpu'
     quiet = False
     load_model = False
     evaluation = {
@@ -66,7 +66,7 @@ def evaluate(dname, load_model, device, batch_size, quiet, val_size, evaluation,
     rundir = os.path.join(os.path.dirname(__file__), '..', 'trained_models')
 
     model = model_config.get_instance()
-    state_dict = torch.load(os.path.join(rundir, f'{dname}.pth'))
+    state_dict = torch.load(os.path.join(rundir, f'{dname}.pth'), map_location=torch.device(device))
     model.load_state_dict(state_dict)
 
     dataloader = torch.utils.data.DataLoader(
