@@ -1448,12 +1448,8 @@ def local_optimize_nn(
     if n_epochs <= 0:
         n_epochs = 50
 
-    graph.data[
-        hub_info[graph.col] == 2
-    ] = 1.0  # current (NNs) -- other (hubs): 1.0 weight
-    graph.data[
-        hub_info[graph.row] == 2
-    ] = 0.0  # current (hubs) -- other (hubs, nns): 0.0 weight (remove)
+    graph.data[hub_info[graph.col] == 2] = 1.0  # current (NNs) -- other (hubs): 1.0 weight
+    graph.data[hub_info[graph.row] == 2] = 0.0  # current (hubs) -- other (hubs, nns): 0.0 weight (remove)
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
     # graph.data[graph.data < 0.2] = 0.0
     graph.eliminate_zeros()
@@ -1499,7 +1495,7 @@ def local_optimize_nn(
         rng_state,
         gamma=gamma,
         # initial_alpha=initial_alpha,
-        initial_alpha=0.05,
+        initial_alpha=0.1,
         negative_sample_rate=negative_sample_rate,
         parallel=parallel,
         verbose=verbose,
@@ -1512,7 +1508,7 @@ def local_optimize_nn(
 class UMATO(BaseEstimator):
     def __init__(
         self,
-        n_neighbors=15,
+        n_neighbors=50,
         n_components=2,
         hub_num=-1,
         metric="euclidean",
@@ -1527,7 +1523,7 @@ class UMATO(BaseEstimator):
         low_memory=False,
         set_op_mix_ratio=1.0,
         local_connectivity=1.0,
-        repulsion_strength=0.5,
+        repulsion_strength=1.0,
         negative_sample_rate=5,
         transform_queue_size=4.0,
         a=None,
