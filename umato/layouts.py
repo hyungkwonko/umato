@@ -609,12 +609,12 @@ def _nn_layout_optimize_single_epoch(
 
                 grad_other = 0.0
                 grad_current = 0.0
-                grad_neg = 0.5
+                grad_neg = 0.1
                 if hub_info[k] == 1:
                     grad_current = 0.1
-                    grad_other = 0.5
+                    grad_other = 0.1
                 elif hub_info[k] == 2:
-                    grad_current = 0.5
+                    grad_current = 0.1
                     grad_other = 0.1
 
                 # grad_other = 0.0
