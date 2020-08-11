@@ -481,93 +481,6 @@ def nn_layout_optimize(
     return head_embedding
 
 
-def _nn_layout_optimize_single_epoch(
-    head_embedding,
-    tail_embedding,
-    head,
-    tail,
-    hub_info,
-    n_vertices,
-    epochs_per_sample,
-    a,
-    b,
-    rng_state,
-    gamma,
-    dim,
-    move_other,
-    alpha,
-    epochs_per_negative_sample,
-    epoch_of_next_negative_sample,
-    epoch_of_next_sample,
-    n,
-):
-    for i in numba.prange(epochs_per_sample.shape[0]):
-        if epoch_of_next_sample[i] <= n:
-            j = head[i]  # j == source index
-            k = tail[i]  # k == target index
-
-            current = head_embedding[j]  # current == source location
-            other = tail_embedding[k]  # other == target location
-
-            dist_squared = rdist(current, other)  # get distance between them
-
-            if dist_squared > 0.0:
-                grad_coeff = -2.0 * a * b * pow(dist_squared, b - 1.0)
-                grad_coeff /= a * pow(dist_squared, b) + 1.0
-            else:
-                grad_coeff = 0.0
-
-            for d in range(dim):
-                grad_d = grad_coeff * (current[d] - other[d])
-
-                current[d] += grad_d * alpha
-
-                grad_other = 1.0
-                if hub_info[k] == 2:
-                    grad_other = 0.01
-
-                if move_other:
-                    other[d] += -grad_d * alpha * grad_other
-
-            epoch_of_next_sample[i] += epochs_per_sample[i]
-
-            n_neg_samples = int(
-                (n - epoch_of_next_negative_sample[i]) / epochs_per_negative_sample[i]
-            )
-
-            for p in range(n_neg_samples):
-                while True:
-                    k = tau_rand_int(rng_state) % n_vertices
-                    if hub_info[k] > 0:
-                        break
-
-                other = tail_embedding[k]
-                dist_squared = rdist(current, other)
-
-                if dist_squared > 0.0:
-                    grad_coeff = 2.0 * gamma * b
-                    grad_coeff /= (0.001 + dist_squared) * (
-                        a * pow(dist_squared, b) + 1
-                    )
-                elif j == k:
-                    continue
-                else:
-                    grad_coeff = 0.0
-
-                for d in range(dim):
-                    if grad_coeff > 0.0:
-                        grad_d = grad_coeff * (current[d] - other[d])
-                    else:
-                        grad_d = 0.0
-
-                    current[d] += grad_d * alpha
-
-            epoch_of_next_negative_sample[i] += (
-                n_neg_samples * epochs_per_negative_sample[i]
-            )
-
-
-
 # def _nn_layout_optimize_single_epoch(
 #     head_embedding,
 #     tail_embedding,
@@ -605,29 +518,13 @@ def _nn_layout_optimize_single_epoch(
 #                 grad_coeff = 0.0
 
 #             for d in range(dim):
-#                 grad_d = clip(grad_coeff * (current[d] - other[d]), 10.0)
+#                 grad_d = grad_coeff * (current[d] - other[d])
 
-#                 grad_other = 0.0
-#                 grad_current = 0.0
-#                 grad_neg = 1.0
-#                 if hub_info[k] == 1:
-#                     grad_current = 1.0
-#                     grad_other = 1.0
-#                 elif hub_info[k] == 2:
-#                     grad_current = 1.0
-#                     grad_other = 0.1
+#                 current[d] += grad_d * alpha
 
-#                 # grad_other = 0.0
-#                 # grad_current = 0.0
-#                 # grad_neg = 5.0
-#                 # if hub_info[k] == 1:
-#                 #     grad_current = 5.0
-#                 #     grad_other = 5.0
-#                 # elif hub_info[k] == 2:
-#                 #     grad_current = 5.0
-#                 #     grad_other = 0.1
-
-#                 current[d] += grad_d * alpha * grad_current
+#                 grad_other = 1.0
+#                 if hub_info[k] == 2:
+#                     grad_other = 0.01
 
 #                 if move_other:
 #                     other[d] += -grad_d * alpha * grad_other
@@ -657,15 +554,118 @@ def _nn_layout_optimize_single_epoch(
 #                 else:
 #                     grad_coeff = 0.0
 
-
 #                 for d in range(dim):
 #                     if grad_coeff > 0.0:
-#                         grad_d = clip(grad_coeff * (current[d] - other[d]), 10.0)
+#                         grad_d = grad_coeff * (current[d] - other[d])
 #                     else:
-#                         grad_d = 10.0
+#                         grad_d = 0.0
 
-#                     current[d] += grad_d * alpha * grad_neg
+#                     current[d] += grad_d * alpha
 
 #             epoch_of_next_negative_sample[i] += (
 #                 n_neg_samples * epochs_per_negative_sample[i]
 #             )
+
+
+
+def _nn_layout_optimize_single_epoch(
+    head_embedding,
+    tail_embedding,
+    head,
+    tail,
+    hub_info,
+    n_vertices,
+    epochs_per_sample,
+    a,
+    b,
+    rng_state,
+    gamma,
+    dim,
+    move_other,
+    alpha,
+    epochs_per_negative_sample,
+    epoch_of_next_negative_sample,
+    epoch_of_next_sample,
+    n,
+):
+    for i in numba.prange(epochs_per_sample.shape[0]):
+        if epoch_of_next_sample[i] <= n:
+            j = head[i]  # j == source index
+            k = tail[i]  # k == target index
+
+            current = head_embedding[j]  # current == source location
+            other = tail_embedding[k]  # other == target location
+
+            dist_squared = rdist(current, other)  # get distance between them
+
+            if dist_squared > 0.0:
+                grad_coeff = -2.0 * a * b * pow(dist_squared, b - 1.0)
+                grad_coeff /= a * pow(dist_squared, b) + 1.0
+            else:
+                grad_coeff = 0.0
+
+            for d in range(dim):
+                grad_d = clip(grad_coeff * (current[d] - other[d]), 10.0)
+
+                grad_other = 0.0
+                grad_current = 0.0
+                grad_neg = 0.5
+                if hub_info[k] == 1:
+                    grad_current = 0.1
+                    grad_other = 0.5
+                elif hub_info[k] == 2:
+                    grad_current = 0.5
+                    grad_other = 0.1
+
+                # grad_other = 0.0
+                # grad_current = 0.0
+                # grad_neg = 5.0
+                # if hub_info[k] == 1:
+                #     grad_current = 5.0
+                #     grad_other = 5.0
+                # elif hub_info[k] == 2:
+                #     grad_current = 5.0
+                #     grad_other = 0.1
+
+                current[d] += grad_d * alpha * grad_current
+
+                if move_other:
+                    other[d] += -grad_d * alpha * grad_other
+
+            epoch_of_next_sample[i] += epochs_per_sample[i]
+
+            n_neg_samples = int(
+                (n - epoch_of_next_negative_sample[i]) / epochs_per_negative_sample[i]
+            )
+
+            for p in range(n_neg_samples):
+                while True:
+                    k = tau_rand_int(rng_state) % n_vertices
+                    if hub_info[k] > 0:
+                        break
+
+                other = tail_embedding[k]
+                dist_squared = rdist(current, other)
+
+                if dist_squared > 0.0:
+                    grad_coeff = 2.0 * gamma * b
+                    grad_coeff /= (0.001 + dist_squared) * (
+                        a * pow(dist_squared, b) + 1
+                    )
+                elif j == k:
+                    continue
+                else:
+                    grad_coeff = 0.0
+
+
+                for d in range(dim):
+                    if grad_coeff > 0.0:
+                        grad_d = clip(grad_coeff * (current[d] - other[d]), 10.0)
+                    else:
+                        grad_d = 10.0
+
+                    current[d] += grad_d * alpha * grad_neg
+
+            epoch_of_next_negative_sample[i] += (
+                n_neg_samples * epochs_per_negative_sample[i]
+            )
