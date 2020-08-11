@@ -278,7 +278,6 @@ def optimize_global_layout(
 ):
 
     costs = []
-    gamma = 1.0
 
     for i in range(max_iter):
         d_squared = np.square(euclidean_distances(Z))
@@ -286,31 +285,78 @@ def optimize_global_layout(
         d_inverse = np.expand_dims(pow(1 + a * d_squared ** b, -1), axis=2)
 
         # Q is the normalized distance in low dimensional space 
-        Q = np.dot(1 - P, pow(0.001 + d_squared, -1))
+        Q = pow(0.001 + d_squared, -1)
         np.fill_diagonal(Q, 0)
+        Q = np.dot(1 - P, Q)
         Q /= np.sum(Q, axis=1, keepdims=True)
         # Q /= Q.max()
 
         grad = np.expand_dims(
-            2 * a * b * P * (1e-12 + d_squared) ** (b - 1) - 2 * gamma * b * Q, axis=2
+            2 * a * b * P * (1e-12 + d_squared) ** (b - 1) - 2 * b * Q, axis=2
         )
         dZ = np.sum(grad * z_diff * d_inverse, axis=1)
         Z -= alpha * dZ
 
         if verbose:
-            cost = get_CE(P, Z, d_squared, a, b)
-            # cost = get_DTM(P, Q, sigma=0.1)
+            # cost = get_CE(P, Z, d_squared, a, b)
+            cost = get_DTM(P, Q, sigma=10.0)
             costs.append(cost)
             print(
                 f"[INFO] Current loss: {cost:.6f}, @ iteration: {i+1}/{max_iter}, alpha: {alpha}"
             )
 
         if savefig:
-            if i % 2 == 1:
+            if i % 4 == 1:
                 from umato.umato_ import plot_tmptmp
                 plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
 
     return Z
+
+# def optimize_global_layout(
+#     P,
+#     Z,
+#     a,
+#     b,
+#     alpha=0.01,
+#     max_iter=10,
+#     verbose=False,
+#     savefig=False,
+#     label=None
+# ):
+
+#     costs = []
+
+#     for i in range(max_iter):
+#         d_squared = np.square(euclidean_distances(Z))
+#         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
+#         d_inverse = np.expand_dims(pow(1 + a * d_squared ** b, -1), axis=2)
+
+#         # Q is the normalized distance in low dimensional space 
+#         Q = np.dot(1 - P, pow(0.001 + d_squared, -1))
+#         np.fill_diagonal(Q, 0)
+#         Q /= np.sum(Q, axis=1, keepdims=True)
+#         # Q /= Q.max()
+
+#         grad = np.expand_dims(
+#             2 * a * b * P * (1e-12 + d_squared) ** (b - 1) - 2 * b * Q, axis=2
+#         )
+#         dZ = np.sum(grad * z_diff * d_inverse, axis=1)
+#         Z -= alpha * dZ
+
+#         if verbose:
+#             # cost = get_CE(P, Z, d_squared, a, b)
+#             cost = get_DTM(P, Q, sigma=1.0)
+#             costs.append(cost)
+#             print(
+#                 f"[INFO] Current loss: {cost:.6f}, @ iteration: {i+1}/{max_iter}, alpha: {alpha}"
+#             )
+
+#         if savefig:
+#             if i % 2 == 1:
+#                 from umato.umato_ import plot_tmptmp
+#                 plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
+
+#     return Z
 
 
 def shaking(Z, num=-1):

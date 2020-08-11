@@ -988,7 +988,7 @@ def build_global_structure(
     a,
     b,
     random_state,
-    alpha=0.0055,
+    alpha=0.006,
     max_iter=10,
     verbose=False,
     label=None,
@@ -1940,8 +1940,8 @@ class UMATO(BaseEstimator):
             a=self._a,
             b=self._b,
             random_state=random_state,
-            alpha=0.006,
-            max_iter=10,
+            alpha=0.0065,
+            max_iter=150,
             # verbose=False,
             verbose=True,
             label=self.ll,
@@ -1958,6 +1958,8 @@ class UMATO(BaseEstimator):
             random_state=random_state,
             label=self.ll,
         )
+
+        # exit()
 
         print("6: ", ts())
 
