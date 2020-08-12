@@ -13,7 +13,7 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    n_neighbor = np.arange(5, 55, 10)
+    n_neighbor = np.arange(5, 55, 5)
     min_dist = np.arange(0, 1.1, 0.1)
 
     for i in range(len(n_neighbor)):

@@ -15,7 +15,8 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    learning_rate = np.sort(loguniform.rvs(10, 1000, size=1000))[99::100]
+    # learning_rate = np.sort(loguniform.rvs(10, 1000, size=1000))[99::100]
+    learning_rate = np.array([15.24742297, 23.48066375, 37.34107189, 58.27652395, 87.24048423, 137.33961493, 211.00561713, 374.36120544, 576.90813121, 983.37544116])
     perplexity = np.arange(5, 55, 5)
 
     for i in range(len(learning_rate)):
