@@ -299,7 +299,7 @@ def optimize_global_layout(
 
         if verbose:
             # cost = get_CE(P, Z, d_squared, a, b)
-            cost = get_DTM(P, Q, sigma=10.0)
+            cost = get_DTM(P, Q, sigma=0.1)
             costs.append(cost)
             print(
                 f"[INFO] Current loss: {cost:.6f}, @ iteration: {i+1}/{max_iter}, alpha: {alpha}"
@@ -609,23 +609,23 @@ def _nn_layout_optimize_single_epoch(
 
                 grad_other = 0.0
                 grad_current = 0.0
-                grad_neg = 0.05
+                grad_neg = 0.005
                 if hub_info[k] == 1:
-                    grad_current = 0.05
-                    grad_other = 0.05
+                    grad_current = 0.01
+                    grad_other = 0.01
                 elif hub_info[k] == 2:
-                    grad_current = 0.05
-                    grad_other = 0.05
+                    grad_current = 0.01
+                    grad_other = 0.005
 
                 # grad_other = 0.0
                 # grad_current = 0.0
-                # grad_neg = 5.0
+                # grad_neg = 0.05
                 # if hub_info[k] == 1:
-                #     grad_current = 5.0
-                #     grad_other = 5.0
+                #     grad_current = 0.05
+                #     grad_other = 0.05
                 # elif hub_info[k] == 2:
-                #     grad_current = 5.0
-                #     grad_other = 0.1
+                #     grad_current = 0.05
+                #     grad_other = 0.05
 
                 current[d] += grad_d * alpha * grad_current
 

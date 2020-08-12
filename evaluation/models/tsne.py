@@ -1,6 +1,8 @@
 from sklearn.manifold import TSNE
 import argparse
 import os
+import numpy as np
+from scipy.stats import loguniform
 from .dataset import get_data, save_csv
 
 parser = argparse.ArgumentParser(description="t-SNE embedding")
@@ -12,12 +14,18 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    # read data
-    x, label = get_data(args.data)
+    learning_rate = np.sort(loguniform.rvs(10, 1000, size=10))
+    perplexity = np.arange(5, 55, 5)
 
-    # run TSNE
-    y = TSNE(n_components=args.dim, random_state=0, verbose=1).fit_transform(x)
+    for i in range(len(learning_rate)):
+        for j in range(len(perplexity)):
 
-    # save as csv
-    path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
-    save_csv(path, alg_name="tsne", data=y, label=label)
+            # read data
+            x, label = get_data(args.data)
+
+            # run TSNE
+            y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_iter=1500, random_state=0, verbose=2).fit_transform(x)
+
+            # save as csv
+            path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
+            save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)

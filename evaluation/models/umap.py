@@ -1,6 +1,7 @@
 from umap import UMAP
 import argparse
 import os
+import numpy as np
 from .dataset import get_data, save_csv
 
 parser = argparse.ArgumentParser(description="UMAP embedding")
@@ -12,13 +13,19 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    # read data
-    x, label = get_data(args.data)
+    n_neighbor = np.arange(5, 500, 10)
+    min_dist = np.arange(0, 1.1, 0.1)
 
-    # run UMAP
-    y = UMAP(n_components=args.dim, verbose=True).fit_transform(x)
+    for i in range(len(n_neighbor)):
+        for j in range(len(min_dist)):
 
-    # save as csv
-    path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
-    save_csv(path, alg_name="umap", data=y, label=label)
+        # read data
+        x, label = get_data(args.data)
+
+        # run UMAP
+        y = UMAP(n_components=args.dim, n_neighbors=n_neighbor[i], min_dist=min_dist[j], verbose=True).fit_transform(x)
+
+        # save as csv
+        path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
+        save_csv(path, alg_name=f"umap_{n_neighbor[i]}_{min_dist[j]}", data=y, label=label)
 
