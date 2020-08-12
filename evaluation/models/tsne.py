@@ -1,4 +1,5 @@
-from sklearn.manifold import TSNE
+# from sklearn.manifold import TSNE
+from MulticoreTSNE import MulticoreTSNE as TSNE
 import argparse
 import os
 import numpy as np
@@ -24,7 +25,7 @@ if __name__ == "__main__":
             x, label = get_data(args.data)
 
             # run TSNE
-            y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_iter=1500, random_state=0, verbose=2).fit_transform(x)
+            y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_iter=1500, n_jobs=40, random_state=0, verbose=2).fit_transform(x)
 
             # save as csv
             path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
