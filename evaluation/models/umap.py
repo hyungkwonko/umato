@@ -19,13 +19,13 @@ if __name__ == "__main__":
     for i in range(len(n_neighbor)):
         for j in range(len(min_dist)):
 
-        # read data
-        x, label = get_data(args.data)
+            # read data
+            x, label = get_data(args.data)
 
-        # run UMAP
-        y = UMAP(n_components=args.dim, n_neighbors=n_neighbor[i], min_dist=min_dist[j], verbose=True).fit_transform(x)
+            # run UMAP
+            y = UMAP(n_components=args.dim, n_neighbors=n_neighbor[i], min_dist=min_dist[j], verbose=True).fit_transform(x)
 
-        # save as csv
-        path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
-        save_csv(path, alg_name=f"umap_{n_neighbor[i]}_{min_dist[j]}", data=y, label=label)
+            # save as csv
+            path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
+            save_csv(path, alg_name=f"umap_{n_neighbor[i]}_{min_dist[j]}", data=y, label=label)
 
