@@ -92,7 +92,7 @@ class GlobalMeasure:
         numba implementation is faster than above for large datasets
         e.g.) for KMNIST dataset
         calculating lower dimensional adjacency matrix: 57.7 (s) --> 34.2 (s)
-        calculating high dimensional adjacency matrix: 684.0 (s) --> 71.2 (s)        
+        calculating high dimensional adjacency matrix: 684.0 (s) --> 71.2 (s)
         """
 
         self.adjacency_matrix_z = adjacency_matrix(z)

@@ -62,9 +62,8 @@ def create_sphere_dataset(n_samples=500, d=100, n_spheres=11, r=5, plot=False, s
 
 
 if __name__ == "__main__":
-    r = 2
-    # d, l = create_sphere_dataset(n_samples=30, d=2, r=50, plot=True)
-    d, l = create_sphere_dataset(r=r)
+    # d, l = create_sphere_dataset(n_samples=30, d=2, r=5, plot=True)
+    d, l = create_sphere_dataset()
     df = pd.DataFrame(d)
     df["label"] = l
 

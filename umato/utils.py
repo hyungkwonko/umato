@@ -9,6 +9,27 @@ import numba
 import scipy.sparse
 
 
+@numba.njit(
+    locals={
+        "matrix": numba.types.float32[:, ::1],
+    },
+    parallel=True,
+    fastmath=True,
+)
+def adjacency_matrix(data):
+    n = data.shape[0]
+    dim = data.shape[1]
+    matrix = np.zeros((n, n), dtype=np.float32)
+
+    for i in numba.prange(n):
+        for j in numba.prange(i):
+            for d in numba.prange(dim):
+                matrix[i, j] += (data[i][d] - data[j][d]) ** 2
+
+    matrix = matrix + matrix.T
+    return np.sqrt(matrix)
+
+
 @numba.njit(parallel=True)
 def fast_knn_indices(X, n_neighbors):
     """A fast computation of knn indices.
