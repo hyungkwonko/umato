@@ -1088,7 +1088,7 @@ def embed_others_disjoint(
     data, init, hubs, disjoints, random_state, label,
 ):
     # generate random normal distribution
-    random_normal = random_state.normal(scale=0.05, size=list(init.shape)).astype(
+    random_normal = random_state.normal(scale=0.02, size=list(init.shape)).astype(
         np.float32
     )
 

@@ -69,6 +69,6 @@ if __name__ == "__main__":
     df["label"] = l
 
     # randomize
-    df = shuffle(df).reset_index(drop=True)
+    # df = shuffle(df).reset_index(drop=True)
 
-    df.to_csv(f"./spheres_2.csv", index=False)
+    df.to_csv(f"./spheres.csv", index=False)

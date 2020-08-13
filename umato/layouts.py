@@ -432,11 +432,6 @@ def nn_layout_optimize(
     move_other = head_embedding.shape[0] == tail_embedding.shape[0]
     alpha = initial_alpha
 
-    if num <= 10000:
-        negative_sample_rate = 5.0  # spheres
-    else:
-        negative_sample_rate = 5.0  # mnist, fmnist, cifar10
-
     epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
     epoch_of_next_negative_sample = epochs_per_negative_sample.copy()
     epoch_of_next_sample = epochs_per_sample.copy()
@@ -609,13 +604,13 @@ def _nn_layout_optimize_single_epoch(
 
                 grad_other = 0.0
                 grad_current = 0.0
-                grad_neg = 0.005
+                grad_neg = 0.001
                 if hub_info[k] == 1:
-                    grad_current = 0.01
-                    grad_other = 0.01
-                elif hub_info[k] == 2:
-                    grad_current = 0.01
+                    grad_current = 0.005
                     grad_other = 0.005
+                elif hub_info[k] == 2:
+                    grad_current = 0.005
+                    grad_other = 0.001
 
                 # grad_other = 0.0
                 # grad_current = 0.0
