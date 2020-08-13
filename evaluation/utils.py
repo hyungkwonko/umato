@@ -79,66 +79,24 @@ from sklearn import metrics
 import numba
 
 
-
-
-@numba.njit(
-    locals={
-        "matrix": numba.types.float32[:, ::1],
-    },
-    parallel=True,
-    fastmath=True,
-)
-def adjacency_matrix(data):
-    n = data.shape[0]
-    dim = data.shape[1]
-    matrix = np.zeros((n, n), dtype=np.float32)
-
-    for i in numba.prange(n):
-        for j in numba.prange(i):
-            for d in numba.prange(dim):
-                matrix[i, j] += (data[i][d] - data[j][d]) ** 2
-
-    matrix = matrix + matrix.T
-    return np.sqrt(matrix)
-
-
-
-
-
-
-
 class GlobalMeasure:
     def __init__(self, x, z, dtype=np.float32):
         self.n_data = x.shape[0]  # number of data
         self.dtype = dtype
 
         # euclidean_distances: much faster than scipy.spatial.distance.squareform(pdist(x))
-        import time
-        t1 = time.time()
-        self.adjacency_matrix_z = metrics.pairwise.euclidean_distances(z)
+        # self.adjacency_matrix_z = metrics.pairwise.euclidean_distances(z)
+        # self.adjacency_matrix_x = metrics.pairwise.euclidean_distances(x)
 
-        t2 = time.time()
+        """
+        numba implementation is faster than above for large datasets
+        e.g.) for KMNIST dataset
+        calculating lower dimensional adjacency matrix: 57.7 (s) --> 34.2 (s)
+        calculating high dimensional adjacency matrix: 684.0 (s) --> 71.2 (s)        
+        """
 
-        aa = adjacency_matrix(z)
-
-        print(t2-t1)
-        t3 = time.time()
-
-        print(t3-t2)
-
-        aa = adjacency_matrix(x)
-
-        t4 = time.time()
-
-        print(t4-t3)
-
-        self.adjacency_matrix_x = metrics.pairwise.euclidean_distances(x)
-
-        t5 = time.time()
-
-        print(t5-t4)
-
-        exit()
+        self.adjacency_matrix_z = adjacency_matrix(z)
+        self.adjacency_matrix_x = adjacency_matrix(x)
 
         if self.dtype:
             self.adjacency_matrix_z = self.adjacency_matrix_z.astype(self.dtype)
@@ -147,7 +105,7 @@ class GlobalMeasure:
         self.squared_differences = np.square(
             self.adjacency_matrix_x - self.adjacency_matrix_z, dtype=self.dtype
         )
-        
+
     def rmse(self):
         """
         Root Mean Squared Error (RMSE)
@@ -230,6 +188,27 @@ class GlobalMeasure:
         # get normalized density
         density_x = np.sum(np.exp(-(x ** 2) / sigma), axis=-1)
         return density_x / density_x.sum()
+
+
+@numba.njit(
+    locals={
+        "matrix": numba.types.float32[:, ::1],
+    },
+    parallel=True,
+    fastmath=True,
+)
+def adjacency_matrix(data):
+    n = data.shape[0]
+    dim = data.shape[1]
+    matrix = np.zeros((n, n), dtype=np.float32)
+
+    for i in numba.prange(n):
+        for j in numba.prange(i):
+            for d in numba.prange(dim):
+                matrix[i, j] += (data[i][d] - data[j][d]) ** 2
+
+    matrix = matrix + matrix.T
+    return np.sqrt(matrix)
 
 
 @numba.njit(parallel=True)
