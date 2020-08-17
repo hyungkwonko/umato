@@ -556,7 +556,6 @@ def fuzzy_simplicial_set(
     else:
         raise ValueError(f"Check if hubs are computed correctly! hubs={hubs}")
 
-
     result = scipy.sparse.coo_matrix(
         (vals, (rows, cols))
     )  # (TODO) do I need to set the shape ?
@@ -575,7 +574,6 @@ def fuzzy_simplicial_set(
     result.eliminate_zeros()
 
     return result, sigmas, rhos
-
 
 
 def make_epochs_per_sample(weights, n_epochs):
@@ -616,4 +614,3 @@ def find_ab_params(spread, min_dist):
     yv[xv >= min_dist] = np.exp(-(xv[xv >= min_dist] - min_dist) / spread)
     params, covar = curve_fit(curve, xv, yv)
     return params[0], params[1]
-

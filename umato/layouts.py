@@ -324,7 +324,6 @@ def _nn_layout_optimize_single_epoch(
                 else:
                     grad_coeff = 0.0
 
-
                 for d in range(dim):
                     if grad_coeff > 0.0:
                         grad_d = clip(grad_coeff * (current[d] - other[d]), 10.0)

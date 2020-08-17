@@ -95,10 +95,10 @@ class GlobalMeasure:
         calculating high dimensional adjacency matrix: 684.0 (s) --> 71.2 (s)
         """
 
-        self.adjacency_matrix_z = adjacency_matrix(z)
-        self.adjacency_matrix_x = adjacency_matrix(x)
+        self.adjacency_matrix_z = adjacency_matrix(data=z, dtype=self.dtype)
+        self.adjacency_matrix_x = adjacency_matrix(data=x, dtype=self.dtype)
 
-        if self.dtype:
+        if (self.adjacency_matrix_x.dtype != self.dtype) or (self.adjacency_matrix_z.dtype != self.dtype):
             self.adjacency_matrix_z = self.adjacency_matrix_z.astype(self.dtype)
             self.adjacency_matrix_x = self.adjacency_matrix_x.astype(self.dtype)
 
@@ -197,10 +197,10 @@ class GlobalMeasure:
     parallel=True,
     fastmath=True,
 )
-def adjacency_matrix(data):
+def adjacency_matrix(data, dtype):
     n = data.shape[0]
     dim = data.shape[1]
-    matrix = np.zeros((n, n), dtype=np.float32)
+    matrix = np.zeros((n, n), dtype=dtype)
 
     for i in numba.prange(n):
         for j in numba.prange(i):

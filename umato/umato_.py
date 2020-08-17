@@ -78,11 +78,6 @@ INT32_MIN = np.iinfo(np.int32).min + 1
 INT32_MAX = np.iinfo(np.int32).max - 1
 
 
-############### Hyung-Kwon Ko
-############### Hyung-Kwon Ko
-############### Hyung-Kwon Ko
-
-
 def plot_tmptmp(data, label, name):
     import matplotlib.pyplot as plt
 
@@ -222,8 +217,10 @@ def get_homology(data, local_knum, top_num, random_state):
     barcodes = rc_tree.persistence()
 
     hom1 = rc_tree.persistence_intervals_in_dimension(1)
+
     # cutoff = 0.3
     # hom1 = hom1[np.where(abs(hom1[:,0] - hom1[:,1]) > cutoff)]
+
     hom1_max = abs(hom1[:, 1] - hom1[:, 0])
     hom1_max_ix = hom1_max.argsort()[-top_num:][::-1]
 
@@ -234,37 +231,47 @@ def select_hubs_homology(
     data,
     random_state,
     sorted_index,
-    hub_num=50,
+    hub_num=100,
     iter_num=5,
-    interval=50,
-    top_num=30,
+    interval=25,
+    top_num=15,
     cutoff=0.05,
     local_knum=7,
 ):
     print("[INFO]: Select hub nodes using homology")
 
+    hubs_list2 = None
+
     while True:
-        results = []
-        k1_list = []
-        k2_list = []
 
-        hubs_list, disjoints = hub_candidates(
-            data, sorted_index, random_state, hub_num, iter_num
-        )
+        if hubs_list2 == None:
+            hubs_list, disjoints = hub_candidates(
+                data, sorted_index, random_state, hub_num, iter_num
+            )
 
-        hubs_list2, _ = hub_candidates(
+            k1_list = []
+            local_knum = int(hub_num * 0.2)
+            for i in range(iter_num):
+                d1 = data[hubs_list[i]]
+                k1 = get_homology(d1, local_knum, top_num, random_state)
+                k1_list.append(k1)
+        else:
+            hubs_list = hubs_list2.copy()
+            disjoints = disjoints2.copy()
+            k1_list = k2_list.copy()
+
+        hubs_list2, disjoints2 = hub_candidates(
             data, sorted_index, random_state, hub_num + interval, iter_num
         )
 
+        k2_list = []
+        local_knum = int((hub_num + interval) * 0.2)
         for i in range(iter_num):
-            d1 = data[hubs_list[i]]
-            k1 = get_homology(d1, local_knum, top_num, random_state)
-            k1_list.append(k1)
-
             d2 = data[hubs_list2[i]]
             k2 = get_homology(d2, local_knum, top_num, random_state)
             k2_list.append(k2)
 
+        results = []
         for _k1 in k1_list:
             for _k2 in k2_list:
                 # result = gd.bottleneck_distance(_k1, _k2, 0.01)  # approximation
@@ -272,19 +279,165 @@ def select_hubs_homology(
                 results.append(result)
 
         val = np.mean(results)
-        print(f"val: {val}")
+        # print(val)
+        print(f"hub_num: {hub_num}, val: {val}")
 
-        if val < cutoff:
+        hub_num += interval
+
+        if hub_num > 450:
             break
-        elif hub_num > 300:  # break if > 300
-            warn(f"Hub node number set to {hub_num}!")
-            break
-        else:
-            hub_num += interval
+
+        # if val < cutoff:
+        #     break
+        # elif hub_num > 300:  # break if > 300
+        #     warn(f"Hub node number set to {hub_num}!")
+        #     break
+        # else:
+        #     hub_num += interval
 
     hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
+    exit()
 
-    return hubs, disjoints
+    return hub_num
+
+
+
+# def hub_candidates(
+#     n, random_state, hub_num, iter_num=5,
+# ):
+#     hubs_list = []
+#     indices = np.arange(n)
+#     for i in range(iter_num):
+#         hubs = random_state.choice(indices, hub_num, replace=False)
+#         hubs_list.append(hubs)
+
+#     return hubs_list
+
+
+# def get_homology(data, local_knum, top_num, random_state, max_dimension=1, max_edge_length=1.0, num_samples=10, metric=gd.bottleneck_distance, level=0.95):
+#     dist = adjacency_matrix(data)
+#     dist /= dist.max()
+
+#     # kill using local connectivity
+#     nn_index = np.argpartition(dist, kth=local_knum - 1, axis=-1)[:,:local_knum]
+#     for i in range(len(dist)):
+#         dist[i][nn_index[i]] = random_state.random(local_knum) * 0.1
+
+#     rc = gd.RipsComplex(distance_matrix=dist, max_edge_length=max_edge_length)
+#     rc_tree = rc.create_simplex_tree(max_dimension=max_dimension+1)
+#     rc_tree.persistence()
+#     barcodes_list = [rc_tree.persistence_intervals_in_dimension(dim) for dim in np.arange(max_dimension+1)]
+
+#     (n, _) = dist.shape
+
+#     # Bottleneck bootstrap method for confidence sets of persistence diagrams for data filtrations built on data points
+#     dist_vec = []
+#     for _ in range(num_samples):
+#         b = random_state.choice(n, n)
+#         rc_b  = gd.RipsComplex(distance_matrix=data[b, :][:, b], max_edge_length=max_edge_length)
+#         rc_tree_b = rc_b.create_simplex_tree(max_dimension=max_dimension+1)
+#         rc_tree_b.persistence()
+
+#         bot_b = 0
+#         for dim in np.arange(max_dimension + 1):
+#             interv_b_dim =  rc_tree_b.persistence_intervals_in_dimension(dim)
+#             bot_b  = max(bot_b, metric(barcodes_list[dim], interv_b_dim))
+
+#         dist_vec.append(bot_b)
+
+#     quantile = np.quantile(dist_vec, level)
+
+#     # calculate cutoff value
+#     cutoff = quantile * 2
+
+#     # sort out important topological features from noises
+#     hom0 = rc_tree.persistence_intervals_in_dimension(0)
+#     hom0 = hom0[np.where(abs(hom0[:,0] - hom0[:,1]) > cutoff)]
+#     hom1 = rc_tree.persistence_intervals_in_dimension(1)
+#     hom1 = hom1[np.where(abs(hom1[:,0] - hom1[:,1]) > cutoff)]
+
+#     print(barcodes_list)
+#     print(quantile)
+#     print(hom0)
+#     print(hom1)
+#     exit()
+
+#     # # we use top n topological features
+#     # hom1_max = abs(hom1[:, 1] - hom1[:, 0])
+#     # hom1_max_ix = hom1_max.argsort()[-top_num:][::-1]
+#     # return hom1[hom1_max_ix]
+
+#     return hom1
+
+
+# def select_hubs_homology(
+#     data,
+#     random_state,
+#     sorted_index,
+#     hub_num=100,
+#     hub_num_limit=500,
+#     iter_num=5,
+#     interval=10,
+#     top_num=5,
+#     cutoff=0.05,
+#     local_knum=7,
+# ):
+#     print("[INFO]: Select hub nodes using homology")
+
+#     # disjoints = disjoint_nn(data=data, sorted_index=sorted_index, hub_num=hub_num_limit,)
+
+#     hubs_list2 = None
+
+#     while True:
+
+#         k1_list = []
+#         if hub_num > 100:
+#             hubs_list = hubs_list2.copy()
+#             k1_list = k2_list.copy()
+#         else:
+#             hubs_list = hub_candidates(
+#                 len(data), random_state, hub_num, iter_num
+#             )
+#             local_knum = int(hub_num * 0.1)
+#             for i in range(iter_num):
+#                 d1 = data[hubs_list[i]]
+#                 k1 = get_homology(d1, local_knum, top_num, random_state)
+#                 k1_list.append(k1)
+
+#         hubs_list2 = hub_candidates(
+#             len(data), random_state, hub_num + interval, iter_num
+#         )
+
+#         k2_list = []
+#         for i in range(iter_num):
+#             d2 = data[hubs_list2[i]]
+#             local_knum = int((hub_num + interval) * 0.1)
+#             k2 = get_homology(d2, local_knum, top_num, random_state)
+#             k2_list.append(k2)
+
+#         results = []
+#         for _k1 in k1_list:
+#             for _k2 in k2_list:
+#                 # result = gd.bottleneck_distance(_k1, _k2, 0.01)  # approximation
+#                 result = gd.bottleneck_distance(_k1, _k2)
+#                 results.append(result)
+
+#         val = np.mean(results)
+#         print(f"hub_num: {hub_num}, val: {val}")
+
+#         # hub_num += interval
+#         if val < cutoff:
+#             break
+#         elif hub_num > hub_num_limit:
+#             warn(f"Hub node number set to {hub_num}!")
+#             break
+#         else:
+#             hub_num += interval
+
+#     exit()
+
+#     return hub_num
+
 
 
 def remove_local_connect(array, random_state, loc=0.05, num=-1):
@@ -1187,21 +1340,21 @@ class UMATO(BaseEstimator):
         t1 = time.time()
 
         if self.hub_num < 0:
-            hubs, disjoints = select_hubs_homology(
+            self.hub_num = select_hubs_homology(
                 data=X,
                 random_state=random_state,
                 sorted_index=sorted_index,
-                hub_num=50,
+                hub_num=100,
             )
-        else:
-            # get disjoint NN matrix
-            disjoints = disjoint_nn(
-                data=X, sorted_index=sorted_index, hub_num=self.hub_num,
-            )
-            # get hub indices from disjoint set
-            hubs = pick_hubs(
-                disjoints=disjoints, random_state=random_state, popular=True,
-            )
+
+        # get disjoint NN matrix
+        disjoints = disjoint_nn(
+            data=X, sorted_index=sorted_index, hub_num=self.hub_num,
+        )
+        # get hub indices from disjoint set
+        hubs = pick_hubs(
+            disjoints=disjoints, random_state=random_state, popular=True,
+        )
 
         print("3: ", ts())
 
