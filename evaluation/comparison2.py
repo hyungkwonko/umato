@@ -31,11 +31,12 @@ if __name__ == "__main__":
             filenamelist = filename.split("/")
             filetarget = filenamelist[-1]
             c = filetarget.split(".")
+            cc = c[0] + '.' +  c[1]
 
             # read data & embedding result
-            z = get_embed_data(args.data, c[0])
+            z = get_embed_data(args.data, cc)
             x, label = get_data(args.data)
 
             gmeasure = GlobalMeasure(x, z)
             dtmkl01_val = gmeasure.dtm_kl(sigma=0.1)
-            print(f"{c[0]}\tDTM_KL01\t{dtmkl01_val}")
+            print(f"{cc}\tDTM_KL01\t{dtmkl01_val}")
