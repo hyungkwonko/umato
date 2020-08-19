@@ -1,6 +1,8 @@
-from .models.dataset import read_data
+from .models.dataset import read_data, get_embed_data, get_data
 from .utils import GlobalMeasure
 import argparse
+import glob
+import os
 
 
 if __name__ == "__main__":
@@ -22,8 +24,18 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # read data & embedding result
-    x, z, label = read_data(args.data, args.algo)
-    gmeasure = GlobalMeasure(x, z)
-    dtmkl01_val = gmeasure.dtm_kl(sigma=0.1)
-    print(f"DTM_KL01\t{dtmkl01_val}")
+    folder_path = f'./evaluation/results/{args.data}'
+    for filename in glob.glob(os.path.join(folder_path, f'{args.algo}*.csv')):
+        with open(filename, 'r') as f:
+            text = f.read()
+            filenamelist = filename.split("/")
+            filetarget = filenamelist[-1]
+            c = filetarget.split(".")
+
+            # read data & embedding result
+            z = get_embed_data(args.data, c[0])
+            x, label = get_data(args.data)
+
+            gmeasure = GlobalMeasure(x, z)
+            dtmkl01_val = gmeasure.dtm_kl(sigma=0.1)
+            print(f"{c[0]}\tDTM_KL01\t{dtmkl01_val}")
