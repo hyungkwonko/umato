@@ -18,8 +18,8 @@ if __name__ == "__main__":
 
     # UMTO
     t1 = time.time()
-    # embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num).fit_transform(x)
-    embedding = umato.UMATO(verbose=True, ll=label).fit_transform(x)
+    embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num).fit_transform(x)
+    # embedding = umato.UMATO(verbose=True, ll=label).fit_transform(x)
     t2 = time.time()
     print(t2-t1)
 

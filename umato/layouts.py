@@ -95,6 +95,15 @@ def optimize_global_layout(
     costs = []
 
     for i in range(max_iter):
+        # result = (
+        #     10.0
+        #     * (Z - np.min(Z, 0))
+        #     / (np.max(Z, 0) - np.min(Z, 0))
+        # ).astype(np.float32, order="C")
+
+        # from evaluation.models.dataset import save_csv
+        # save_csv('./', alg_name=f"z_{i}", data=result, label=label)
+
         d_squared = np.square(adjacency_matrix(Z))
         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
         d_inverse = np.expand_dims(pow(1 + a * d_squared ** b, -1), axis=2)
@@ -231,6 +240,18 @@ def nn_layout_optimize(
         )
 
         alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
+
+        save_csv = False
+        if save_csv:
+            result = (
+                10.0
+                * (head_embedding - np.min(head_embedding, 0))
+                / (np.max(head_embedding, 0) - np.min(head_embedding, 0))
+            ).astype(np.float32, order="C")
+
+            hubs = np.where(hub_info > 0)[0]
+            from evaluation.models.dataset import save_csv
+            save_csv('./', alg_name=f"zz{n}", data=result[hubs], label=label[hubs])
 
         if verbose and n % 10 == 0:
             from umato.umato_ import plot_tmptmp
