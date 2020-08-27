@@ -22,24 +22,24 @@
 			</table>
 		{/each}
 	{:else}
-		<h1>UMAP pipeline</h1>
-		<table>
-			<tr>
-				<td><Scatterplot2 dname={dnames[0]} algoname={"pca"}></Scatterplot2></td>
-				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 dname={dnames[0]} algoname={"umap"}></Scatterplot2></td>
-			</tr>
-		</table>
 		<h1>UMATO pipeline</h1>
 		<table>
 			<tr>
-				<td><Scatterplot2 dname={dnames[0]} algoname={"pca"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"global_init"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 dname={dnames[0]} algoname={"tsne"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"global_opt"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 dname={dnames[0]} algoname={"umap"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"local_init"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 dname={dnames[0]} algoname={"umap"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"local_opt"}></Scatterplot2></td>
+			</tr>
+		</table>
+		<h1>UMAP pipeline</h1>
+		<table>
+			<tr>
+				<td><Scatterplot2 filename={"before"}></Scatterplot2></td>
+				<td><Arrow></Arrow></td>
+				<td><Scatterplot2 filename={"after"}></Scatterplot2></td>
 			</tr>
 		</table>
 	{/if}

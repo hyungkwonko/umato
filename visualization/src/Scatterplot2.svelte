@@ -8,8 +8,7 @@
     let counter = 0;
 	let maxlen = 10
 
-    export let algoname: string;
-    export let dname: string;
+    export let filename: string;
 
     function translate(x, y) {
         return 'translate(' + x + ',' + y + ')'
@@ -34,7 +33,7 @@
         return csvData
     }
 
-    let data = read_csv("results/" + dname + "/" + algoname + ".csv")
+    let data = read_csv("results/pipeline/" + filename + ".csv")
 
     let svgWidth = 450
     let svgHeight = 450
@@ -77,6 +76,6 @@
                 ></circle>
             {/each}
         </svg>
-        <h2>{algoname.toUpperCase()}</h2>
+        <h2>{filename.toUpperCase()}</h2>
     </div>
 </div>
