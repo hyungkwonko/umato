@@ -14,3 +14,9 @@ h1, h2 {
 svg {
 	overflow: visible;
 }
+
+table {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
