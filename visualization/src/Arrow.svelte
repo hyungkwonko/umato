@@ -7,7 +7,7 @@
         return 'translate(' + x + ',' + y + ')'
     }
 
-    let width = 100
+    let width = 80
     let height = 450
     let arrowlength = 40
 

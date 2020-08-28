@@ -61,6 +61,9 @@
         .domain(d3.extent(colorDomain))
         .range(colorRange);
 
+    console.log(filename.replace(/_/g,' '));
+    
+
 </script>
 
 <div class="outer">
@@ -76,6 +79,6 @@
                 ></circle>
             {/each}
         </svg>
-        <h2>{filename.toUpperCase()}</h2>
+        <h2>{filename.replace(/_/g,' ').toUpperCase()}</h2>
     </div>
 </div>
