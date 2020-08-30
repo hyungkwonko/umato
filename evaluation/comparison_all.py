@@ -24,7 +24,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    folder_path = f'./evaluation/results/{args.data}'
+    folder_path = f'./visualization/public/results/{args.data}'
     for filename in glob.glob(os.path.join(folder_path, f'{args.algo}*.csv')):
         with open(filename, 'r') as f:
             text = f.read()

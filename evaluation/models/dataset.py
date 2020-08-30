@@ -102,27 +102,27 @@ def get_data(dname):
 
 def get_embed_data(dname, algo):
     if dname == "spheres":
-        path = os.path.join(os.getcwd(), "evaluation", "results", "spheres")
+        path = os.path.join(os.getcwd(), "visualization", "public", "results", "spheres")
         df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
         z = df.drop(columns=['label']).to_numpy()
         return z
     elif dname == "mnist":
-        path = os.path.join(os.getcwd(), "evaluation", "results", "mnist")
+        path = os.path.join(os.getcwd(), "visualization", "public", "results", "mnist")
         df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
         z = df.drop(columns=['label']).to_numpy()
         return z
     elif dname == "kmnist":
-        path = os.path.join(os.getcwd(), "evaluation", "results", "kmnist")
+        path = os.path.join(os.getcwd(), "visualization", "public", "results", "kmnist")
         df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
         z = df.drop(columns=['label']).to_numpy()
         return z
     elif dname == "fmnist":
-        path = os.path.join(os.getcwd(), "evaluation", "results", "fmnist")
+        path = os.path.join(os.getcwd(), "visualization", "public", "results", "fmnist")
         df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
         z = df.drop(columns=['label']).to_numpy()
         return z
     elif dname == "cifar10":
-        path = os.path.join(os.getcwd(), "evaluation", "results", "cifar10")
+        path = os.path.join(os.getcwd(), "visualization", "public", "results", "cifar10")
         df = pd.read_csv(os.path.join(path, f'{algo}.csv')) # load data
         z = df.drop(columns=['label']).to_numpy()
         return z

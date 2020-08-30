@@ -29,5 +29,5 @@ if __name__ == "__main__":
             y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_iter=1500, n_jobs=40, random_state=0, verbose=2).fit_transform(x)
 
             # save as csv
-            path = os.path.join(os.getcwd(), "evaluation", "results", args.data)
+            path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
             save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
