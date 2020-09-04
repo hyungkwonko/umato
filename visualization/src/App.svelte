@@ -4,7 +4,7 @@
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
 	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
-	let comparison = false;
+	let comparison = true;
 
 </script>
 
@@ -19,6 +19,7 @@
 					<td><Scatterplot dname={dname} algoname={"tsne"}></Scatterplot></td>
 					<td><Scatterplot dname={dname} algoname={"umap"}></Scatterplot></td>
 					<td><Scatterplot dname={dname} algoname={"topoae"}></Scatterplot></td>
+					<td><Scatterplot dname={dname} algoname={"atsne"}></Scatterplot></td>
 					<td><Scatterplot dname={dname} algoname={"umato"}></Scatterplot></td>
 				</tr>
 			</table>
