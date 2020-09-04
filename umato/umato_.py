@@ -65,7 +65,6 @@ try:
     from pynndescent import NNDescent
     from pynndescent.distances import named_distances as pynn_named_distances
     from pynndescent.sparse import sparse_named_distances as pynn_sparse_named_distances
-
     _HAVE_PYNNDESCENT = True
 except ImportError:
     _HAVE_PYNNDESCENT = False
@@ -484,13 +483,13 @@ def build_global_structure(
     # local connectivity for global optimization
     # P = remove_local_connect(P, random_state)
 
-    import pandas as pd
-    import os
-    df = pd.DataFrame(Z)
-    df['label'] = label[hubs]
-    df.to_csv(os.path.join('global_init.csv'), index=False)
-    print(hubs[:100])
-    print("global init saved")
+    # import pandas as pd
+    # import os
+    # df = pd.DataFrame(Z)
+    # df['label'] = label[hubs]
+    # df.to_csv(os.path.join('global_init.csv'), index=False)
+    # print(hubs[:100])
+    # print("global init saved")
 
 
     if verbose:
@@ -510,11 +509,11 @@ def build_global_structure(
             P, Z, a, b, alpha=alpha, max_iter=max_iter
         )  # (TODO) how to optimize max_iter & alpha?
 
-    df = pd.DataFrame(result)
-    df['label'] = label[hubs]
-    df.to_csv(os.path.join('global_opt.csv'), index=False)
-    print("global init saved")
-    print(hubs[:100])
+    # df = pd.DataFrame(result)
+    # df['label'] = label[hubs]
+    # df.to_csv(os.path.join('global_opt.csv'), index=False)
+    # print("global init saved")
+    # print(hubs[:100])
 
     return result
 
@@ -927,16 +926,14 @@ def local_optimize_nn(
         / (np.max(embedding, 0) - np.min(embedding, 0))
     ).astype(np.float32, order="C")
 
-    import pandas as pd
-    import os
-
-    hubs = np.where(hub_info > 0)[0]
-    print(hubs[:100])
-
-    df = pd.DataFrame(embedding[hubs])
-    df['label'] = label[hubs]
-    df.to_csv(os.path.join('local_init.csv'), index=False)
-    print("local init saved")
+    # import pandas as pd
+    # import os
+    # hubs = np.where(hub_info > 0)[0]
+    # print(hubs[:100])
+    # df = pd.DataFrame(embedding[hubs])
+    # df['label'] = label[hubs]
+    # df.to_csv(os.path.join('local_init.csv'), index=False)
+    # print("local init saved")
 
     rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
 
