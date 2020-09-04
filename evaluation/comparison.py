@@ -38,7 +38,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--algo",
         type=str,
-        help="choose algorithm: pca, tsne, umap, topoae, umato",
+        help="choose algorithm: pca, tsne, umap, topoae, atsne, umato",
         default="all",
     )
     parser.add_argument(
