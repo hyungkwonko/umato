@@ -11,8 +11,6 @@ import numpy as np
 import umato.sparse
 
 from umato.utils import (
-    tau_rand,
-    norm,
     make_heap,
     heap_push,
     unchecked_heap_push,

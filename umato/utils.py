@@ -3,9 +3,8 @@
 # License: BSD 3 clause
 
 import time
-
-import numpy as np
 import numba
+import numpy as np
 import scipy.sparse
 
 
@@ -620,3 +619,56 @@ def csr_unique(matrix, return_index=True, return_inverse=True, return_counts=Tru
         return_inverse=return_inverse,
         return_counts=return_counts,
     )[1 : (return_values + 1)]
+
+
+@numba.njit()
+def clip(val, cutoff):
+    """Standard clamping of a value into a fixed range (in this case -4.0 to
+    4.0)
+
+    Parameters
+    ----------
+    val: float
+        The value to be clamped.
+
+    Returns
+    -------
+    The clamped value, now fixed to be in the range -4.0 to 4.0.
+    """
+    if val > cutoff:
+        return cutoff
+    elif val < -cutoff:
+        return -cutoff
+    else:
+        return val
+
+
+@numba.njit(
+    "f4(f4[::1],f4[::1])",
+    fastmath=True,
+    cache=True,
+    locals={
+        "result": numba.types.float32,
+        "diff": numba.types.float32,
+        "dim": numba.types.int32,
+    },
+)
+def rdist(x, y):
+    """Reduced Euclidean distance.
+
+    Parameters
+    ----------
+    x: array of shape (embedding_dim,)
+    y: array of shape (embedding_dim,)
+
+    Returns
+    -------
+    The squared euclidean distance between x and y
+    """
+    result = 0.0
+    dim = x.shape[0]
+    for i in range(dim):
+        diff = x[i] - y[i]
+        result += diff * diff
+
+    return result

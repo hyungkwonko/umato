@@ -7,9 +7,9 @@ import time
 from umato.umato_ import plot_tmptmp
 import argparse
 
-parser = argparse.ArgumentParser(description="test umato")
-parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, cifar10", default="fmnist")
-parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=300)
+parser = argparse.ArgumentParser(description="args for umato")
+parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, cifar10", default="spheres")
+parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=200)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -24,4 +24,4 @@ if __name__ == "__main__":
     print(t2-t1)
 
     plot_tmptmp(embedding, label, "pic5_fin")
-    save_csv('./', alg_name="umato", data=embedding, label=label)
+    # save_csv('./', alg_name="umato", data=embedding, label=label)

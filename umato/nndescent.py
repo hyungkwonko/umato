@@ -7,7 +7,6 @@ import numpy as np
 import numba
 
 from umato.utils import (
-    tau_rand,
     make_heap,
     heap_push,
     unchecked_heap_push,

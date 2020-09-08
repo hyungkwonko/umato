@@ -1,6 +1,7 @@
-# Author: Leland McInnes <leland.mcinnes@gmail.com>
-#
-# License: BSD 3 clause
+"""
+Auhtor: Hyung-Kwon Ko (hkko@hcil.snu.ac.kr)
+"""
+
 from __future__ import print_function
 
 import locale
@@ -20,40 +21,24 @@ except ImportError:
 
 import numpy as np
 import scipy.sparse
-from scipy.sparse import tril as sparse_tril, triu as sparse_triu
 import scipy.sparse.csgraph
 import numba
 
 import umato.distances as dist
-
 import umato.sparse as sparse
-import umato.sparse_nndescent as sparse_nn
 
 from umato.utils import (
     adjacency_matrix,
-    tau_rand_int,
-    deheap_sort,
-    submatrix,
     ts,
     csr_unique,
-    fast_knn_indices,
 )
-from umato.nndescent import (
-    # make_nn_descent,
-    # make_initialisations,
-    # make_initialized_nnd_search,
-    nn_descent,
-    initialized_nnd_search,
-    initialise_search,
-)
-from umato.rp_tree import rptree_leaf_array, make_forest
-from umato.spectral import spectral_layout
+
 from umato.layouts import (
     optimize_global_layout,
     nn_layout_optimize,
 )
 
-from umato.umap_utils import (
+from umato.umap_ import (
     nearest_neighbors,
     fuzzy_simplicial_set,
     make_epochs_per_sample,
@@ -69,7 +54,6 @@ try:
 except ImportError:
     _HAVE_PYNNDESCENT = False
 
-import gudhi as gd
 
 locale.setlocale(locale.LC_NUMERIC, "C")
 
@@ -88,21 +72,18 @@ def plot_tmptmp(data, label, name):
     plt.close()
 
 
-def check_nn_accuracy(
-    indices_info, label,
-):
-    # ix = np.arange(indices_info.shape[0])
-    # ix2 = ix[self.ll < 10]
-    scores = np.array([])
-    for i in np.arange(indices_info.shape[0]):
-        score = 0
-        for j in range(1, indices_info.shape[1]):
-            if label[indices_info[i][j]] == label[indices_info[i][0]]:
-                score += 1.0 / (indices_info.shape[1] - 1)
-        scores = np.append(scores, score)
-    print(len(scores))
-    print(np.mean(scores))
-    return 0
+def remove_local_connect(array, random_state, loc=0.05, num=-1):
+    if num < 0:
+        num = array.shape[0] // 10  # use 10 % of the hub nodes
+
+    normal = random_state.normal(loc=loc, scale=loc, size=num).astype(np.float32)
+    normal = np.clip(normal, a_min=0.0, a_max=loc * 2)
+
+    for _, e in enumerate(array):
+        indices = np.argsort(e)[:num]
+        e[indices] = np.sort(normal)
+
+    return array
 
 
 @numba.njit(
@@ -187,272 +168,6 @@ def pick_hubs(
         return hubs
 
 
-def hub_candidates(
-    data, sorted_index, random_state, hub_num, iter_num=5,
-):
-    hubs_list = []
-    disjoints = disjoint_nn(data=data, sorted_index=sorted_index, hub_num=hub_num,)
-
-    for i in range(iter_num):
-        hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=False,)
-        hubs_list.append(hubs)
-
-    return hubs_list, disjoints
-
-
-def get_homology(data, local_knum, top_num, random_state):
-    dist = adjacency_matrix(data)
-    dist /= dist.max()
-
-    nn_index = np.argpartition(dist, kth=local_knum - 1, axis=-1)[
-        :, :local_knum
-    ]  # kill using local connectivity
-
-    for i in range(len(dist)):
-        dist[i][nn_index[i]] = random_state.random(local_knum) * 0.1
-
-    rc = gd.RipsComplex(distance_matrix=dist, max_edge_length=1.0)
-    rc_tree = rc.create_simplex_tree(max_dimension=2)
-    barcodes = rc_tree.persistence()
-
-    hom1 = rc_tree.persistence_intervals_in_dimension(1)
-
-    # cutoff = 0.3
-    # hom1 = hom1[np.where(abs(hom1[:,0] - hom1[:,1]) > cutoff)]
-
-    hom1_max = abs(hom1[:, 1] - hom1[:, 0])
-    hom1_max_ix = hom1_max.argsort()[-top_num:][::-1]
-
-    return hom1[hom1_max_ix]
-
-
-def select_hubs_homology(
-    data,
-    random_state,
-    sorted_index,
-    hub_num=100,
-    iter_num=5,
-    interval=25,
-    top_num=15,
-    cutoff=0.05,
-    local_knum=7,
-):
-    print("[INFO]: Select hub nodes using homology")
-
-    hubs_list2 = None
-
-    while True:
-
-        if hubs_list2 == None:
-            hubs_list, disjoints = hub_candidates(
-                data, sorted_index, random_state, hub_num, iter_num
-            )
-
-            k1_list = []
-            local_knum = int(hub_num * 0.2)
-            for i in range(iter_num):
-                d1 = data[hubs_list[i]]
-                k1 = get_homology(d1, local_knum, top_num, random_state)
-                k1_list.append(k1)
-        else:
-            hubs_list = hubs_list2.copy()
-            disjoints = disjoints2.copy()
-            k1_list = k2_list.copy()
-
-        hubs_list2, disjoints2 = hub_candidates(
-            data, sorted_index, random_state, hub_num + interval, iter_num
-        )
-
-        k2_list = []
-        local_knum = int((hub_num + interval) * 0.2)
-        for i in range(iter_num):
-            d2 = data[hubs_list2[i]]
-            k2 = get_homology(d2, local_knum, top_num, random_state)
-            k2_list.append(k2)
-
-        results = []
-        for _k1 in k1_list:
-            for _k2 in k2_list:
-                # result = gd.bottleneck_distance(_k1, _k2, 0.01)  # approximation
-                result = gd.bottleneck_distance(_k1, _k2)
-                results.append(result)
-
-        val = np.mean(results)
-        # print(val)
-        print(f"hub_num: {hub_num}, val: {val}")
-
-        hub_num += interval
-
-        if hub_num > 450:
-            break
-
-        # if val < cutoff:
-        #     break
-        # elif hub_num > 300:  # break if > 300
-        #     warn(f"Hub node number set to {hub_num}!")
-        #     break
-        # else:
-        #     hub_num += interval
-
-    hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
-    exit()
-
-    return hub_num
-
-
-
-# def hub_candidates(
-#     n, random_state, hub_num, iter_num=5,
-# ):
-#     hubs_list = []
-#     indices = np.arange(n)
-#     for i in range(iter_num):
-#         hubs = random_state.choice(indices, hub_num, replace=False)
-#         hubs_list.append(hubs)
-
-#     return hubs_list
-
-
-# def get_homology(data, local_knum, top_num, random_state, max_dimension=1, max_edge_length=1.0, num_samples=10, metric=gd.bottleneck_distance, level=0.95):
-#     dist = adjacency_matrix(data)
-#     dist /= dist.max()
-
-#     # kill using local connectivity
-#     nn_index = np.argpartition(dist, kth=local_knum - 1, axis=-1)[:,:local_knum]
-#     for i in range(len(dist)):
-#         dist[i][nn_index[i]] = random_state.random(local_knum) * 0.1
-
-#     rc = gd.RipsComplex(distance_matrix=dist, max_edge_length=max_edge_length)
-#     rc_tree = rc.create_simplex_tree(max_dimension=max_dimension+1)
-#     rc_tree.persistence()
-#     barcodes_list = [rc_tree.persistence_intervals_in_dimension(dim) for dim in np.arange(max_dimension+1)]
-
-#     (n, _) = dist.shape
-
-#     # Bottleneck bootstrap method for confidence sets of persistence diagrams for data filtrations built on data points
-#     dist_vec = []
-#     for _ in range(num_samples):
-#         b = random_state.choice(n, n)
-#         rc_b  = gd.RipsComplex(distance_matrix=data[b, :][:, b], max_edge_length=max_edge_length)
-#         rc_tree_b = rc_b.create_simplex_tree(max_dimension=max_dimension+1)
-#         rc_tree_b.persistence()
-
-#         bot_b = 0
-#         for dim in np.arange(max_dimension + 1):
-#             interv_b_dim =  rc_tree_b.persistence_intervals_in_dimension(dim)
-#             bot_b  = max(bot_b, metric(barcodes_list[dim], interv_b_dim))
-
-#         dist_vec.append(bot_b)
-
-#     quantile = np.quantile(dist_vec, level)
-
-#     # calculate cutoff value
-#     cutoff = quantile * 2
-
-#     # sort out important topological features from noises
-#     hom0 = rc_tree.persistence_intervals_in_dimension(0)
-#     hom0 = hom0[np.where(abs(hom0[:,0] - hom0[:,1]) > cutoff)]
-#     hom1 = rc_tree.persistence_intervals_in_dimension(1)
-#     hom1 = hom1[np.where(abs(hom1[:,0] - hom1[:,1]) > cutoff)]
-
-#     print(barcodes_list)
-#     print(quantile)
-#     print(hom0)
-#     print(hom1)
-#     exit()
-
-#     # # we use top n topological features
-#     # hom1_max = abs(hom1[:, 1] - hom1[:, 0])
-#     # hom1_max_ix = hom1_max.argsort()[-top_num:][::-1]
-#     # return hom1[hom1_max_ix]
-
-#     return hom1
-
-
-# def select_hubs_homology(
-#     data,
-#     random_state,
-#     sorted_index,
-#     hub_num=100,
-#     hub_num_limit=500,
-#     iter_num=5,
-#     interval=10,
-#     top_num=5,
-#     cutoff=0.05,
-#     local_knum=7,
-# ):
-#     print("[INFO]: Select hub nodes using homology")
-
-#     # disjoints = disjoint_nn(data=data, sorted_index=sorted_index, hub_num=hub_num_limit,)
-
-#     hubs_list2 = None
-
-#     while True:
-
-#         k1_list = []
-#         if hub_num > 100:
-#             hubs_list = hubs_list2.copy()
-#             k1_list = k2_list.copy()
-#         else:
-#             hubs_list = hub_candidates(
-#                 len(data), random_state, hub_num, iter_num
-#             )
-#             local_knum = int(hub_num * 0.1)
-#             for i in range(iter_num):
-#                 d1 = data[hubs_list[i]]
-#                 k1 = get_homology(d1, local_knum, top_num, random_state)
-#                 k1_list.append(k1)
-
-#         hubs_list2 = hub_candidates(
-#             len(data), random_state, hub_num + interval, iter_num
-#         )
-
-#         k2_list = []
-#         for i in range(iter_num):
-#             d2 = data[hubs_list2[i]]
-#             local_knum = int((hub_num + interval) * 0.1)
-#             k2 = get_homology(d2, local_knum, top_num, random_state)
-#             k2_list.append(k2)
-
-#         results = []
-#         for _k1 in k1_list:
-#             for _k2 in k2_list:
-#                 # result = gd.bottleneck_distance(_k1, _k2, 0.01)  # approximation
-#                 result = gd.bottleneck_distance(_k1, _k2)
-#                 results.append(result)
-
-#         val = np.mean(results)
-#         print(f"hub_num: {hub_num}, val: {val}")
-
-#         # hub_num += interval
-#         if val < cutoff:
-#             break
-#         elif hub_num > hub_num_limit:
-#             warn(f"Hub node number set to {hub_num}!")
-#             break
-#         else:
-#             hub_num += interval
-
-#     exit()
-
-#     return hub_num
-
-
-
-def remove_local_connect(array, random_state, loc=0.05, num=-1):
-    if num < 0:
-        num = array.shape[0] // 10  # use 10 % of the hub nodes
-
-    normal = random_state.normal(loc=loc, scale=loc, size=num).astype(np.float32)
-    normal = np.clip(normal, a_min=0.0, a_max=loc * 2)
-
-    for _, e in enumerate(array):
-        indices = np.argsort(e)[:num]
-        e[indices] = np.sort(normal)
-
-    return array
-
-
 def build_global_structure(
     data,
     hubs,
@@ -483,15 +198,6 @@ def build_global_structure(
     # local connectivity for global optimization
     # P = remove_local_connect(P, random_state)
 
-    # import pandas as pd
-    # import os
-    # df = pd.DataFrame(Z)
-    # df['label'] = label[hubs]
-    # df.to_csv(os.path.join('global_init.csv'), index=False)
-    # print(hubs[:100])
-    # print("global init saved")
-
-
     if verbose:
         result = optimize_global_layout(
             P=P,
@@ -508,12 +214,6 @@ def build_global_structure(
         result = optimize_global_layout(
             P, Z, a, b, alpha=alpha, max_iter=max_iter
         )  # (TODO) how to optimize max_iter & alpha?
-
-    # df = pd.DataFrame(result)
-    # df['label'] = label[hubs]
-    # df.to_csv(os.path.join('global_opt.csv'), index=False)
-    # print("global init saved")
-    # print(hubs[:100])
 
     return result
 
@@ -707,79 +407,6 @@ def nn_initialize(
     return init
 
 
-# @numba.njit()
-# def remove_from_graph(data, array, hub_info, remove_target):
-#     """
-#     remove_target == 0: outliers
-#     remove_target == 1: NNs
-#     remove_target == 2: hubs
-#     """
-#     for target in remove_target:
-#         if target not in [0, 1, 2]:
-#             raise ValueError(
-#                 "remove_target should be 0 (outliers) or 1 (NNs) or 2 (hubs)"
-#             )
-
-#         for i, e in enumerate(array):
-#             if hub_info[e] == target:
-#                 data[i] = 0
-
-#     return data
-
-# @numba.njit()
-# def change_graph_ix(array, hubs):
-#     result = array.copy()
-#     for i, hub in enumerate(hubs):
-#         result[array == i] = hub
-#     return result
-
-# @numba.njit(
-#     locals={
-#         "sigmas": numba.types.float32[::1],
-#         "rhos": numba.types.float32[::1],
-#         "vals": numba.types.float32[::1],
-#         "dists": numba.types.float32[::1],
-#     },
-#     parallel=True,
-#     fastmath=True,
-# )
-# def fast_knn_indices_hub(X, n_neighbors, hubs, nns):
-
-#     nn_num = len(nns)
-#     hub_num = len(hubs)
-
-#     rows = np.zeros(n_neighbors * nn_num, dtype=np.int32)
-#     cols = np.zeros(n_neighbors * nn_num, dtype=np.int32)
-#     vals = np.zeros(n_neighbors * nn_num, dtype=np.float32)
-
-#     for i in numba.prange(nn_num):
-#         dists = np.zeros(hub_num, dtype=np.float32)
-#         for j in numba.prange(hub_num):
-#             dist = 0.0
-#             for d in numba.prange(X.shape[1]):
-#                 dist += (X[nns[i]][d] - X[hubs[j]][d]) ** 2
-#             dists[j] = np.sqrt(dist)
-
-#         sorted_dists = dists.argsort(kind="quicksort")
-#         neighbors = sorted_dists[:n_neighbors]
-
-#         rows[i * n_neighbors : (i + 1) * n_neighbors] = nns[i]
-#         cols[i * n_neighbors : (i + 1) * n_neighbors] = neighbors
-#         vals[i * n_neighbors : (i + 1) * n_neighbors] = 1.0
-
-#     return rows, cols, vals
-
-# def compute_hub_nn_graph(
-#     data, n_neighbors, hub_info,
-# ):
-
-#     hubs = np.where(hub_info == 2)[0]
-#     nns = np.where(hub_info == 1)[0]
-#     knn_indices = fast_knn_indices_hub(data, n_neighbors, hubs, nns)
-
-#     return knn_indices
-
-
 @numba.njit(
     locals={
         "out_indices": numba.types.int32[:, ::1],
@@ -901,8 +528,6 @@ def local_optimize_nn(
     # graph.data[graph.data < 0.2] = 0.0
     graph.eliminate_zeros()
 
-    # check_nn_accuracy(indices_info=hub_knn_indices, label=label)
-
     init_data = np.array(init)
     if len(init_data.shape) == 2:
         if np.unique(init_data, axis=0).shape[0] < init_data.shape[0]:
@@ -925,15 +550,6 @@ def local_optimize_nn(
         * (embedding - np.min(embedding, 0))
         / (np.max(embedding, 0) - np.min(embedding, 0))
     ).astype(np.float32, order="C")
-
-    # import pandas as pd
-    # import os
-    # hubs = np.where(hub_info > 0)[0]
-    # print(hubs[:100])
-    # df = pd.DataFrame(embedding[hubs])
-    # df['label'] = label[hubs]
-    # df.to_csv(os.path.join('local_init.csv'), index=False)
-    # print("local init saved")
 
     rng_state = random_state.randint(INT32_MIN, INT32_MAX, 3).astype(np.int64)
 
@@ -972,7 +588,6 @@ class UMATO(BaseEstimator):
         output_metric_kwds=None,
         n_epochs=None,
         learning_rate=1.0,
-        init="spectral",
         min_dist=0.1,
         spread=1.0,
         low_memory=False,
@@ -980,30 +595,20 @@ class UMATO(BaseEstimator):
         local_connectivity=1.0,
         repulsion_strength=1.0,
         negative_sample_rate=5,
-        transform_queue_size=4.0,
         a=None,
         b=None,
         random_state=None,
         angular_rp_forest=False,
-        target_n_neighbors=-1,
-        target_metric="categorical",
-        target_metric_kwds=None,
-        target_weight=0.5,
-        transform_seed=42,
-        force_approximation_algorithm=False,
         verbose=False,
-        unique=False,
         ll=None,
     ):
         self.n_neighbors = n_neighbors
         self.hub_num = hub_num
         self.metric = metric
         self.output_metric = output_metric
-        self.target_metric = target_metric
         self.metric_kwds = metric_kwds
         self.output_metric_kwds = output_metric_kwds
         self.n_epochs = n_epochs
-        self.init = init
         self.n_components = n_components
         self.repulsion_strength = repulsion_strength
         self.learning_rate = learning_rate
@@ -1016,15 +621,7 @@ class UMATO(BaseEstimator):
         self.negative_sample_rate = negative_sample_rate
         self.random_state = random_state
         self.angular_rp_forest = angular_rp_forest
-        self.transform_queue_size = transform_queue_size
-        self.target_n_neighbors = target_n_neighbors
-        self.target_metric = target_metric
-        self.target_metric_kwds = target_metric_kwds
-        self.target_weight = target_weight
-        self.transform_seed = transform_seed
-        self.force_approximation_algorithm = force_approximation_algorithm
         self.verbose = verbose
-        self.unique = unique
         self.ll = ll
 
         self.a = a
@@ -1039,15 +636,6 @@ class UMATO(BaseEstimator):
             raise ValueError("min_dist must be less than or equal to spread")
         if self.min_dist < 0.0:
             raise ValueError("min_dist cannot be negative")
-        if not isinstance(self.init, str) and not isinstance(self.init, np.ndarray):
-            raise ValueError("init must be a string or ndarray")
-        if isinstance(self.init, str) and self.init not in ("spectral", "random"):
-            raise ValueError('string init values must be "spectral" or "random"')
-        if (
-            isinstance(self.init, np.ndarray)
-            and self.init.shape[1] != self.n_components
-        ):
-            raise ValueError("init ndarray must match n_components value")
         if not isinstance(self.metric, str) and not callable(self.metric):
             raise ValueError("metric must be string or callable")
         if self.negative_sample_rate < 0:
@@ -1058,8 +646,6 @@ class UMATO(BaseEstimator):
             raise ValueError("n_neighbors must be greater than 1")
         if not isinstance(self.hub_num, int) or self.hub_num < -1:
             raise ValueError("hub_num must be a positive integer or -1 (None)")
-        if self.target_n_neighbors < 2 and self.target_n_neighbors != -1:
-            raise ValueError("target_n_neighbors must be greater than 1")
         if not isinstance(self.n_components, int):
             if isinstance(self.n_components, str):
                 raise ValueError("n_components must be an int")
@@ -1085,10 +671,6 @@ class UMATO(BaseEstimator):
             self._output_metric_kwds = {}
         else:
             self._output_metric_kwds = self.output_metric_kwds
-        if self.target_metric_kwds is None:
-            self._target_metric_kwds = {}
-        else:
-            self._target_metric_kwds = self.target_metric_kwds
         # check sparsity of data upfront to set proper _input_distance_func &
         # save repeated checks later on
         if scipy.sparse.isspmatrix_csr(self._raw_data):
@@ -1118,8 +700,6 @@ class UMATO(BaseEstimator):
                     "a tuple of (distance [float], gradient [np.array])"
                 )
         elif self.metric == "precomputed":
-            if self.unique:
-                raise ValueError("unique is poorly defined on a precomputed metric")
             warn(
                 "using precomputed metric; transform will be unavailable for new data and inverse_transform "
                 "will be unavailable for all data"
@@ -1210,7 +790,7 @@ class UMATO(BaseEstimator):
         # True if metric returns iterable of length 2, False otherwise
         return hasattr(metric_out, "__iter__") and len(metric_out) == 2
 
-    def fit(self, X, y=None):
+    def fit(self, X):
         """Fit X into an embedded space.
 
         Optionally use y for supervised dimension reduction.
@@ -1222,12 +802,6 @@ class UMATO(BaseEstimator):
             matrix. Otherwise it contains a sample per row. If the method
             is 'exact', X may be a sparse matrix of type 'csr', 'csc'
             or 'coo'.
-
-        y : array, shape (n_samples)
-            A target array for supervised dimension reduction. How this is
-            handled is determined by parameters UMAP was instantiated with.
-            The relevant attributes are ``target_metric`` and
-            ``target_metric_kwds``.
         """
 
         X = check_array(X, dtype=np.float32, accept_sparse="csr", order="C")
@@ -1240,11 +814,6 @@ class UMATO(BaseEstimator):
             self._a = self.a
             self._b = self.b
 
-        if isinstance(self.init, np.ndarray):
-            init = check_array(self.init, dtype=np.float32, accept_sparse=False)
-        else:
-            init = self.init
-
         self._initial_alpha = self.learning_rate
 
         self._validate_parameters()
@@ -1252,40 +821,8 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(str(self))
 
-        # Check if we should unique the data
-        # We've already ensured that we aren't in the precomputed case
-        if self.unique:
-            # check if the matrix is dense
-            if self._sparse_data:
-                # Call a sparse unique function
-                index, inverse, counts = csr_unique(X)
-            else:
-                index, inverse, counts = np.unique(
-                    X,
-                    return_index=True,
-                    return_inverse=True,
-                    return_counts=True,
-                    axis=0,
-                )[1:4]
-            if self.verbose:
-                print(
-                    "Unique=True -> Number of data points reduced from ",
-                    X.shape[0],
-                    " to ",
-                    X[index].shape[0],
-                )
-                most_common = np.argmax(counts)
-                print(
-                    "Most common duplicate is",
-                    index[most_common],
-                    " with a count of ",
-                    counts[most_common],
-                )
-        # If we aren't asking for unique use the full index.
-        # This will save special cases later.
-        else:
-            index = list(range(X.shape[0]))
-            inverse = list(range(X.shape[0]))
+        index = list(range(X.shape[0]))
+        inverse = list(range(X.shape[0]))
 
         # Error check n_neighbors based on data size
         if X[index].shape[0] <= self.n_neighbors:
@@ -1345,11 +882,9 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Construct global structure")
 
-        ###### Hyung-Kwon Ko
-        ###### Hyung-Kwon Ko
-        ###### Hyung-Kwon Ko
 
-        print("1: ", ts())
+        ###### Hyung-Kwon Ko
+        ###### Hyung-Kwon Ko
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
@@ -1358,35 +893,15 @@ class UMATO(BaseEstimator):
             freq.argsort(kind="stable")[::-1]
         ]  # sorted index in decreasing order
 
-        print("2: ", ts())
-
-        t1 = time.time()
-
-        if self.hub_num < 0:
-            self.hub_num = select_hubs_homology(
-                data=X,
-                random_state=random_state,
-                sorted_index=sorted_index,
-                hub_num=100,
-            )
-
         # get disjoint NN matrix
         disjoints = disjoint_nn(
             data=X, sorted_index=sorted_index, hub_num=self.hub_num,
         )
+
         # get hub indices from disjoint set
         hubs = pick_hubs(
             disjoints=disjoints, random_state=random_state, popular=True,
         )
-
-        print("3: ", ts())
-
-        # # check NN accuracy
-        # check_nn_accuracy(
-        #     indices_info=disjoints, label=self.ll,
-        # )
-
-        print("4: ", ts())
 
         init_global = build_global_structure(
             data=X,
@@ -1396,13 +911,11 @@ class UMATO(BaseEstimator):
             b=self._b,
             random_state=random_state,
             alpha=0.0065,
-            max_iter=150,
+            max_iter=30,
             # verbose=False,
             verbose=True,
             label=self.ll,
         )
-
-        print("5: ", ts())
 
         init, hub_info, hubs = embed_others_nn(
             data=X,
@@ -1414,10 +927,6 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        # exit()
-
-        print("6: ", ts())
-
         self._knn_indices, self._knn_dists, counts = select_from_knn(
             knn_indices=self._knn_indices,
             knn_dists=self._knn_dists,
@@ -1425,8 +934,6 @@ class UMATO(BaseEstimator):
             n_neighbors=self.n_neighbors,
             n=X.shape[0],
         )
-
-        print("7: ", ts())
 
         counts_hub = counts[hubs]
         counts_sum = len(counts_hub[counts_hub < self.n_neighbors])
@@ -1449,12 +956,6 @@ class UMATO(BaseEstimator):
                     f"KNN indices not fully determined! counts_sum: {counts_sum} != 0"
                 )
 
-        # check_nn_accuracy(
-        #     indices_info=self._knn_indices[hubs], label=self.ll,
-        # )
-
-        print("8: ", ts())
-
         self.graph_, _, _ = fuzzy_simplicial_set(
             X[hubs],
             self.n_neighbors,
@@ -1471,13 +972,8 @@ class UMATO(BaseEstimator):
             True,
         )
 
-        print("9: ", ts())
-
         if self.verbose:
             print(ts(), "Construct local structure")
-
-        # with open("./hubs.npy", "wb") as f:
-        #     np.save(f, hubs)
 
         init = local_optimize_nn(
             data=X,
@@ -1499,8 +995,6 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        print("10: ", ts())
-
         self.embedding_ = embed_others_disjoint(
             data=X,
             init=init,
@@ -1510,10 +1004,6 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        print("11: ", ts())
-
-        # exit()
-
         if self.verbose:
             print(ts() + " Finished embedding")
 
@@ -1521,7 +1011,7 @@ class UMATO(BaseEstimator):
 
         return self
 
-    def fit_transform(self, X, y=None):
+    def fit_transform(self, X):
         """Fit X into an embedded space and return that transformed
         output.
 
@@ -1531,16 +1021,10 @@ class UMATO(BaseEstimator):
             If the metric is 'precomputed' X must be a square distance
             matrix. Otherwise it contains a sample per row.
 
-        y : array, shape (n_samples)
-            A target array for supervised dimension reduction. How this is
-            handled is determined by parameters UMAP was instantiated with.
-            The relevant attributes are ``target_metric`` and
-            ``target_metric_kwds``.
-
         Returns
         -------
         X_new : array, shape (n_samples, n_components)
             Embedding of the training data in low-dimensional space.
         """
-        self.fit(X, y)
+        self.fit(X)
         return self.embedding_

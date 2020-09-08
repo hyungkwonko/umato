@@ -1,67 +1,14 @@
 import numpy as np
 import numba
 import umato.distances as dist
-from umato.utils import tau_rand_int, adjacency_matrix
+from umato.utils import (
+    tau_rand_int,
+    adjacency_matrix,
+    clip,
+    rdist,
+)
 import matplotlib.pyplot as plt
 
-
-@numba.njit()
-def clip(val, cutoff):
-    """Standard clamping of a value into a fixed range (in this case -4.0 to
-    4.0)
-
-    Parameters
-    ----------
-    val: float
-        The value to be clamped.
-
-    Returns
-    -------
-    The clamped value, now fixed to be in the range -4.0 to 4.0.
-    """
-    if val > cutoff:
-        return cutoff
-    elif val < -cutoff:
-        return -cutoff
-    else:
-        return val
-
-
-@numba.njit(
-    "f4(f4[::1],f4[::1])",
-    fastmath=True,
-    cache=True,
-    locals={
-        "result": numba.types.float32,
-        "diff": numba.types.float32,
-        "dim": numba.types.int32,
-    },
-)
-def rdist(x, y):
-    """Reduced Euclidean distance.
-
-    Parameters
-    ----------
-    x: array of shape (embedding_dim,)
-    y: array of shape (embedding_dim,)
-
-    Returns
-    -------
-    The squared euclidean distance between x and y
-    """
-    result = 0.0
-    dim = x.shape[0]
-    for i in range(dim):
-        diff = x[i] - y[i]
-        result += diff * diff
-
-    return result
-
-
-################
-# hyung-kwon ko
-# hyung-kwon ko
-# hyung-kwon ko
 
 def get_CE(P, Y, d_squared, a, b):
     Q = pow(1 + a * d_squared ** b, -1)
@@ -95,14 +42,6 @@ def optimize_global_layout(
     costs = []
 
     for i in range(max_iter):
-        # result = (
-        #     10.0
-        #     * (Z - np.min(Z, 0))
-        #     / (np.max(Z, 0) - np.min(Z, 0))
-        # ).astype(np.float32, order="C")
-
-        # from evaluation.models.dataset import save_csv
-        # save_csv('./', alg_name=f"z_{i}", data=result, label=label)
 
         d_squared = np.square(adjacency_matrix(Z))
         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
@@ -135,55 +74,6 @@ def optimize_global_layout(
                 plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
 
     return Z
-
-
-def shaking(Z, num=-1):
-    if num < 0:
-        num = Z.shape[0] // 10
-
-    centre = Z.mean(axis=0)
-    distances = []
-    for i in range(Z.shape[0]):
-        distance = 0.0
-        for d in range(Z.shape[1]):
-            distance += (Z[i][d] - centre[d]) ** 2
-        distances.append(distance)
-
-    distances = np.array(distances)
-
-    indices = np.argsort(distances)[-num:]
-    for j in indices:
-        Z[j] = centre + np.random.random(2) * 0.1
-
-    return Z
-
-
-def shaking2(Z, cutoff, times=1.25):
-    centre = Z.mean(axis=0)
-    for i in range(Z.shape[0]):
-        distance = 0.0
-        for d in range(Z.shape[1]):
-            distance += (Z[i][d] - centre[d]) ** 2
-        distance = np.sqrt(distance)
-        if distance > (cutoff * times):
-            Z[i] = (
-                ((Z[i] - centre) / 2.0 / distance * cutoff)
-                + np.random.random(2) * 0.5
-                + centre
-            )
-    return Z
-
-
-def get_max_hub(Z):
-    centre = Z.mean(axis=0)
-    cutoff = 0.0
-    for i in range(Z.shape[0]):
-        distance = 0.0
-        for d in range(Z.shape[1]):
-            distance += (Z[i][d] - centre[d]) ** 2
-        if distance > cutoff:
-            cutoff = distance
-    return np.sqrt(cutoff)
 
 
 def nn_layout_optimize(
@@ -240,18 +130,6 @@ def nn_layout_optimize(
         )
 
         alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
-
-        save_csv = False
-        if save_csv:
-            result = (
-                10.0
-                * (head_embedding - np.min(head_embedding, 0))
-                / (np.max(head_embedding, 0) - np.min(head_embedding, 0))
-            ).astype(np.float32, order="C")
-
-            hubs = np.where(hub_info > 0)[0]
-            from evaluation.models.dataset import save_csv
-            save_csv('./', alg_name=f"zz{n}", data=result[hubs], label=label[hubs])
 
         if verbose and n % 10 == 0:
             from umato.umato_ import plot_tmptmp

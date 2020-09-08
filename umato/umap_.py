@@ -1,3 +1,7 @@
+# Author: Leland McInnes <leland.mcinnes@gmail.com>
+#
+# License: BSD 3 clause
+
 from __future__ import print_function
 
 import locale
@@ -7,12 +11,11 @@ from scipy.optimize import curve_fit
 
 import numpy as np
 import scipy.sparse
-from scipy.sparse import tril as sparse_tril, triu as sparse_triu
 import numba
 
 import umato.distances as dist
 import umato.sparse as sparse
-import umato.sparse_nndescent as sparse_nn
+# import umato.sparse_nndescent as sparse_nn
 
 from umato.utils import (
     ts,
@@ -20,11 +23,10 @@ from umato.utils import (
 )
 from umato.nndescent import (
     nn_descent,
-    initialized_nnd_search,
-    initialise_search,
+    # initialized_nnd_search,
+    # initialise_search,
 )
 from umato.rp_tree import rptree_leaf_array, make_forest
-from umato.spectral import spectral_layout
 
 try:
     # Use pynndescent, if installed (python 3 only)
