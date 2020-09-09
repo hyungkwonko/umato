@@ -1,7 +1,0 @@
-[submodule "vendor/cmdline"]
-	path = vendor/cmdline
-	url = https://github.com/sovrasov/cmdline.git
-	branch = fix_msvc_build
-[submodule "vendor/faiss"]
-	path = vendor/faiss
-	url = https://github.com/facebookresearch/faiss.git
