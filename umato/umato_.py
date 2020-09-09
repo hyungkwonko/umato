@@ -31,6 +31,7 @@ from umato.utils import (
     adjacency_matrix,
     ts,
     csr_unique,
+    plot_tmptmp,
 )
 
 from umato.layouts import (
@@ -60,17 +61,6 @@ locale.setlocale(locale.LC_NUMERIC, "C")
 
 INT32_MIN = np.iinfo(np.int32).min + 1
 INT32_MAX = np.iinfo(np.int32).max - 1
-
-
-def plot_tmptmp(data, label, name):
-    import matplotlib.pyplot as plt
-
-    plt.scatter(data[:, 0], data[:, 1], s=2.0, c=label, cmap="Spectral", alpha=1.0)
-    cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
-    cbar.set_ticks(np.arange(11))
-    plt.title("Embedded")
-    plt.savefig(f"./tmp/{name}.png")
-    plt.close()
 
 
 @numba.njit(
@@ -162,8 +152,8 @@ def build_global_structure(
     a,
     b,
     random_state,
-    alpha=0.006,
-    max_iter=10,
+    alpha=0.0065,
+    n_epochs=30,
     verbose=False,
     label=None,
     init_global="pca",
@@ -188,15 +178,15 @@ def build_global_structure(
             a=a,
             b=b,
             alpha=alpha,
-            max_iter=max_iter,
+            n_epochs=n_epochs,
             verbose=True,
-            savefig=True,
+            savefig=False,
             label=label[hubs],
         )
     else:
         result = optimize_global_layout(
-            P, Z, a, b, alpha=alpha, max_iter=max_iter
-        )  # (TODO) how to optimize max_iter & alpha?
+            P, Z, a, b, alpha=alpha, n_epochs=n_epochs
+        )  # (TODO) how to optimize n_epochs & alpha?
 
     return result
 
@@ -234,7 +224,7 @@ def embed_others_nn(
         original_hubs=original_hubs,
         hub_nn=hub_nn,
         random=random_normal,
-        nn_consider=10,
+        nn_consider=10, # number of hubs to consider
     )
 
     # np.array of hub information (hubs = 2, hub_nn = 1, outliers = 0)
@@ -756,7 +746,7 @@ class UMATO(BaseEstimator):
             self.local_n_epochs = 50
 
         if self.global_n_epochs is None:
-            self.global_n_epochs = 30
+            self.global_n_epochs = 100
 
         if self.verbose:
             print(ts(), "Build K-nearest neighbor graph structure")
@@ -787,8 +777,7 @@ class UMATO(BaseEstimator):
             b=self.b,
             random_state=random_state,
             alpha=self.global_learning_rate,
-            max_iter=30,
-            # verbose=False,
+            n_epochs=self.global_n_epochs,
             verbose=True,
             label=self.ll,
         )
@@ -886,7 +875,7 @@ class UMATO(BaseEstimator):
         )
 
         if self.verbose:
-            print(ts(), " Finished embedding")
+            print(ts(), "Finished embedding")
 
         self._input_hash = joblib.hash(self._raw_data)
 

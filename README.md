@@ -3,6 +3,14 @@
 ## What is UMATO?
 work in progress...
 
+### System Requirements
+- Python 3.6 or greater
+- scikit-learn
+- numpy
+- scipy
+- numba
+- pandas (to read csv data)
+
 ## Running benchmarks
 You can try the following code to see the result:
 ```python

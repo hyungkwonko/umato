@@ -6,6 +6,17 @@ import time
 import numba
 import numpy as np
 import scipy.sparse
+import matplotlib.pyplot as plt
+
+
+def plot_tmptmp(data, label, name):
+
+    plt.scatter(data[:, 0], data[:, 1], s=2.0, c=label, cmap="Spectral", alpha=1.0)
+    cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
+    cbar.set_ticks(np.arange(11))
+    plt.title("Embedded")
+    plt.savefig(f"./tmp/{name}.png")
+    plt.close()
 
 
 @numba.njit(

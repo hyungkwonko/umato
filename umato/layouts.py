@@ -31,8 +31,8 @@ def optimize_global_layout(
     Z,
     a,
     b,
-    alpha=0.01,
-    max_iter=10,
+    alpha,
+    n_epochs,
     verbose=False,
     savefig=False,
     label=None
@@ -40,7 +40,7 @@ def optimize_global_layout(
 
     costs = []
 
-    for i in range(max_iter):
+    for i in range(n_epochs):
 
         d_squared = np.square(adjacency_matrix(Z))
         z_diff = np.expand_dims(Z, axis=1) - np.expand_dims(Z, axis=0)
@@ -60,11 +60,12 @@ def optimize_global_layout(
         Z -= alpha * dZ
 
         if verbose:
-            # cost = get_CE(P, Z, d_squared, a, b)
-            cost = get_DTM(P, Q, sigma=0.1)
+            tmpZ = Z / np.sum(Z, axis=1, keepdims=True)
+            cost = get_CE(P, tmpZ, d_squared, a, b)
+            # cost = get_DTM(P, tmpZ, sigma=0.1)
             costs.append(cost)
             print(
-                f"[INFO] Current loss: {cost:.6f}, @ iteration: {i+1}/{max_iter}, alpha: {alpha}"
+                f"[INFO] Current loss: {cost:.6f}, @ iteration: {i+1}/{n_epochs}"
             )
 
         if savefig:
