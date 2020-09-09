@@ -7,7 +7,6 @@ from umato.utils import (
     clip,
     rdist,
 )
-import matplotlib.pyplot as plt
 
 
 def get_CE(P, Y, d_squared, a, b):
@@ -89,16 +88,16 @@ def nn_layout_optimize(
     b,
     rng_state,
     gamma=1.0,
-    initial_alpha=1.0,
+    learning_rate=1.0,
     negative_sample_rate=5.0,
     parallel=False,
     verbose=False,
     label=None,
 ):
 
-    (num, dim) = head_embedding.shape
+    (_, dim) = head_embedding.shape
     move_other = head_embedding.shape[0] == tail_embedding.shape[0]
-    alpha = initial_alpha
+    alpha = learning_rate
 
     epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
     epoch_of_next_negative_sample = epochs_per_negative_sample.copy()
@@ -129,13 +128,12 @@ def nn_layout_optimize(
             n,
         )
 
-        alpha = initial_alpha * (1.0 - (float(n) / float(n_epochs)))
+        alpha = learning_rate * (1.0 - (float(n) / float(n_epochs)))
 
         if verbose and n % 10 == 0:
             from umato.umato_ import plot_tmptmp
 
             plot_tmptmp(data=head_embedding, label=label, name=f"pic3_local{n}")
-            # plot_tmptmp(data=tail_embedding, label=label, name=f"pic3_tail{n}")
 
         if verbose and n % 5 == 0:
             print("\tcompleted ", n, " / ", n_epochs, "epochs")
@@ -183,17 +181,12 @@ def _nn_layout_optimize_single_epoch(
             for d in range(dim):
                 grad_d = clip(grad_coeff * (current[d] - other[d]), 10.0)
 
-                grad_other = 0.0
-                grad_current = 0.0
-                grad_neg = 0.001
-                if hub_info[k] == 1:
-                    grad_current = 0.01
-                    grad_other = 0.01
-                elif hub_info[k] == 2:
-                    grad_current = 0.01
-                    grad_other = 0.001
+                current[d] += grad_d * alpha
 
-                current[d] += grad_d * alpha * grad_current
+                grad_other = 1.0
+
+                if hub_info[k] == 2:
+                    grad_other = 0.1
 
                 if move_other:
                     other[d] += -grad_d * alpha * grad_other
@@ -229,7 +222,7 @@ def _nn_layout_optimize_single_epoch(
                     else:
                         grad_d = 10.0
 
-                    current[d] += grad_d * alpha * grad_neg
+                    current[d] += grad_d * alpha * grad_other
 
             epoch_of_next_negative_sample[i] += (
                 n_neg_samples * epochs_per_negative_sample[i]

@@ -1,4 +1,4 @@
-# Uniform Manifold Approximation and Two-phase Optimization
+# Uniform Manifold Approximation with Two-phase Optimization
 
 ## What is UMATO?
 work in progress...

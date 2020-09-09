@@ -50,6 +50,7 @@ try:
     from pynndescent import NNDescent
     from pynndescent.distances import named_distances as pynn_named_distances
     from pynndescent.sparse import sparse_named_distances as pynn_sparse_named_distances
+
     _HAVE_PYNNDESCENT = True
 except ImportError:
     _HAVE_PYNNDESCENT = False
@@ -76,7 +77,7 @@ def plot_tmptmp(data, label, name):
     # parallel=True,  # can SABOTAGE the array order (should be used with care)
     fastmath=True,
 )
-def disjoint_nn(
+def build_knn_graph(
     data, sorted_index, hub_num,
 ):
     sorted_index_c = sorted_index.copy()
@@ -167,7 +168,6 @@ def build_global_structure(
     label=None,
     init_global="pca",
 ):
-    print("[INFO] Building global structure")
 
     if init_global == "pca":
         Z = PCA(n_components=n_components).fit_transform(data[hubs])
@@ -207,8 +207,6 @@ def embed_others_nn(
     init = np.zeros((data.shape[0], init_global.shape[1]))
     original_hubs = hubs.copy()
     init[original_hubs] = init_global
-
-    print("[INFO] get hub_nn indices")
 
     while True:
         val = len(hubs)
@@ -250,7 +248,7 @@ def embed_others_nn(
     return init, hub_info, hubs
 
 
-def embed_others_disjoint(
+def embed_outliers(
     data, init, hubs, disjoints, random_state, label,
 ):
     # generate random normal distribution
@@ -303,7 +301,7 @@ def disjoint_initialize(
                         distance = np.sqrt(distance)
                         distances.append(distance)
                         indices.append(k)
-                
+
                 nn_consider_tmp = nn_consider
                 if len(distances) < nn_consider:
                     nn_consider_tmp = len(distances)
@@ -354,9 +352,6 @@ def hub_nn_num(
 def nn_initialize(
     data, init, original_hubs, hub_nn, random, nn_consider=10,
 ):
-    print(
-        "[INFO] Embedding other nodes using NN information using only original hub information"
-    )
 
     num_log = np.zeros(data.shape[0], dtype=np.float32)
     num_log[original_hubs] = -1
@@ -432,7 +427,7 @@ def apppend_knn(
         num = n_neighbors - counts[i]
         if hub_info[i] > 0 and num > 0:
             # found neighbors (# of neighbors < n_neighbors)
-            neighbors = knn_indices[i][:counts[i]]
+            neighbors = knn_indices[i][: counts[i]]
 
             # find unique target indices
             indices = set()
@@ -503,8 +498,12 @@ def local_optimize_nn(
     if n_epochs <= 0:
         n_epochs = 50
 
-    graph.data[hub_info[graph.col] == 2] = 1.0  # current (NNs) -- other (hubs): 1.0 weight
-    graph.data[hub_info[graph.row] == 2] = 0.0  # current (hubs) -- other (hubs, nns): 0.0 weight (remove)
+    graph.data[
+        hub_info[graph.col] == 2
+    ] = 1.0  # current (NNs) -- other (hubs): 1.0 weight
+    graph.data[
+        hub_info[graph.row] == 2
+    ] = 0.0  # current (hubs) -- other (hubs, nns): 0.0 weight (remove)
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
     graph.eliminate_zeros()
 
@@ -546,7 +545,7 @@ def local_optimize_nn(
         b,
         rng_state,
         gamma=gamma,
-        initial_alpha=initial_alpha,
+        learning_rate=initial_alpha,
         negative_sample_rate=negative_sample_rate,
         parallel=parallel,
         verbose=verbose,
@@ -564,7 +563,7 @@ class UMATO(BaseEstimator):
         hub_num=-1,
         metric="euclidean",
         n_epochs=None,
-        learning_rate=1.0,
+        learning_rate=0.01,
         min_dist=0.1,
         spread=1.0,
         low_memory=False,
@@ -613,7 +612,7 @@ class UMATO(BaseEstimator):
             raise ValueError("metric must be string or callable")
         if self.negative_sample_rate < 0:
             raise ValueError("negative sample rate must be positive")
-        if self._initial_alpha < 0.0:
+        if self.learning_rate < 0.0:
             raise ValueError("learning_rate must be positive")
         if self.n_neighbors < 2:
             raise ValueError("n_neighbors must be greater than 1")
@@ -670,7 +669,6 @@ class UMATO(BaseEstimator):
         ):
             self.angular_rp_forest = True
 
-
     def fit(self, X):
         """Fit X into an embedded space.
 
@@ -691,8 +689,6 @@ class UMATO(BaseEstimator):
         # Handle all the optional arguments, setting default
         if self.a is None or self.b is None:
             self.a, self.b = find_ab_params(self.spread, self.min_dist)
-
-        self._initial_alpha = self.learning_rate
 
         self._validate_parameters()
 
@@ -726,7 +722,7 @@ class UMATO(BaseEstimator):
         random_state = check_random_state(self.random_state)
 
         if self.verbose:
-            print("Construct fuzzy simplicial set")
+            print(ts(), "Construct fuzzy simplicial set")
 
         # pass string identifier if pynndescent also defines distance metric
         if _HAVE_PYNNDESCENT:
@@ -757,7 +753,7 @@ class UMATO(BaseEstimator):
             n_epochs = self.n_epochs
 
         if self.verbose:
-            print(ts(), "Construct global structure")
+            print(ts(), "Build K-nearest neighbor graph structure")
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
@@ -767,14 +763,15 @@ class UMATO(BaseEstimator):
         ]  # sorted index in decreasing order
 
         # get disjoint NN matrix
-        disjoints = disjoint_nn(
+        disjoints = build_knn_graph(
             data=X, sorted_index=sorted_index, hub_num=self.hub_num,
         )
 
         # get hub indices from disjoint set
-        hubs = pick_hubs(
-            disjoints=disjoints, random_state=random_state, popular=True,
-        )
+        hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
+
+        if self.verbose:
+            print(ts(), "Run global optimization")
 
         init_global = build_global_structure(
             data=X,
@@ -789,6 +786,11 @@ class UMATO(BaseEstimator):
             verbose=True,
             label=self.ll,
         )
+
+        if self.verbose:
+            print(
+                ts(), "Get NN indices & Initialize them using original hub information"
+            )
 
         init, hub_info, hubs = embed_others_nn(
             data=X,
@@ -845,14 +847,14 @@ class UMATO(BaseEstimator):
         )
 
         if self.verbose:
-            print(ts(), "Construct local structure")
+            print(ts(), "Run local optimization")
 
         init = local_optimize_nn(
             data=X,
             graph=self.graph_,
             hub_info=hub_info,
             n_components=self.n_components,
-            initial_alpha=self._initial_alpha,
+            initial_alpha=self.learning_rate,
             a=self.a,
             b=self.b,
             gamma=self.repulsion_strength,
@@ -865,7 +867,10 @@ class UMATO(BaseEstimator):
             label=self.ll,
         )
 
-        self.embedding_ = embed_others_disjoint(
+        if self.verbose:
+            print(ts(), "Embedding outliers")
+
+        self.embedding_ = embed_outliers(
             data=X,
             init=init,
             hubs=hubs,
@@ -875,7 +880,7 @@ class UMATO(BaseEstimator):
         )
 
         if self.verbose:
-            print(ts() + " Finished embedding")
+            print(ts(), " Finished embedding")
 
         self._input_hash = joblib.hash(self._raw_data)
 

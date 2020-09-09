@@ -623,8 +623,7 @@ def csr_unique(matrix, return_index=True, return_inverse=True, return_counts=Tru
 
 @numba.njit()
 def clip(val, cutoff):
-    """Standard clamping of a value into a fixed range (in this case -4.0 to
-    4.0)
+    """Standard clamping of a value into a fixed range
 
     Parameters
     ----------
@@ -633,7 +632,7 @@ def clip(val, cutoff):
 
     Returns
     -------
-    The clamped value, now fixed to be in the range -4.0 to 4.0.
+    The clamped value, now fixed to be in the range -cutoff to cutoff.
     """
     if val > cutoff:
         return cutoff
