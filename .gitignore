@@ -150,6 +150,7 @@ cython_debug/
 
 # Topological Autoencoder trained model & data
 evaluation/models/topoae/trained_models/*
+evaluation/models/AtSNE/*
 # evaluation/results
 *.pth
 
