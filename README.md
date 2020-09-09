@@ -17,8 +17,7 @@ You can try the following code to see the result:
 # install requirements
 pip install scikit-learn numpy numba pandas
 
-# download all / specific (e.g., MNIST) datasets
-bash download.sh
+# download specific (e.g., MNIST) datasets
 bash download.sh mnist
 
 # run UMATO
@@ -52,13 +51,15 @@ For the qualitative evaluation, we can compare the 2D visualization of each algo
 ```python
 # see visualization
 cd visualization
+
+# run svelte app
 npm run dev
 ```
 
 ### Embedding results of four datasets for each algorithm:
 
-|            2D visualization         |
-:-------------------------:|
+|             2D visualization           |
+|:--------------------------------------:|
 ![Comparing result](./figures/result.png)|
 
 
@@ -68,7 +69,7 @@ Likewise, we compared the embedding result quantitatively. We use measures such 
 
 To print the quantitative result:
 ```python
-# see table result
+# print table result
 python -m evaluation.comparison --algo=all --data=spheres --measure=all
 ```
 
@@ -76,13 +77,12 @@ python -m evaluation.comparison --algo=all --data=spheres --measure=all
 
 |                     |  PCA   | t-SNE  |  UMAP  | TopoAE | At-SNE |  UMATO (ours) |
 | :-----------------: | :----: | :----: | :----: | :----: | :----: | :-----------: |
-| DTM                 | 0.9680 | 0.9116 | 0.9360 | 0.9181 | 0.9181 |               |
-| KL-Div (sigma=0.01) | 0.7385 | x.xxxx | x.xxxx | x.xxxx | 0.9181 |               |
-| KL-Div (sigma=0.1)  | 0.5987 | x.xxxx | x.xxxx | x.xxxx | 0.9181 |               |
-| KL-Div (sigma=1.)   | 0.0125 | x.xxxx | x.xxxx | x.xxxx | 0.9181 |               |
+| DTM                 | 0.9680 | 0.9116 | 0.9209 | 0.6619 | 0.9448 | __0.3849__    |
+| KL-Div (sigma=0.01) | 0.7385 | 0.6070 | 0.6100 | 0.1865 | 0.6584 | __0.1569__    |
+| KL-Div (sigma=0.1)  | 0.5987 | 0.5365 | 0.5383 | 0.3007 | 0.5712 | __0.1333__    |
+| KL-Div (sigma=1.)   | 0.0125 | 0.0128 | 0.0134 | 0.0057 | 0.0138 | __0.0008__    |
 
-- DTM: Lower is better
-- KL divergence: Lower is better
+- DTM: & KL divergence: Lower is better
 
 
 ## References
