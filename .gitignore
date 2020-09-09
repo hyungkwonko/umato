@@ -161,6 +161,7 @@ data/KuzushijiMNIST/*/*
 data/cifar-10-batches-py/*
 data/cifar-10-python.tar.gz
 !*.sh
+evaluation/models/AtSNE/data/
 
 tmp/
 test_spectral.py

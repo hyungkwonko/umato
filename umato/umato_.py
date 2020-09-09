@@ -547,7 +547,7 @@ class UMATO(BaseEstimator):
         self,
         n_neighbors=50,
         n_components=2,
-        hub_num=-1,
+        hub_num=300,
         metric="euclidean",
         global_n_epochs=None,
         local_n_epochs=None,
