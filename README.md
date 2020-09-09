@@ -1,7 +1,7 @@
 # Uniform Manifold Approximation with Two-phase Optimization
 
 Uniform Manifold Approximation with Two-phase Optimization (UMATO) is a dimensionality reduction technique, which can preserve the global as well as the local structure of high-dimensional data. Most existing dimensionality reduction algorithms focus on either of the two aspects, however, such insufficiency can lead to overlooking or misinterpreting important patterns in the data. For this aim, we propose a two-phase optimization: global optimization and local optimization. First, we obtain the global structure by selecting and optimizing the hub points.
-Next, we initialize and optimize other points using the nearest neighbor graph. Our experiments with one synthetic and three real world datasets show that UMATO can outperform the baseline algorithms, such as PCA, t-SNE, [UMAP](https://github.com/lmcinnes/umap), [Topological Autoencoders](https://github.com/BorgwardtLab/topological-autoencoders) and [Anchor t-SNE](https://github.com/ZJULearning/AtSNE), in terms of global measures and qualitative projection results.
+Next, we initialize and optimize other points using the nearest neighbor graph. Our experiments with one synthetic and three real world datasets show that UMATO can outperform the baseline algorithms, such as PCA, [t-SNE](https://lvdmaaten.github.io/tsne/), [UMAP](https://github.com/lmcinnes/umap), [Topological Autoencoders](https://github.com/BorgwardtLab/topological-autoencoders) and [Anchor t-SNE](https://github.com/ZJULearning/AtSNE), in terms of global measures and qualitative projection results.
 
 ### System Requirements
 - Python 3.6 or greater
@@ -28,7 +28,8 @@ python test.py --data=mnist
 
 ## Training models & Generating embedding result
 We will generate embedding results for each algorithm for the comparison. The algorithms we will use are the following:
-- t-SNE
+- PCA
+- [t-SNE](https://lvdmaaten.github.io/tsne/)
 - [UMAP](https://github.com/lmcinnes/umap)
 - [Topological Autoencoder](https://github.com/BorgwardtLab/topological-autoencoders)
 - [Anchor t-SNE](https://github.com/ZJULearning/AtSNE)
@@ -51,6 +52,9 @@ For the qualitative evaluation, we can compare the 2D visualization of each algo
 ```python
 # see visualization
 cd visualization
+
+# install requirements
+npm install
 
 # run svelte app
 npm run dev
@@ -82,7 +86,7 @@ python -m evaluation.comparison --algo=all --data=spheres --measure=all
 | KL-Div (sigma=0.1)  | 0.5987 | 0.5365 | 0.5383 | 0.3007 | 0.5712 | __0.1333__    |
 | KL-Div (sigma=1.)   | 0.0125 | 0.0128 | 0.0134 | 0.0057 | 0.0138 | __0.0008__    |
 
-- DTM: & KL divergence: Lower is better
+- DTM & KL divergence: Lower is better
 
 
 ## References
