@@ -72,20 +72,6 @@ def plot_tmptmp(data, label, name):
     plt.close()
 
 
-def remove_local_connect(array, random_state, loc=0.05, num=-1):
-    if num < 0:
-        num = array.shape[0] // 10  # use 10 % of the hub nodes
-
-    normal = random_state.normal(loc=loc, scale=loc, size=num).astype(np.float32)
-    normal = np.clip(normal, a_min=0.0, a_max=loc * 2)
-
-    for _, e in enumerate(array):
-        indices = np.argsort(e)[:num]
-        e[indices] = np.sort(normal)
-
-    return array
-
-
 @numba.njit(
     # parallel=True,  # can SABOTAGE the array order (should be used with care)
     fastmath=True,
@@ -194,9 +180,6 @@ def build_global_structure(
     P = adjacency_matrix(data[hubs])
     # P /= np.sum(P, axis=1, keepdims=True)
     P /= P.max()
-
-    # local connectivity for global optimization
-    # P = remove_local_connect(P, random_state)
 
     if verbose:
         result = optimize_global_layout(
@@ -508,8 +491,6 @@ def local_optimize_nn(
     n_epochs,
     init,
     random_state,
-    metric,
-    metric_kwds,
     parallel=False,
     verbose=False,
     label=None,
@@ -525,7 +506,6 @@ def local_optimize_nn(
     graph.data[hub_info[graph.col] == 2] = 1.0  # current (NNs) -- other (hubs): 1.0 weight
     graph.data[hub_info[graph.row] == 2] = 0.0  # current (hubs) -- other (hubs, nns): 0.0 weight (remove)
     graph.data[graph.data < (graph.data.max() / float(n_epochs))] = 0.0
-    # graph.data[graph.data < 0.2] = 0.0
     graph.eliminate_zeros()
 
     init_data = np.array(init)
@@ -583,9 +563,6 @@ class UMATO(BaseEstimator):
         n_components=2,
         hub_num=-1,
         metric="euclidean",
-        metric_kwds=None,
-        output_metric="euclidean",
-        output_metric_kwds=None,
         n_epochs=None,
         learning_rate=1.0,
         min_dist=0.1,
@@ -605,14 +582,10 @@ class UMATO(BaseEstimator):
         self.n_neighbors = n_neighbors
         self.hub_num = hub_num
         self.metric = metric
-        self.output_metric = output_metric
-        self.metric_kwds = metric_kwds
-        self.output_metric_kwds = output_metric_kwds
         self.n_epochs = n_epochs
         self.n_components = n_components
         self.repulsion_strength = repulsion_strength
         self.learning_rate = learning_rate
-
         self.spread = spread
         self.min_dist = min_dist
         self.low_memory = low_memory
@@ -622,10 +595,10 @@ class UMATO(BaseEstimator):
         self.random_state = random_state
         self.angular_rp_forest = angular_rp_forest
         self.verbose = verbose
-        self.ll = ll
-
         self.a = a
         self.b = b
+
+        self.ll = ll
 
     def _validate_parameters(self):
         if self.set_op_mix_ratio < 0.0 or self.set_op_mix_ratio > 1.0:
@@ -663,52 +636,15 @@ class UMATO(BaseEstimator):
             self.n_epochs <= 10 or not isinstance(self.n_epochs, int)
         ):
             raise ValueError("n_epochs must be a positive integer of at least 10")
-        if self.metric_kwds is None:
-            self._metric_kwds = {}
-        else:
-            self._metric_kwds = self.metric_kwds
-        if self.output_metric_kwds is None:
-            self._output_metric_kwds = {}
-        else:
-            self._output_metric_kwds = self.output_metric_kwds
-        # check sparsity of data upfront to set proper _input_distance_func &
-        # save repeated checks later on
+
+        # check sparsity of data
         if scipy.sparse.isspmatrix_csr(self._raw_data):
             self._sparse_data = True
         else:
             self._sparse_data = False
-        # set input distance metric & inverse_transform distance metric
-        if callable(self.metric):
-            in_returns_grad = self._check_custom_metric(
-                self.metric, self._metric_kwds, self._raw_data
-            )
-            if in_returns_grad:
-                _m = self.metric
 
-                @numba.njit(fastmath=True)
-                def _dist_only(x, y, *kwds):
-                    return _m(x, y, *kwds)[0]
-
-                self._input_distance_func = _dist_only
-                self._inverse_distance_func = self.metric
-            else:
-                self._input_distance_func = self.metric
-                self._inverse_distance_func = None
-                warn(
-                    "custom distance metric does not return gradient; inverse_transform will be unavailable. "
-                    "To enable using inverse_transform method method, define a distance function that returns "
-                    "a tuple of (distance [float], gradient [np.array])"
-                )
-        elif self.metric == "precomputed":
-            warn(
-                "using precomputed metric; transform will be unavailable for new data and inverse_transform "
-                "will be unavailable for all data"
-            )
-            self._input_distance_func = self.metric
-            self._inverse_distance_func = None
-        elif self.metric == "hellinger" and self._raw_data.min() < 0:
-            raise ValueError("Metric 'hellinger' does not support negative values")
-        elif self.metric in dist.named_distances:
+        # set input distance metric
+        if self.metric in dist.named_distances:
             if self._sparse_data:
                 if self.metric in sparse.sparse_named_distances:
                     self._input_distance_func = sparse.sparse_named_distances[
@@ -720,45 +656,9 @@ class UMATO(BaseEstimator):
                     )
             else:
                 self._input_distance_func = dist.named_distances[self.metric]
-            try:
-                self._inverse_distance_func = dist.named_distances_with_gradients[
-                    self.metric
-                ]
-            except KeyError:
-                warn(
-                    "gradient function is not yet implemented for {} distance metric; "
-                    "inverse_transform will be unavailable".format(self.metric)
-                )
-                self._inverse_distance_func = None
         else:
-            raise ValueError("metric is neither callable nor a recognised string")
-        # set ooutput distance metric
-        if callable(self.output_metric):
-            out_returns_grad = self._check_custom_metric(
-                self.output_metric, self._output_metric_kwds
-            )
-            if out_returns_grad:
-                self._output_distance_func = self.output_metric
-            else:
-                raise ValueError(
-                    "custom output_metric must return a tuple of (distance [float], gradient [np.array])"
-                )
-        elif self.output_metric == "precomputed":
-            raise ValueError("output_metric cannnot be 'precomputed'")
-        elif self.output_metric in dist.named_distances_with_gradients:
-            self._output_distance_func = dist.named_distances_with_gradients[
-                self.output_metric
-            ]
-        elif self.output_metric in dist.named_distances:
-            raise ValueError(
-                "gradient function is not yet implemented for {}.".format(
-                    self.output_metric
-                )
-            )
-        else:
-            raise ValueError(
-                "output_metric is neither callable nor a recognised string"
-            )
+            raise ValueError("metric is not a recognised string")
+
         # set angularity for NN search based on metric
         if self.metric in (
             "cosine",
@@ -770,25 +670,6 @@ class UMATO(BaseEstimator):
         ):
             self.angular_rp_forest = True
 
-    def _check_custom_metric(self, metric, kwds, data=None):
-        # quickly check to determine whether user-defined
-        # self.metric/self.output_metric returns both distance and gradient
-        if data is not None:
-            # if checking the high-dimensional distance metric, test directly on
-            # input data so we don't risk violating any assumptions potentially
-            # hard-coded in the metric (e.g., bounded; non-negative)
-            x, y = data[np.random.randint(0, data.shape[0], 2)]
-        else:
-            # if checking the manifold distance metric, simulate some data on a
-            # reasonable interval with output dimensionality
-            x, y = np.random.uniform(low=-10, high=10, size=(2, self.n_components))
-
-        if scipy.sparse.issparse(data):
-            metric_out = metric(x.indices, x.data, y.indices, y.data, **kwds)
-        else:
-            metric_out = metric(x, y, **kwds)
-        # True if metric returns iterable of length 2, False otherwise
-        return hasattr(metric_out, "__iter__") and len(metric_out) == 2
 
     def fit(self, X):
         """Fit X into an embedded space.
@@ -809,10 +690,7 @@ class UMATO(BaseEstimator):
 
         # Handle all the optional arguments, setting default
         if self.a is None or self.b is None:
-            self._a, self._b = find_ab_params(self.spread, self.min_dist)
-        else:
-            self._a = self.a
-            self._b = self.b
+            self.a, self.b = find_ab_params(self.spread, self.min_dist)
 
         self._initial_alpha = self.learning_rate
 
@@ -866,7 +744,6 @@ class UMATO(BaseEstimator):
             self._n_neighbors,
             # int(self._n_neighbors * 1.2),  # we can use more neighbors
             nn_metric,
-            self._metric_kwds,
             self.angular_rp_forest,
             random_state,
             self.low_memory,
@@ -881,10 +758,6 @@ class UMATO(BaseEstimator):
 
         if self.verbose:
             print(ts(), "Construct global structure")
-
-
-        ###### Hyung-Kwon Ko
-        ###### Hyung-Kwon Ko
 
         flat_indices = self._knn_indices.flatten()  # flattening all knn indices
         index, freq = np.unique(flat_indices, return_counts=True)
@@ -907,8 +780,8 @@ class UMATO(BaseEstimator):
             data=X,
             hubs=hubs,
             n_components=self.n_components,
-            a=self._a,
-            b=self._b,
+            a=self.a,
+            b=self.b,
             random_state=random_state,
             alpha=0.0065,
             max_iter=30,
@@ -961,7 +834,6 @@ class UMATO(BaseEstimator):
             self.n_neighbors,
             random_state,
             nn_metric,
-            self._metric_kwds,
             hubs,
             self._knn_indices[hubs],
             self._knn_dists[hubs],
@@ -981,15 +853,13 @@ class UMATO(BaseEstimator):
             hub_info=hub_info,
             n_components=self.n_components,
             initial_alpha=self._initial_alpha,
-            a=self._a,
-            b=self._b,
+            a=self.a,
+            b=self.b,
             gamma=self.repulsion_strength,
             negative_sample_rate=self.negative_sample_rate,
             n_epochs=n_epochs,
             init=init,
             random_state=random_state,
-            metric=self._input_distance_func,
-            metric_kwds=self.metric_kwds,
             parallel=False,
             verbose=True,
             label=self.ll,

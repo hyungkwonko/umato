@@ -165,7 +165,6 @@ def nearest_neighbors(
     X,
     n_neighbors,
     metric,
-    metric_kwds,
     angular,
     random_state,
     low_memory=False,
@@ -236,7 +235,7 @@ def nearest_neighbors(
                 X,
                 n_neighbors=n_neighbors,
                 metric=metric,
-                metric_kwds=metric_kwds,
+                metric_kwds={},
                 random_state=random_state,
                 n_trees=n_trees,
                 n_iters=n_iters,
@@ -263,27 +262,10 @@ def nearest_neighbors(
                 else:
                     try:
                         _distance_func = sparse.sparse_named_distances[metric]
-                        if metric in sparse.sparse_need_n_features:
-                            metric_kwds["n_features"] = X.shape[1]
                     except KeyError as e:
                         raise ValueError(
                             "Metric {} not supported for sparse data".format(metric)
                         ) from e
-
-                # Create a partial function for distances with arguments
-                if len(metric_kwds) > 0:
-                    dist_args = tuple(metric_kwds.values())
-
-                    @numba.njit()
-                    def _partial_dist_func(ind1, data1, ind2, data2):
-                        return _distance_func(ind1, data1, ind2, data2, *dist_args)
-
-                    distance_func = _partial_dist_func
-                else:
-                    distance_func = _distance_func
-                # metric_nn_descent = sparse.make_sparse_nn_descent(
-                #     distance_func, tuple(metric_kwds.values())
-                # )
 
                 if verbose:
                     print(ts(), "Building RP forest with", str(n_trees), "trees")
@@ -312,16 +294,8 @@ def nearest_neighbors(
                 # metric_nn_descent = make_nn_descent(
                 #     distance_func, tuple(metric_kwds.values())
                 # )
-                if len(metric_kwds) > 0:
-                    dist_args = tuple(metric_kwds.values())
 
-                    @numba.njit()
-                    def _partial_dist_func(x, y):
-                        return _distance_func(x, y, *dist_args)
-
-                    distance_func = _partial_dist_func
-                else:
-                    distance_func = _distance_func
+                distance_func = _distance_func
 
                 if verbose:
                     print(ts(), "Building RP forest with", str(n_trees), "trees")
@@ -426,7 +400,6 @@ def fuzzy_simplicial_set(
     n_neighbors,
     random_state,
     metric,
-    metric_kwds={},
     hubs=None,
     knn_indices=None,
     knn_dists=None,
@@ -494,10 +467,6 @@ def fuzzy_simplicial_set(
         time care must be taken and dictionary elements must be ordered
         appropriately; this will hopefully be fixed in the future.
 
-    metric_kwds: dict (optional, default {})
-        Arguments to pass on to the metric, such as the ``p`` value for
-        Minkowski distance.
-
     knn_indices: array of shape (n_samples, n_neighbors) (optional)
         If the k-nearest neighbors of each point has already been calculated
         you can pass them in here to save computation time. This should be
@@ -542,7 +511,7 @@ def fuzzy_simplicial_set(
     """
     if knn_indices is None or knn_dists is None:
         knn_indices, knn_dists, _ = nearest_neighbors(
-            X, n_neighbors, metric, metric_kwds, angular, random_state, verbose=verbose
+            X, n_neighbors, metric, angular, random_state, verbose=verbose
         )
 
     knn_dists = knn_dists.astype(np.float32)
