@@ -478,7 +478,7 @@ def local_optimize_nn(
     graph,
     hub_info,
     n_components,
-    initial_alpha,
+    learning_rate,
     a,
     b,
     gamma,
@@ -494,9 +494,6 @@ def local_optimize_nn(
     graph = graph.tocoo()
     graph.sum_duplicates()
     n_vertices = graph.shape[1]
-
-    if n_epochs <= 0:
-        n_epochs = 50
 
     graph.data[
         hub_info[graph.col] == 2
@@ -545,7 +542,7 @@ def local_optimize_nn(
         b,
         rng_state,
         gamma=gamma,
-        learning_rate=initial_alpha,
+        learning_rate=learning_rate,
         negative_sample_rate=negative_sample_rate,
         parallel=parallel,
         verbose=verbose,
@@ -562,8 +559,10 @@ class UMATO(BaseEstimator):
         n_components=2,
         hub_num=-1,
         metric="euclidean",
-        n_epochs=None,
-        learning_rate=0.01,
+        global_n_epochs=None,
+        local_n_epochs=None,
+        global_learning_rate=0.0065,
+        local_learning_rate=0.01,
         min_dist=0.1,
         spread=1.0,
         low_memory=False,
@@ -581,10 +580,12 @@ class UMATO(BaseEstimator):
         self.n_neighbors = n_neighbors
         self.hub_num = hub_num
         self.metric = metric
-        self.n_epochs = n_epochs
+        self.global_n_epochs = global_n_epochs
+        self.local_n_epochs = local_n_epochs
         self.n_components = n_components
         self.repulsion_strength = repulsion_strength
-        self.learning_rate = learning_rate
+        self.global_learning_rate = global_learning_rate
+        self.local_learning_rate = local_learning_rate
         self.spread = spread
         self.min_dist = min_dist
         self.low_memory = low_memory
@@ -612,8 +613,8 @@ class UMATO(BaseEstimator):
             raise ValueError("metric must be string or callable")
         if self.negative_sample_rate < 0:
             raise ValueError("negative sample rate must be positive")
-        if self.learning_rate < 0.0:
-            raise ValueError("learning_rate must be positive")
+        if self.global_learning_rate < 0.0 or self.local_learning_rate < 0.0:
+            raise ValueError("learning_rates must be positive")
         if self.n_neighbors < 2:
             raise ValueError("n_neighbors must be greater than 1")
         if not isinstance(self.hub_num, int) or self.hub_num < -1:
@@ -631,10 +632,14 @@ class UMATO(BaseEstimator):
                 raise ValueError("n_components must be an int")
         if self.n_components < 1:
             raise ValueError("n_components must be greater than 0")
-        if self.n_epochs is not None and (
-            self.n_epochs <= 10 or not isinstance(self.n_epochs, int)
+        if self.global_n_epochs is not None and (
+            self.global_n_epochs > 0 or not isinstance(self.global_n_epochs, int)
         ):
-            raise ValueError("n_epochs must be a positive integer of at least 10")
+            raise ValueError("global_n_epochs must be a positive integer")
+        if self.local_n_epochs is not None and (
+            self.local_n_epochs > 0 or not isinstance(self.local_n_epochs, int)
+        ):
+            raise ValueError("local_n_epochs must be a positive integer")
 
         # check sparsity of data
         if scipy.sparse.isspmatrix_csr(self._raw_data):
@@ -747,10 +752,11 @@ class UMATO(BaseEstimator):
             verbose=self.verbose,
         )
 
-        if self.n_epochs is None:
-            n_epochs = 0
-        else:
-            n_epochs = self.n_epochs
+        if self.local_n_epochs is None:
+            self.local_n_epochs = 50
+
+        if self.global_n_epochs is None:
+            self.global_n_epochs = 30
 
         if self.verbose:
             print(ts(), "Build K-nearest neighbor graph structure")
@@ -780,7 +786,7 @@ class UMATO(BaseEstimator):
             a=self.a,
             b=self.b,
             random_state=random_state,
-            alpha=0.0065,
+            alpha=self.global_learning_rate,
             max_iter=30,
             # verbose=False,
             verbose=True,
@@ -854,12 +860,12 @@ class UMATO(BaseEstimator):
             graph=self.graph_,
             hub_info=hub_info,
             n_components=self.n_components,
-            initial_alpha=self.learning_rate,
+            learning_rate=self.local_learning_rate,
             a=self.a,
             b=self.b,
             gamma=self.repulsion_strength,
             negative_sample_rate=self.negative_sample_rate,
-            n_epochs=n_epochs,
+            n_epochs=self.local_n_epochs,
             init=init,
             random_state=random_state,
             parallel=False,

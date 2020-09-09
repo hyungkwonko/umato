@@ -181,12 +181,12 @@ def _nn_layout_optimize_single_epoch(
             for d in range(dim):
                 grad_d = clip(grad_coeff * (current[d] - other[d]), 10.0)
 
-                current[d] += grad_d * alpha
-
                 grad_other = 1.0
-
+                grad_neg = 0.1
                 if hub_info[k] == 2:
                     grad_other = 0.1
+
+                current[d] += grad_d * alpha
 
                 if move_other:
                     other[d] += -grad_d * alpha * grad_other
@@ -222,7 +222,7 @@ def _nn_layout_optimize_single_epoch(
                     else:
                         grad_d = 10.0
 
-                    current[d] += grad_d * alpha * grad_other
+                    current[d] += grad_d * alpha * grad_neg
 
             epoch_of_next_negative_sample[i] += (
                 n_neg_samples * epochs_per_negative_sample[i]
