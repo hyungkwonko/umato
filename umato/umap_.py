@@ -15,7 +15,7 @@ import numba
 
 import umato.distances as dist
 import umato.sparse as sparse
-# import umato.sparse_nndescent as sparse_nn
+import umato.sparse_nndescent as sparse_nn
 
 from umato.utils import (
     ts,

@@ -93,6 +93,7 @@ def nn_layout_optimize(
     negative_sample_rate=5.0,
     parallel=False,
     verbose=False,
+    k=0,
     label=None,
 ):
 
@@ -134,12 +135,12 @@ def nn_layout_optimize(
         if verbose and n % 10 == 0:
             from umato.umato_ import plot_tmptmp
 
-            plot_tmptmp(data=head_embedding, label=label, name=f"pic3_local{n}")
+            plot_tmptmp(data=head_embedding, label=label, name=f"pic3_{k}_local{n}")
 
         if verbose and n % 5 == 0:
             print("\tcompleted ", n, " / ", n_epochs, "epochs")
 
-    plot_tmptmp(data=head_embedding, label=label, name=f"pic3_local{n}")
+    plot_tmptmp(data=head_embedding, label=label, name=f"pic3_{k}_local{n}")
     return head_embedding
 
 

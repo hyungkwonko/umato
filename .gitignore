@@ -164,7 +164,7 @@ data/cifar-10-python.tar.gz
 !*.sh
 data/atsne_data/
 
-tmp/
+figures/pic*
 test_spectral.py
 test_spheres_umap.py
 numba_example.py
