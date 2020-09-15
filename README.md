@@ -9,7 +9,7 @@ Next, we initialize and optimize other points using the nearest neighbor graph. 
 - numpy
 - scipy
 - numba
-- pandas (to read csv data)
+- pandas (to read csv files)
 
 ## Run
 You can try the following code to see the result:
@@ -60,7 +60,7 @@ npm install
 npm run dev
 ```
 
-### Embedding results of four datasets for each algorithm:
+### Embedding results of four datasets for each algorithm
 
 |             2D visualization           |
 |:--------------------------------------:|

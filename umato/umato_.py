@@ -881,6 +881,7 @@ class UMATO(BaseEstimator):
 
         return self
 
+
     def fit_transform(self, X):
         """Fit X into an embedded space and return that transformed
         output.

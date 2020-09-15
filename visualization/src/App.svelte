@@ -4,7 +4,7 @@
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
 	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
-	let comparison = true;
+	let comparison = false;
 
 </script>
 
@@ -37,13 +37,13 @@
 				<td><Scatterplot2 filename={"local_opt"}></Scatterplot2></td>
 			</tr>
 		</table>
-		<h1>UMAP pipeline</h1>
+		<!-- <h1>UMAP pipeline</h1>
 		<table>
 			<tr>
 				<td><Scatterplot2 filename={"initialization"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
 				<td><Scatterplot2 filename={"optimization"}></Scatterplot2></td>
 			</tr>
-		</table>
+		</table> -->
 	{/if}
 </main>

@@ -15,7 +15,7 @@ def plot_tmptmp(data, label, name):
     cbar = plt.colorbar(boundaries=np.arange(11) - 0.5)
     cbar.set_ticks(np.arange(11))
     plt.title("Embedded")
-    plt.savefig(f"./tmp/{name}.png")
+    plt.savefig(f"./figures/{name}.png")
     plt.close()
 
 
