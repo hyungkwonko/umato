@@ -168,3 +168,5 @@ figures/pic*
 test_spectral.py
 test_spheres_umap.py
 numba_example.py
+
+visualization/public/results/pipeline/*_fmnist.csv

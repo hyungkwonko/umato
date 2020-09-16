@@ -25,7 +25,7 @@
 			</table>
 		{/each}
 	{:else}
-		<h1>UMATO pipeline</h1>
+		<!-- <h1>UMATO pipeline</h1> -->
 		<table>
 			<tr>
 				<td><Scatterplot2 filename={"global_init"}></Scatterplot2></td>
