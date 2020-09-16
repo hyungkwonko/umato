@@ -271,8 +271,6 @@ def disjoint_initialize(
     hubs_true[hubs] = True
     hubs = set(hubs)
 
-    nndist = np.sum(init[:, 1]) / len(hubs)
-
     for disjoint in disjoints:
         for j in disjoint:
             # j == -1 means we've run all the iteration

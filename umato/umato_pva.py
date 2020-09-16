@@ -881,75 +881,77 @@ class UMATO(BaseEstimator):
         )
 
         print("finished 0")
+        print(np.unique(hub_info, return_counts=True))
 
-        # # SECOND EMBEDDING
-        # init, hub_info, hubs = embed_others_nn_progressive(
-        #     data=X,
-        #     init_global=init[hubs],
-        #     original_hubs=original_hubs,
-        #     hubs=hubs,
-        #     knn_indices=self._knn_indices,
-        #     nn_consider=self._n_neighbors,
-        #     random_state=random_state,
-        #     label=self.ll,
-        #     last=False,
-        # )
+        # SECOND EMBEDDING
+        init, hub_info, hubs = embed_others_nn_progressive(
+            data=X,
+            init_global=init[hubs],
+            original_hubs=original_hubs,
+            hubs=hubs,
+            knn_indices=self._knn_indices,
+            nn_consider=self._n_neighbors,
+            random_state=random_state,
+            label=self.ll,
+            last=False,
+        )
 
-        # (tmp_knn_indices, tmp_knn_dists, _) = nearest_neighbors(
-        #     X[hubs],
-        #     self._n_neighbors,
-        #     nn_metric,
-        #     self.angular_rp_forest,
-        #     random_state,
-        #     self.low_memory,
-        #     use_pynndescent=True,
-        #     verbose=self.verbose,
-        # )
+        (tmp_knn_indices, tmp_knn_dists, _) = nearest_neighbors(
+            X[hubs],
+            self._n_neighbors,
+            nn_metric,
+            self.angular_rp_forest,
+            random_state,
+            self.low_memory,
+            use_pynndescent=True,
+            verbose=self.verbose,
+        )
 
-        # tmp_knn_indices = np.array(tmp_knn_indices, dtype=np.int32)
-        # tmp_knn_dists = np.array(tmp_knn_dists, dtype=np.int32)
+        tmp_knn_indices = np.array(tmp_knn_indices, dtype=np.int32)
+        tmp_knn_dists = np.array(tmp_knn_dists, dtype=np.int32)
 
-        # tmp_knn_indices = change_indices(tmp_knn_indices, hubs)
-        # tmp_knn_dists = change_indices(tmp_knn_dists, hubs)
+        tmp_knn_indices = change_indices(tmp_knn_indices, hubs)
+        tmp_knn_dists = change_indices(tmp_knn_dists, hubs)
 
-        # self.graph_, _, _ = fuzzy_simplicial_set(
-        #     X[hubs],
-        #     self.n_neighbors,
-        #     random_state,
-        #     nn_metric,
-        #     hubs,
-        #     tmp_knn_indices,
-        #     tmp_knn_dists,
-        #     self.angular_rp_forest,
-        #     self.set_op_mix_ratio,
-        #     self.local_connectivity,
-        #     True,
-        #     True,
-        # )
+        self.graph_, _, _ = fuzzy_simplicial_set(
+            X[hubs],
+            self.n_neighbors,
+            random_state,
+            nn_metric,
+            hubs,
+            tmp_knn_indices,
+            tmp_knn_dists,
+            self.angular_rp_forest,
+            self.set_op_mix_ratio,
+            self.local_connectivity,
+            True,
+            True,
+        )
 
-        # if self.verbose:
-        #     print(ts(), "Run local optimization")
+        if self.verbose:
+            print(ts(), "Run local optimization")
 
-        # init = local_optimize_nn(
-        #     data=X,
-        #     graph=self.graph_,
-        #     hub_info=hub_info,
-        #     n_components=self.n_components,
-        #     learning_rate=self.local_learning_rate,
-        #     a=self.a,
-        #     b=self.b,
-        #     gamma=self.repulsion_strength,
-        #     negative_sample_rate=self.negative_sample_rate,
-        #     n_epochs=10,
-        #     init=init,
-        #     random_state=random_state,
-        #     parallel=False,
-        #     verbose=True,
-        #     k=1,
-        #     label=self.ll,
-        # )
+        init = local_optimize_nn(
+            data=X,
+            graph=self.graph_,
+            hub_info=hub_info,
+            n_components=self.n_components,
+            learning_rate=self.local_learning_rate,
+            a=self.a,
+            b=self.b,
+            gamma=self.repulsion_strength,
+            negative_sample_rate=self.negative_sample_rate,
+            n_epochs=10,
+            init=init,
+            random_state=random_state,
+            parallel=False,
+            verbose=True,
+            k=1,
+            label=self.ll,
+        )
 
-        # print("finished 1")
+        print("finished 1")
+        print(np.unique(hub_info, return_counts=True))
 
         # THIRD EMBEDDING
         init, hub_info, hubs = embed_others_nn_progressive(
@@ -1009,7 +1011,7 @@ class UMATO(BaseEstimator):
             b=self.b,
             gamma=self.repulsion_strength,
             negative_sample_rate=self.negative_sample_rate,
-            n_epochs=30,
+            n_epochs=40,
             init=init,
             random_state=random_state,
             parallel=False,
@@ -1019,6 +1021,7 @@ class UMATO(BaseEstimator):
         )
 
         print("finished 2")
+        print(np.unique(hub_info, return_counts=True))
 
         if self.verbose:
             print(ts(), "Embedding outliers")

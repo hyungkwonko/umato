@@ -1,5 +1,5 @@
-# from .umato_ import UMATO
-from .umato_pva import UMATO
+from .umato_ import UMATO
+# from .umato_pva import UMATO
 
 # Workaround: https://github.com/numba/numba/issues/3341
 import numba
