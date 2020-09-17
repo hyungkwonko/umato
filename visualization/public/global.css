@@ -43,6 +43,9 @@ table {
 .circle-atsne {
 	fill: green;
 }
+.circle-tsne {
+	fill: orange;
+}
 
 svg {
 	position: relative;
@@ -87,6 +90,9 @@ svg {
 }
 .path-line-atsne {
 	stroke: green;
+}
+.path-line-tsne {
+	stroke: orange;
 }
 
 

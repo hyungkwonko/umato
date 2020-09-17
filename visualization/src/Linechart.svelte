@@ -12,7 +12,7 @@
         return 'translate(' + x + ',' + y + ')'
     }
 
-    let measures = ["umato", "umap", "atsne"]
+    let measures = ["umato", "umap", "atsne", "tsne"]
 
     let r = 5;
 	
@@ -30,7 +30,7 @@
 		d.umato = +d.umato;
     });
 
-    const yTicks = [0.0, 0.02, 0.04, 0.06, 0.08, 0.10];
+    const yTicks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
     const xTicks = [0,10,20,30,40,50,60,70,80,90,100];
     
 	$: xScale = d3.scaleLinear()
@@ -47,11 +47,13 @@
     let path;
     let path2;
     let path3;
+    let path4;
 
     $: {
         path = `M${data.map(d => `${xScale(d.percentage)}, ${yScale(d.umato)}`).join('L')}`;
         path2 = `M${data.map(d => `${xScale(d.percentage)}, ${yScale(d.umap)}`).join('L')}`;
         path3 = `M${data.map(d => `${xScale(d.percentage)}, ${yScale(d.atsne)}`).join('L')}`;
+        path4 = `M${data.map(d => `${xScale(d.percentage)}, ${yScale(d.tsne)}`).join('L')}`;
     }
     // $: dot = data.map(d => `${xScale(d.percentage)}, ${yScale(d.dtm01)}`);
     // $: area = `${path}L${xScale(maxX)},${yScale(0)}L${xScale(minX)},${yScale(0)}Z`;
@@ -77,8 +79,8 @@
     <g class="axis y-axis" transform="translate(0, {margin.top})">
         {#each yTicks as tick}
             <g class="tick tick-{tick}" transform="translate(0, {yScale(tick) - margin.bottom})">
-                <line x2="100%"></line>
-                <text x="-20" y="-4">{tick}</text>
+                <line y1="+10" y2="+10" x2="100%"></line>
+                <text x="-20" y="+6">{tick}</text>
                 <!-- <text y="-4">{tick} {tick === 1 ? '.0 y axis' : ''}</text> -->
             </g>
         {/each}
@@ -87,7 +89,7 @@
     <!-- x axis -->
     <g class="axis x-axis">
         {#each xTicks as tick}
-            <g class="tick tick-{ tick }" transform="translate({xScale(tick)},{height})">
+            <g class="tick tick-{ tick }" transform="translate({xScale(tick)},{height+10})">
                 <line y1="-{height}" y2="-{margin.bottom}" x1="0" x2="0"></line>
                 <text y="-{margin.bottom-5}">{width > 380 ? tick : formatMobile(tick)}</text>
             </g>
@@ -95,13 +97,14 @@
     </g>
 
     <!-- x axis label -->
-    <text x='{(width - margin.left) / 2 - 10}' y='{height}' font-size="12px">Percentage (%)</text>
+    <text x='{(width - margin.left) / 2 - 10}' y='{height+10}' font-size="12px">Percentage (%)</text>
 
 
     <!-- line chart -->
     <path class="path-line path-line-umato" d={path}></path>
     <path class="path-line path-line-umap" d={path2}></path>
     <path class="path-line path-line-atsne" d={path3}></path>
+    <path class="path-line path-line-tsne" d={path4}></path>
     <!-- <path class="path-area" d={area}></path> -->
 
     <!-- circles -->
@@ -121,6 +124,11 @@
             cx='{xScale(d.percentage)}'
             cy='{yScale(d.atsne)}'
         ></circle>
+        <circle class="circle-line circle-tsne"
+            r={r}
+            cx='{xScale(d.percentage)}'
+            cy='{yScale(d.tsne)}'
+        ></circle>
     {/each}
 
     <!-- legend -->
@@ -128,9 +136,9 @@
         <circle class="circle-line circle-{measure}"
             r={r}
             cx='{width - 90}'
-            cy='{17 * (i + 1)}'
+            cy='{17 * (i + 1) + 15}'
         ></circle>
-        <text x='{width - 70}' y='{19 * (i+1)}' font-size="12px">{measure}</text>
+        <text x='{width - 70}' y='{19 * (i+1) + 15}' font-size="12px">{measure}</text>
     {/each}
 
 </svg>
