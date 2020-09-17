@@ -35,13 +35,13 @@ table {
 }
 
 .circle-umato {
-	fill: green;
-}
-.circle-umap {
 	fill: blue;
 }
-.circle-atsne {
+.circle-umap {
 	fill: red;
+}
+.circle-atsne {
+	fill: green;
 }
 
 svg {
@@ -80,13 +80,13 @@ svg {
 }
 
 .path-line-umato {
-	stroke: green;
-}
-.path-line-umap {
 	stroke: blue;
 }
-.path-line-atsne {
+.path-line-umap {
 	stroke: red;
+}
+.path-line-atsne {
+	stroke: green;
 }
 
 
