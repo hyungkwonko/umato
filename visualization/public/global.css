@@ -21,3 +21,75 @@ table {
 	align-items: center;
 	margin-top: 30px;
 }
+
+
+
+
+/* stability chart */
+
+
+.circle-line {
+	fill-opacity: 0.7;
+	stroke: #eee;
+	stroke-width: 1.5;
+}
+
+.circle-umato {
+	fill: green;
+}
+.circle-umap {
+	fill: blue;
+}
+.circle-atsne {
+	fill: red;
+}
+
+svg {
+	position: relative;
+	overflow: visible;
+}
+
+.tick {
+	font-size: .725em;
+	font-weight: 200;
+}
+
+.tick line {
+	stroke: #aaa;
+	stroke-dasharray: 2;
+}
+
+.tick text {
+	fill: #666;
+	text-anchor: start;
+}
+
+.tick.tick-0 line {
+	stroke-dasharray: 0;
+}
+
+.x-axis .tick text {
+	text-anchor: middle;
+}
+
+.path-line {
+	fill: none;
+	stroke-linejoin: round;
+	stroke-linecap: round;
+	stroke-width: 2;
+}
+
+.path-line-umato {
+	stroke: green;
+}
+.path-line-umap {
+	stroke: blue;
+}
+.path-line-atsne {
+	stroke: red;
+}
+
+
+.path-area {
+	fill: rgba(0, 128, 0, 0.2);
+}

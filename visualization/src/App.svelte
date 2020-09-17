@@ -1,15 +1,16 @@
 <script lang="ts">
 	import Scatterplot from "./Scatterplot.svelte";
 	import Scatterplot2 from "./Scatterplot2.svelte";
+	import Linechart from "./Linechart.svelte";
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
 	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
-	let comparison = false;
+	let type = 1;
 
 </script>
 
 <main>
-	{#if comparison}
+	{#if type == 2}
 		{#each dnames as dname}
 			<!-- <h1>{dname.charAt(0).toUpperCase() + dname.slice(1)} data</h1> -->
 			<table>
@@ -24,6 +25,12 @@
 				</tr>
 			</table>
 		{/each}
+	{:else if type == 1}
+		<table>
+			<tr>
+				<td><Linechart></Linechart></td>
+			</tr>
+		</table>
 	{:else}
 		<!-- <h1>UMATO pipeline</h1> -->
 		<table>
