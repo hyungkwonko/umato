@@ -689,7 +689,6 @@ class UMATO(BaseEstimator):
             print(str(self))
 
         index = list(range(X.shape[0]))
-        inverse = list(range(X.shape[0]))
 
         # Error check n_neighbors based on data size
         if X[index].shape[0] <= self.n_neighbors:
