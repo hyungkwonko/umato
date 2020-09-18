@@ -19,7 +19,7 @@ MEASURE_GLOBAL_LIST = [
 ]
 
 MEASURE_LOCAL_LIST = [
-    # "Spearman",
+    "Spearman",
     "Trustworthiness",
     "Continuity",
     "MRRE",
@@ -49,6 +49,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--measure", type=str, help="choose measures: all, global, local", default="all"
+    )
+    parser.add_argument(
+        "--k", type=int, help="number of nearest neighbors", default=5
     )
     parser.add_argument(
         "--load", type=bool, help="load hubs", default=False
@@ -105,26 +108,25 @@ if __name__ == "__main__":
 
         if args.measure == "all" or args.measure == "local":
 
-            lmeasure = LocalMeasure(x, z, k=5)
+            lmeasure = LocalMeasure(x, z, k=args.k)
 
             algorithms.extend([alg] * len(MEASURE_LOCAL_LIST))
             measures.extend(MEASURE_LOCAL_LIST)
 
-            # spearman_val = lmeasure.spearmans_rho()
+            spearman_val = lmeasure.spearmans_rho()
             trust_val = lmeasure.trustworthiness()
             conti_val = lmeasure.continuity()
             mrre_val = lmeasure.mrre()
 
             values.extend(
-                # [spearman_val, trust_val, conti_val, mrre_val,]
-                [trust_val, conti_val, mrre_val,]
+                [spearman_val, trust_val, conti_val, mrre_val,]
+                # [trust_val, conti_val, mrre_val,]
             )
 
-        print(f"[INFO] dataset [{args.data}] - Quantitative result")
         result = pd.DataFrame(
             {"measure": measures, "algorithm": algorithms, "values": values}
         )
         result = result.pivot(index="measure", columns="algorithm", values="values").fillna(
             "NA"
         )
-        print(f"{result}\n")
+    print(f"{result}\n")
