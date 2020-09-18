@@ -31,8 +31,16 @@ if __name__ == "__main__":
         help="choose dataset: spheres, mnist, fmnist, cifar10",
         default="spheres",
     )
+    parser.add_argument(
+        "--algo",
+        type=str,
+        help="choose algorithm: pca, tsne, umap, topoae, atsne, umato",
+        default="all",
+    )
     args = parser.parse_args()
 
+    if args.algo != "all":
+        ALGO_LIST = [args.algo]
 
     for k in [10, 15, 20, 30, 35, 40, 45, 50, 75, 100]:
     # for k in [3,4,5,6,7,8,9,10,11,12,13]:

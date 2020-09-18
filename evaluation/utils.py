@@ -332,7 +332,7 @@ class LocalMeasure:
 
         return 1 - 2 / (n_data * k * (2 * n_data - 3 * k - 1)) * value
 
-    def mrre(self, ratio=0.5):
+    def mrre(self, ratio=0.0):
         """
         Mean Relative Rank Error (MRRE)
 
