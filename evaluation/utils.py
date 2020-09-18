@@ -77,6 +77,7 @@ import numpy as np
 from scipy.stats import spearmanr
 from sklearn import metrics
 import numba
+# import faiss
 
 
 class GlobalMeasure:
@@ -234,6 +235,14 @@ def get_fast_knn(arr, n_neighbors):
     return knn_indices, knn_ranks
 
 
+# def get_gpu_knn(x, k):
+#     index = faiss.IndexFlatL2(x.shape[1])
+#     index.add(x)
+#     _, knn_indices = index.search(x, k + 1) # first index = distance (we don't need it here)
+#     # self.rank_x = 
+#     return knn_indices[:, 1:k+1]
+
+
 def get_nnidx_rank(arr, n_neighbors):
     """
     Brute force wau to get the index of NNs and ranks
@@ -255,6 +264,10 @@ class LocalMeasure:
         # fast && requires less memory
         self.nnidx_z, self.rank_z = get_fast_knn(z, k)
         self.nnidx_x, self.rank_x = get_fast_knn(x, k)
+
+        # using GPU (faiss)
+        # tmp = get_gpu_knn(x, k)
+
 
     def spearmans_rho(self):
         """

@@ -8,13 +8,13 @@ from umato.umato_ import plot_tmptmp
 import argparse
 
 parser = argparse.ArgumentParser(description="args for umato")
-parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, cifar10", default="fmnist")
+parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, kmnist", default="mnist")
 parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=300)
 args = parser.parse_args()
 
 if __name__ == "__main__":
     # x = load_digits()  # (1797, 64 dim)
-    x, label = get_data(args.data)  # spheres, mnist, fmnist, cifar10
+    x, label = get_data(args.data)  # spheres, mnist, fmnist, kmnist
 
     # UMTO
     t1 = time.time()
