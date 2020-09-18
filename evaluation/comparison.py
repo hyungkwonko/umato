@@ -25,8 +25,7 @@ MEASURE_LOCAL_LIST = [
     "MRRE",
 ]
 
-ALGO_LIST = ["pca", "tsne", "umap", "topoae", "umato"]  # (TODO) add umato
-# ALGO_LIST = ["umato",]  # (TODO) add umato
+ALGO_LIST = ["pca", "tsne", "umap", "topoae", "umato"]
 DATA_LIST = ["spheres"]
 
 
