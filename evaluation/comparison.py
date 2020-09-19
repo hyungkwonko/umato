@@ -9,7 +9,7 @@ import argparse
 import numpy as np
 
 MEASURE_GLOBAL_LIST = [
-    "RMSE",
+    # "RMSE",
     # "Kruskal",
     # "Sammon",
     "DTM",
@@ -19,13 +19,15 @@ MEASURE_GLOBAL_LIST = [
 ]
 
 MEASURE_LOCAL_LIST = [
-    "Spearman",
+    # "Spearman",
     "Trustworthiness",
     "Continuity",
-    "MRRE",
+    "MRRE_XZ",
+    "MRRE_ZX",
 ]
 
-ALGO_LIST = ["pca", "tsne", "umap", "topoae", "atsne" "umato"]
+ALGO_LIST = ["pca", "tsne", "umap", "topoae", "atsne", "umato"]
+# ALGO_LIST = ["topoae", "atsne"]
 DATA_LIST = ["spheres"]
 
 
@@ -86,7 +88,7 @@ if __name__ == "__main__":
             algorithms.extend([alg] * len(MEASURE_GLOBAL_LIST))
             measures.extend(MEASURE_GLOBAL_LIST)
 
-            rmse_val = gmeasure.rmse()
+            # rmse_val = gmeasure.rmse()
             # kruskal_val = gmeasure.kruskal_stress_measure()
             # sammon_val = gmeasure.sammon_stress()
             dtm_val = gmeasure.dtm()
@@ -95,7 +97,7 @@ if __name__ == "__main__":
             dtmkl001_val = gmeasure.dtm_kl(sigma=0.01)
             values.extend(
                 [
-                    rmse_val,
+                    # rmse_val,
                     # kruskal_val,
                     # sammon_val,
                     dtm_val,
@@ -112,14 +114,15 @@ if __name__ == "__main__":
             algorithms.extend([alg] * len(MEASURE_LOCAL_LIST))
             measures.extend(MEASURE_LOCAL_LIST)
 
-            spearman_val = lmeasure.spearmans_rho()
+            # spearman_val = lmeasure.spearmans_rho()
             trust_val = lmeasure.trustworthiness()
             conti_val = lmeasure.continuity()
-            mrre_val = lmeasure.mrre()
+            mrre_xz_val = lmeasure.mrre_xz()
+            mrre_zx_val = lmeasure.mrre_zx()
 
             values.extend(
-                [spearman_val, trust_val, conti_val, mrre_val,]
-                # [trust_val, conti_val, mrre_val,]
+                # [spearman_val, trust_val, conti_val, mrre_xz_val, mrre_zx_val]
+                [trust_val, conti_val, mrre_xz_val, mrre_zx_val]
             )
 
         result = pd.DataFrame(
@@ -128,4 +131,4 @@ if __name__ == "__main__":
         result = result.pivot(index="measure", columns="algorithm", values="values").fillna(
             "NA"
         )
-    print(f"{result}\n")
+        print(f"{result}\n")

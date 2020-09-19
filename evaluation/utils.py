@@ -103,48 +103,48 @@ class GlobalMeasure:
             self.adjacency_matrix_z = self.adjacency_matrix_z.astype(self.dtype)
             self.adjacency_matrix_x = self.adjacency_matrix_x.astype(self.dtype)
 
-        self.squared_differences = np.square(
-            self.adjacency_matrix_x - self.adjacency_matrix_z, dtype=self.dtype
-        )
+        # self.squared_differences = np.square(
+        #     self.adjacency_matrix_x - self.adjacency_matrix_z, dtype=self.dtype
+        # )
 
-    def rmse(self):
-        """
-        Root Mean Squared Error (RMSE)
-        - Lower is BETTER
-        - Global
-        """
-        sum_of_squared_differences = self.squared_differences.sum()
+    # def rmse(self):
+    #     """
+    #     Root Mean Squared Error (RMSE)
+    #     - Lower is BETTER
+    #     - Global
+    #     """
+    #     sum_of_squared_differences = self.squared_differences.sum()
 
-        return np.sqrt(sum_of_squared_differences / self.n_data, dtype=self.dtype)
+    #     return np.sqrt(sum_of_squared_differences / self.n_data, dtype=self.dtype)
 
-    def kruskal_stress_measure(self):
-        """
-        Kruskal Stress Measure
+    # def kruskal_stress_measure(self):
+    #     """
+    #     Kruskal Stress Measure
 
-        A measure to capture the deviation from monotonicity
-        - Lower is BETTER
-        - Global
-        """
-        sum_of_squared_differences = self.squared_differences.sum()
-        sum_of_squares_z = np.square(self.adjacency_matrix_z, dtype=self.dtype).sum()
+    #     A measure to capture the deviation from monotonicity
+    #     - Lower is BETTER
+    #     - Global
+    #     """
+    #     sum_of_squared_differences = self.squared_differences.sum()
+    #     sum_of_squares_z = np.square(self.adjacency_matrix_z, dtype=self.dtype).sum()
 
-        return np.sqrt(sum_of_squared_differences / sum_of_squares_z, dtype=self.dtype)
+    #     return np.sqrt(sum_of_squared_differences / sum_of_squares_z, dtype=self.dtype)
 
-    def sammon_stress(self):
-        """
-        Sammon's Stress
+    # def sammon_stress(self):
+    #     """
+    #     Sammon's Stress
 
-        An error measure used to test structure preservation
-        - Lower is BETTER
-        - Global
-        """
-        numerator = np.divide(
-            self.squared_differences,
-            self.adjacency_matrix_x,
-            out=np.zeros(self.squared_differences.shape, dtype=float),
-            where=self.adjacency_matrix_x != 0,
-        )
-        return numerator.sum() / self.adjacency_matrix_x.sum()
+    #     An error measure used to test structure preservation
+    #     - Lower is BETTER
+    #     - Global
+    #     """
+    #     numerator = np.divide(
+    #         self.squared_differences,
+    #         self.adjacency_matrix_x,
+    #         out=np.zeros(self.squared_differences.shape, dtype=float),
+    #         where=self.adjacency_matrix_x != 0,
+    #     )
+    #     return numerator.sum() / self.adjacency_matrix_x.sum()
 
     def dtm(self, sigma=0.1):
         """
@@ -354,6 +354,18 @@ class LocalMeasure:
             self.nnidx_z, self.rank_z, self.rank_x, self.n_data, self.k
         )
         return mrre_xz * ratio + mrre_zx * (1 - ratio)
+
+    def mrre_xz(self):
+        mrre_xz = self._mrre_caculation(
+            self.nnidx_x, self.rank_x, self.rank_z, self.n_data, self.k
+        )
+        return mrre_xz
+
+    def mrre_zx(self):
+        mrre_zx = self._mrre_caculation(
+            self.nnidx_z, self.rank_z, self.rank_x, self.n_data, self.k
+        )
+        return mrre_zx
 
     @staticmethod
     def _mrre_caculation(nnidx_base, rank_base, rank_target, n_data, k):
