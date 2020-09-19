@@ -550,7 +550,7 @@ class UMATO(BaseEstimator):
         global_n_epochs=None,
         local_n_epochs=None,
         global_learning_rate=0.0065,
-        local_learning_rate=0.01,
+        local_learning_rate=0.1,
         min_dist=0.1,
         spread=1.0,
         low_memory=False,

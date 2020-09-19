@@ -42,7 +42,8 @@ if __name__ == "__main__":
     if args.algo != "all":
         ALGO_LIST = [args.algo]
 
-    for k in [10, 15, 20, 30, 35, 40, 45, 50, 75, 100]:
+    for k in [5]:
+    # for k in [5, 10, 15, 20, 30, 35, 40, 45, 50, 75, 100]:
     # for k in [3,4,5,6,7,8,9,10,11,12,13]:
         measures = []
         algorithms = []
