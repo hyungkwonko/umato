@@ -9,7 +9,7 @@ import argparse
 import numpy as np
 
 MEASURE_GLOBAL_LIST = [
-    "RMSE",
+    # "RMSE",
     # "Kruskal",
     # "Sammon",
     "DTM",
@@ -22,11 +22,12 @@ MEASURE_LOCAL_LIST = [
     # "Spearman",
     "Trustworthiness",
     "Continuity",
-    "MRRE",
+    "MRRE_XZ",
+    "MRRE_ZX",
 ]
 
-ALGO_LIST = ["pca", "tsne", "umap", "topoae", "umato"]  # (TODO) add umato
-# ALGO_LIST = ["umato",]  # (TODO) add umato
+ALGO_LIST = ["pca", "tsne", "umap", "topoae", "atsne", "umato"]
+# ALGO_LIST = ["topoae", "atsne"]
 DATA_LIST = ["spheres"]
 
 
@@ -49,6 +50,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--measure", type=str, help="choose measures: all, global, local", default="all"
+    )
+    parser.add_argument(
+        "--k", type=int, help="number of nearest neighbors", default=5
     )
     parser.add_argument(
         "--load", type=bool, help="load hubs", default=False
@@ -84,7 +88,7 @@ if __name__ == "__main__":
             algorithms.extend([alg] * len(MEASURE_GLOBAL_LIST))
             measures.extend(MEASURE_GLOBAL_LIST)
 
-            rmse_val = gmeasure.rmse()
+            # rmse_val = gmeasure.rmse()
             # kruskal_val = gmeasure.kruskal_stress_measure()
             # sammon_val = gmeasure.sammon_stress()
             dtm_val = gmeasure.dtm()
@@ -93,7 +97,7 @@ if __name__ == "__main__":
             dtmkl001_val = gmeasure.dtm_kl(sigma=0.01)
             values.extend(
                 [
-                    rmse_val,
+                    # rmse_val,
                     # kruskal_val,
                     # sammon_val,
                     dtm_val,
@@ -105,7 +109,7 @@ if __name__ == "__main__":
 
         if args.measure == "all" or args.measure == "local":
 
-            lmeasure = LocalMeasure(x, z, k=5)
+            lmeasure = LocalMeasure(x, z, k=args.k)
 
             algorithms.extend([alg] * len(MEASURE_LOCAL_LIST))
             measures.extend(MEASURE_LOCAL_LIST)
@@ -113,14 +117,14 @@ if __name__ == "__main__":
             # spearman_val = lmeasure.spearmans_rho()
             trust_val = lmeasure.trustworthiness()
             conti_val = lmeasure.continuity()
-            mrre_val = lmeasure.mrre()
+            mrre_xz_val = lmeasure.mrre_xz()
+            mrre_zx_val = lmeasure.mrre_zx()
 
             values.extend(
-                # [spearman_val, trust_val, conti_val, mrre_val,]
-                [trust_val, conti_val, mrre_val,]
+                # [spearman_val, trust_val, conti_val, mrre_xz_val, mrre_zx_val]
+                [trust_val, conti_val, mrre_xz_val, mrre_zx_val]
             )
 
-        print(f"[INFO] dataset [{args.data}] - Quantitative result")
         result = pd.DataFrame(
             {"measure": measures, "algorithm": algorithms, "values": values}
         )
