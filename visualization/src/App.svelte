@@ -5,7 +5,7 @@
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
 	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
-	let type = 1;
+	let type = 0;
 
 </script>
 
@@ -35,22 +35,14 @@
 		<!-- <h1>UMATO pipeline</h1> -->
 		<table>
 			<tr>
-				<td><Scatterplot2 filename={"global_init"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"(A)_global_init"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 filename={"global_opt"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"(B)_global_opt"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 filename={"local_init"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"(C)_local_init"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 filename={"local_opt"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"(D)_final_result"}></Scatterplot2></td>
 			</tr>
 		</table>
-		<!-- <h1>UMAP pipeline</h1>
-		<table>
-			<tr>
-				<td><Scatterplot2 filename={"initialization"}></Scatterplot2></td>
-				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 filename={"optimization"}></Scatterplot2></td>
-			</tr>
-		</table> -->
 	{/if}
 </main>
