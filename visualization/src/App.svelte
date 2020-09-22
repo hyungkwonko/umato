@@ -5,12 +5,20 @@
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
 	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
-	let type = 0;
+	let type = 3;
 
 </script>
 
 <main>
-	{#if type == 2}
+	{#if type == 3}
+		<table>
+			<tr>
+				<td><Scatterplot dname={"multiphase"} algoname={"umato"}></Scatterplot></td>
+				<td><Scatterplot dname={"multiphase"} algoname={"umato_3-phases"}></Scatterplot></td>
+				<td><Scatterplot dname={"multiphase"} algoname={"umato_4-phases"}></Scatterplot></td>
+			</tr>
+		</table>
+	{:else if type == 2}
 		{#each dnames as dname}
 			<!-- <h1>{dname.charAt(0).toUpperCase() + dname.slice(1)} data</h1> -->
 			<table>

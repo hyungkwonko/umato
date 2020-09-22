@@ -61,9 +61,6 @@
         .domain(d3.extent(colorDomain))
         .range(colorRange);
 
-    console.log(filename.replace(/_/g,' '));
-    
-
 </script>
 
 <div class="outer">
