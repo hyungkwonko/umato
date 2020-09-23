@@ -3,7 +3,6 @@ from sklearn.datasets import load_digits
 from evaluation.models.dataset import get_data, save_csv
 import os
 import numpy as np
-import time
 from umato.umato_ import plot_tmptmp
 import argparse
 
@@ -17,11 +16,8 @@ if __name__ == "__main__":
     x, label = get_data(args.data)  # spheres, mnist, fmnist, kmnist
 
     # UMTO
-    t1 = time.time()
     embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num).fit_transform(x)
     # embedding = umato.UMATO(verbose=True, ll=label).fit_transform(x)
-    t2 = time.time()
-    print(t2-t1)
 
     plot_tmptmp(embedding, label, "pic5_fin")
     save_csv('./', alg_name="umato", data=embedding, label=label)

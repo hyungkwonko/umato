@@ -1,16 +1,23 @@
 <script lang="ts">
 	import Scatterplot from "./Scatterplot.svelte";
 	import Scatterplot2 from "./Scatterplot2.svelte";
+	import Scatterplot3 from "./Scatterplot3.svelte";
 	import Linechart from "./Linechart.svelte";
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
 	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
-	let type = 3;
+	let type = 4;
 
 </script>
 
 <main>
-	{#if type == 3}
+	{#if type == 4}
+		<table>
+			<tr>
+				<td><Scatterplot3 dname={"classification"} algoname={"umato"}></Scatterplot3></td>
+			</tr>
+		</table>
+	{:else if type == 3}
 		<table>
 			<tr>
 				<td><Scatterplot dname={"multiphase"} algoname={"umato"}></Scatterplot></td>

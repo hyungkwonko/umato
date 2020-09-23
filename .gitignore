@@ -171,3 +171,5 @@ numba_example.py
 
 visualization/public/results/pipeline/*_fmnist.csv
 visualization/public/results/stability/*-*.csv
+
+/etc/*

@@ -1,7 +1,3 @@
-<!-- https://svelte.dev/examples#scatterplot -->
-<!-- https://svelte.recipes/components/scatterplot/ -->
-<!-- https://svelte.dev/repl/b4c485ee69484fd8a63b8dc07c3b20a2?version=3.4.1 -->
-
 <script lang="ts">
     import * as d3 from 'd3';
 
@@ -29,14 +25,16 @@
 
     let data = read_csv("results/" + dname + "/" + algoname + ".csv")
 
-    let svgWidth = 450
-    let svgHeight = 450
+    let svgWidth = 600
+    let svgHeight = 600
     const margin = { top: 25, right: 25, bottom: 25, left: 25 };
 
     let width = svgWidth - margin.left - margin.right
     let height = svgHeight - margin.top - margin.bottom
 
-    let r = 3;
+    let r = 4;
+    let trg = 3;
+    let rec = 4;
     
 	const [minX, maxX] = d3.extent(data,(d) => d[0]);
     const [minY, maxY] = d3.extent(data,(d) => d[1]);
@@ -49,29 +47,27 @@
 		.domain([minY, maxY])
         .range([height, 0]);
 
-    const colorDomain = d3.extent(data, d => d[2])
-    const colorRange = ["#4e79a7","#f28e2c","#76b7b2","#59a14f","#edc949","#af7aa1","#ff9da7","#9c755f","#bab0ab", "#e15759","#5E4FA2"];
-    // const colorRange = ["#3288BD", "#5E4FA2", "#66C2A5", "#ABDDA4", "#E6F598", "#FFFFBF", "#FEE08B", "#FDAE61", "#F46D43", "#D53E4F", "#9E0142"];
-    const colorScale =  d3.scaleOrdinal()
-        .domain(d3.extent(colorDomain))
-        .range(colorRange);
+    const colorRange = ["blue","green", "red"];
 
 </script>
 
 <div class="outer">
     <div class="inner">
         <svg {width} {height}>
-            <!-- <text fill="currentColor" x="400px" y="400px">asdas</text> -->
             {#each data as d}
-                <circle class="circle-line"
-                    r={r}
-                    cx='{xScale(d[0])}'
-                    cy='{yScale(d[1])}'
-                    fill='{colorScale(d[2])}'
-                ></circle>
+                {#if d[2] == 0}
+                    <polygon fill="{colorRange[0]}" stroke="{colorRange[0]}" stroke-width="2" points="{xScale(d[0])-trg},{yScale(d[1])+trg} {xScale(d[0])},{yScale(d[1])-trg * 0.5} {xScale(d[0])+trg},{yScale(d[1])+trg}"></polygon>
+                {:else if d[2] == 1}
+                    <rect x="{xScale(d[0])}" y="{yScale(d[1])}" width="{rec}" height="{rec}" fill="{colorRange[1]}"></rect>
+                {:else}
+                    <circle class="circle-line"
+                        r={r}
+                        cx='{xScale(d[0])}'
+                        cy='{yScale(d[1])}'
+                        fill='{colorRange[2]}'
+                    ></circle>
+                {/if}
             {/each}
         </svg>
-        <!-- <h2>{algoname.toUpperCase()}</h2> -->
-        <h2>{algoname.replace(/_/g,' ').toUpperCase()}</h2>
     </div>
 </div>
