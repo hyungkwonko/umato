@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import gzip
+import fcsparser
 
 # Load Kuzushiji Japanese Handwritten dataset
 def load_kmnist(path, dtype="kmnist", kind='train'):
@@ -76,6 +77,12 @@ def get_CIFAR10_data(cifar10_dir):
 
     return x_train, y_train, x_test, y_test
 
+def get_flow_data(ROOT):
+    fcs_data = fcsparser.parse(os.path.join(ROOT, "pbmc_luca.fcs"))
+    raw_data = fcs_data[1]
+    selected_columns = [col for col in raw_data.columns if col.endswith("-A")] + ['Time']
+    x = np.arcsinh(raw_data[selected_columns].values / 150.0).astype(np.float32, order='C')
+    return x
 
 def get_data(dname):
     if dname == "spheres":
@@ -97,6 +104,10 @@ def get_data(dname):
         path = os.path.join(os.getcwd(), "data", "cifar-10-batches-py")
         x, label, _, _ = get_CIFAR10_data(path)
         return x, label
+    elif dname == "flow":
+        path = os.path.join(os.getcwd(), "data", "flow", "raw")
+        x = get_flow_data(path)
+        return x, np.arange(x.shape[0])
     else:
         pass
 

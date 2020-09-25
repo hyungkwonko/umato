@@ -7,7 +7,7 @@ from umato.umato_ import plot_tmptmp
 import argparse
 
 parser = argparse.ArgumentParser(description="args for umato")
-parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, kmnist", default="mnist")
+parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, kmnist, flow", default="mnist")
 parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=300)
 args = parser.parse_args()
 

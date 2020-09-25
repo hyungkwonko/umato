@@ -161,6 +161,7 @@ data/FashionMNIST/*/*
 data/KuzushijiMNIST/*/*
 data/cifar-10-batches-py/*
 data/cifar-10-python.tar.gz
+data/flow/raw/pbmc_luca.fcs
 !*.sh
 data/atsne_data/
 
@@ -170,6 +171,6 @@ test_spheres_umap.py
 numba_example.py
 
 visualization/public/results/pipeline/*_fmnist.csv
-visualization/public/results/stability/*-*.csv
+visualization/public/results/stability/*_*.csv
 
 /etc/*
