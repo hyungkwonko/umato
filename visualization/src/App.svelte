@@ -11,13 +11,13 @@
 </script>
 
 <main>
-	{#if type == 4}
+	{#if type == 0}
 		<table>
 			<tr>
 				<td><Scatterplot3 dname={"classification"} algoname={"umato"}></Scatterplot3></td>
 			</tr>
 		</table>
-	{:else if type == 3}
+	{:else if type == 1}
 		<table>
 			<tr>
 				<td><Scatterplot dname={"multiphase"} algoname={"umato"}></Scatterplot></td>
@@ -40,10 +40,19 @@
 				</tr>
 			</table>
 		{/each}
-	{:else if type == 1}
+	{:else if type == 3}
 		<table>
 			<tr>
 				<td><Linechart></Linechart></td>
+			</tr>
+		</table>
+	{:else if type == 4}
+		<table>
+			<tr>
+				<td><Scatterplot dname={"local"} algoname={"spheres_lr1.0"}></Scatterplot></td>
+				<td><Scatterplot dname={"local"} algoname={"mnist_lr1.0"}></Scatterplot></td>
+				<td><Scatterplot dname={"local"} algoname={"fmnist_lr1.0"}></Scatterplot></td>
+				<td><Scatterplot dname={"local"} algoname={"kmnist_lr1.0"}></Scatterplot></td>
 			</tr>
 		</table>
 	{:else}
