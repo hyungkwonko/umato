@@ -35,6 +35,7 @@
     let r = 4;
     let trg = 3;
     let rec = 4;
+    let ln = 1;
     
 	const [minX, maxX] = d3.extent(data,(d) => d[0]);
     const [minY, maxY] = d3.extent(data,(d) => d[1]);
@@ -58,7 +59,9 @@
                 {#if d[2] == 0}
                     <polygon fill="{colorRange[0]}" stroke="{colorRange[0]}" stroke-width="2" points="{xScale(d[0])-trg},{yScale(d[1])+trg} {xScale(d[0])},{yScale(d[1])-trg * 0.5} {xScale(d[0])+trg},{yScale(d[1])+trg}"></polygon>
                 {:else if d[2] == 1}
-                    <rect x="{xScale(d[0])}" y="{yScale(d[1])}" width="{rec}" height="{rec}" fill="{colorRange[1]}"></rect>
+                    <rect x="{xScale(d[0])}" y="{yScale(d[1])}" width="{rec}" height="{rec}" stroke="{colorRange[1]}" fill="white"></rect>
+                    <!-- <line fill="white" x1="{xScale(d[0]) - ln}" y1="{yScale(d[1]) - ln}" x2="{xScale(d[0]) + ln}" y2="{yScale(d[1]) + ln}" stroke="{colorRange[1]}" stroke-width="1"></line>
+                    <line x1="{xScale(d[0]) + ln}" y1="{yScale(d[1]) + ln}" x2="{xScale(d[0]) - ln}" y2="{yScale(d[1]) - ln}" stroke="{colorRange[1]}" stroke-width="1"></line> -->
                 {:else}
                     <circle class="circle-line"
                         r={r}
