@@ -166,6 +166,7 @@ data/flow/raw/pbmc_luca.fcs
 data/atsne_data/
 
 figures/pic*
+figures/lr*
 test_spectral.py
 test_spheres_umap.py
 numba_example.py
@@ -174,3 +175,4 @@ visualization/public/results/pipeline/*_fmnist.csv
 visualization/public/results/stability/*_*.csv
 
 /etc/*
+/etc2/*

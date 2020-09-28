@@ -88,7 +88,7 @@ def nn_layout_optimize(
     a,
     b,
     rng_state,
-    gamma=1.0,
+    gamma,
     learning_rate=1.0,
     negative_sample_rate=5.0,
     parallel=False,
@@ -184,13 +184,13 @@ def _nn_layout_optimize_single_epoch(
                 grad_d = clip(grad_coeff * (current[d] - other[d]), 10.0)
 
                 grad_other = 1.0
-                grad_neg = 0.1
                 if hub_info[k] == 2:
-                    grad_other = 0.1
+                    grad_other = gamma
 
                 current[d] += grad_d * alpha
 
                 if move_other:
+                    # other[d] += -grad_d * alpha
                     other[d] += -grad_d * alpha * grad_other
 
             epoch_of_next_sample[i] += epochs_per_sample[i]
@@ -209,7 +209,7 @@ def _nn_layout_optimize_single_epoch(
                 dist_squared = rdist(current, other)
 
                 if dist_squared > 0.0:
-                    grad_coeff = 2.0 * gamma * b
+                    grad_coeff = 2.0 * b
                     grad_coeff /= (0.001 + dist_squared) * (
                         a * pow(dist_squared, b) + 1
                     )
@@ -224,7 +224,8 @@ def _nn_layout_optimize_single_epoch(
                     else:
                         grad_d = 10.0
 
-                    current[d] += grad_d * alpha * grad_neg
+                    # current[d] += grad_d * alpha
+                    current[d] += grad_d * alpha * gamma
 
             epoch_of_next_negative_sample[i] += (
                 n_neg_samples * epochs_per_negative_sample[i]

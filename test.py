@@ -16,7 +16,7 @@ if __name__ == "__main__":
     x, label = get_data(args.data)  # spheres, mnist, fmnist, kmnist
 
     # UMTO
-    embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num).fit_transform(x)
+    embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, local_learning_rate=1.0).fit_transform(x)
     # embedding = umato.UMATO(verbose=True, ll=label).fit_transform(x)
 
     plot_tmptmp(embedding, label, "pic5_fin")

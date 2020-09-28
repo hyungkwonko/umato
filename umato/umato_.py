@@ -550,13 +550,13 @@ class UMATO(BaseEstimator):
         global_n_epochs=None,
         local_n_epochs=None,
         global_learning_rate=0.0065,
-        local_learning_rate=0.01,
+        local_learning_rate=0.015,
         min_dist=0.1,
         spread=1.0,
         low_memory=False,
         set_op_mix_ratio=1.0,
         local_connectivity=1.0,
-        repulsion_strength=1.0,
+        gamma=0.1,
         negative_sample_rate=5,
         a=None,
         b=None,
@@ -571,7 +571,7 @@ class UMATO(BaseEstimator):
         self.global_n_epochs = global_n_epochs
         self.local_n_epochs = local_n_epochs
         self.n_components = n_components
-        self.repulsion_strength = repulsion_strength
+        self.gamma = gamma
         self.global_learning_rate = global_learning_rate
         self.local_learning_rate = local_learning_rate
         self.spread = spread
@@ -591,8 +591,8 @@ class UMATO(BaseEstimator):
     def _validate_parameters(self):
         if self.set_op_mix_ratio < 0.0 or self.set_op_mix_ratio > 1.0:
             raise ValueError("set_op_mix_ratio must be between 0.0 and 1.0")
-        if self.repulsion_strength < 0.0:
-            raise ValueError("repulsion_strength cannot be negative")
+        if self.gamma < 0.0:
+            raise ValueError("gamma cannot be negative")
         if self.min_dist > self.spread:
             raise ValueError("min_dist must be less than or equal to spread")
         if self.min_dist < 0.0:
@@ -849,7 +849,7 @@ class UMATO(BaseEstimator):
             learning_rate=self.local_learning_rate,
             a=self.a,
             b=self.b,
-            gamma=self.repulsion_strength,
+            gamma=self.gamma,
             negative_sample_rate=self.negative_sample_rate,
             n_epochs=self.local_n_epochs,
             init=init,
