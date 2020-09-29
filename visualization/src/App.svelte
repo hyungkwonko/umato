@@ -6,7 +6,7 @@
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
 	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
-	let type = 4;
+	let type = 5;
 
 </script>
 
@@ -53,6 +53,15 @@
 				<td><Scatterplot dname={"local"} algoname={"mnist_lr1.0"}></Scatterplot></td>
 				<td><Scatterplot dname={"local"} algoname={"fmnist_lr1.0"}></Scatterplot></td>
 				<td><Scatterplot dname={"local"} algoname={"kmnist_lr1.0"}></Scatterplot></td>
+			</tr>
+		</table>
+	{:else if type == 5}
+		<table>
+			<tr>
+				<td><Scatterplot dname={dnames[0]} algoname={"umato"}></Scatterplot></td>
+				<td><Scatterplot dname={dnames[1]} algoname={"umato"}></Scatterplot></td>
+				<td><Scatterplot dname={dnames[2]} algoname={"umato"}></Scatterplot></td>
+				<td><Scatterplot dname={dnames[3]} algoname={"umato"}></Scatterplot></td>
 			</tr>
 		</table>
 	{:else}
