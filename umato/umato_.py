@@ -192,7 +192,7 @@ def build_global_structure(
 
 
 def embed_others_nn(
-    data, init_global, hubs, knn_indices, nn_consider, random_state, label,
+    data, init_global, hubs, knn_indices, nn_consider, random_state, label, verbose=False,
 ):
     init = np.zeros((data.shape[0], init_global.shape[1]))
     original_hubs = hubs.copy()
@@ -205,7 +205,7 @@ def embed_others_nn(
         )
 
         if val == len(hubs):
-            if len(init) > len(hubs):
+            if len(init) > len(hubs) and verbose:
                 print(f"len(hubs) {len(hubs)} is smaller than len(init) {len(init)}")
             break
 
@@ -233,13 +233,14 @@ def embed_others_nn(
     hub_info[original_hubs] = 2
 
     # save figure2
-    plot_tmptmp(data=init[hubs], label=label[hubs], name=f"pic2")
+    if verbose:
+        plot_tmptmp(data=init[hubs], label=label[hubs], name=f"pic2")
 
     return init, hub_info, hubs
 
 
 def embed_outliers(
-    data, init, hubs, disjoints, random_state, label,
+    data, init, hubs, disjoints, random_state, label, verbose=False,
 ):
     # generate random normal distribution
     random_normal = random_state.normal(scale=0.02, size=list(init.shape)).astype(
@@ -257,7 +258,8 @@ def embed_outliers(
         )
 
     # save figure3
-    plot_tmptmp(data=init, label=label, name="pic4_disjoint")
+    if verbose:
+        plot_tmptmp(data=init, label=label, name="pic4_disjoint")
 
     return init
 
@@ -775,7 +777,7 @@ class UMATO(BaseEstimator):
             random_state=random_state,
             alpha=self.global_learning_rate,
             n_epochs=self.global_n_epochs,
-            verbose=True,
+            verbose=self.verbose,
             label=self.ll,
         )
 
@@ -792,6 +794,7 @@ class UMATO(BaseEstimator):
             nn_consider=self._n_neighbors,
             random_state=random_state,
             label=self.ll,
+            verbose=self.verbose,
         )
 
         self._knn_indices, self._knn_dists, counts = select_from_knn(
@@ -855,7 +858,7 @@ class UMATO(BaseEstimator):
             init=init,
             random_state=random_state,
             parallel=False,
-            verbose=True,
+            verbose=self.verbose,
             label=self.ll,
         )
 
@@ -869,6 +872,7 @@ class UMATO(BaseEstimator):
             disjoints=disjoints,
             random_state=random_state,
             label=self.ll,
+            verbose=self.verbose,
         )
 
         if self.verbose:
