@@ -108,6 +108,14 @@ def get_data(dname):
         path = os.path.join(os.getcwd(), "data", "flow", "raw")
         x = get_flow_data(path)
         return x, np.arange(x.shape[0])
+    elif dname == "swissroll":
+        from sklearn import datasets
+        x, label = datasets.make_swiss_roll(n_samples=1500)
+        return x, label
+    elif dname == "scurve":
+        from sklearn import datasets
+        x, label = datasets.make_s_curve(n_samples=1500)
+        return x, label
     else:
         pass
 

@@ -27,6 +27,7 @@ MEASURE_LOCAL_LIST = [
 ]
 
 ALGO_LIST = ["pca", "tsne", "umap", "topoae", "atsne", "umato"]
+# ALGO_LIST = ["isomap_20", "isomap_25", "isomap_30", "isomap_35", "isomap_40", "isomap_45", "isomap_50"]
 # ALGO_LIST = ["topoae", "atsne"]
 DATA_LIST = ["spheres"]
 
