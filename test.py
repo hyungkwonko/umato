@@ -17,6 +17,7 @@ if __name__ == "__main__":
 
     # UMTO
     embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num).fit_transform(x)
+    # embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, local_learning_rate=0.005).fit_transform(x)
 
     plot_tmptmp(embedding, label, "pic5_fin")
     path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
