@@ -1,5 +1,6 @@
 # from sklearn.manifold import TSNE
 from MulticoreTSNE import MulticoreTSNE as TSNE
+from sklearn.decomposition import PCA
 import argparse
 import os
 import numpy as np
@@ -30,8 +31,11 @@ if __name__ == "__main__":
                 # read data
                 x, label = get_data(args.data)
 
+                # PCA initialization
+                init = PCA(n_components=args.dim).fit_transform(x)
+
                 # run TSNE
-                y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_iter=1500, n_jobs=40, random_state=0, verbose=2).fit_transform(x)
+                y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], init=init, n_iter=1500, n_jobs=40, random_state=0, verbose=2).fit_transform(x)
 
                 # save as csv
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
