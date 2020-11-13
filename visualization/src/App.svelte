@@ -2,11 +2,13 @@
 	import Scatterplot from "./Scatterplot.svelte";
 	import Scatterplot2 from "./Scatterplot2.svelte";
 	import Scatterplot3 from "./Scatterplot3.svelte";
+	import Scatterplot4 from "./Scatterplot4.svelte";
 	import Linechart from "./Linechart.svelte";
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
 	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
-	let type = 5;
+	let dnames2 = ["scurve", "swissroll"];
+	let type = 6;
 
 </script>
 
@@ -64,6 +66,20 @@
 				<td><Scatterplot dname={dnames[3]} algoname={"umato"}></Scatterplot></td>
 			</tr>
 		</table>
+	{:else if type == 6}
+		{#each dnames2 as dname}
+			<!-- <h1>{dname.charAt(0).toUpperCase() + dname.slice(1)} data</h1> -->
+			<table>
+				<tr>
+					<td><Head dname={dname}></Head></td>
+					<td><Scatterplot4 dname={dname} algoname={"pca"}></Scatterplot4></td>
+					<td><Scatterplot4 dname={dname} algoname={"isomap"}></Scatterplot4></td>
+					<td><Scatterplot4 dname={dname} algoname={"tsne"}></Scatterplot4></td>
+					<td><Scatterplot4 dname={dname} algoname={"umap"}></Scatterplot4></td>
+					<td><Scatterplot4 dname={dname} algoname={"umato"}></Scatterplot4></td>
+				</tr>
+			</table>
+		{/each}
 	{:else}
 		<!-- <h1>UMATO pipeline</h1> -->
 		<table>

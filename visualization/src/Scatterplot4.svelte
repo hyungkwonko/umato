@@ -49,12 +49,13 @@
 		.domain([minY, maxY])
         .range([height, 0]);
 
-    const colorDomain = d3.extent(data, d => d[2])
-    const colorRange = ["#4e79a7","#f28e2c","#76b7b2","#59a14f","#edc949","#af7aa1","#ff9da7","#9c755f","#bab0ab", "#e15759","#5E4FA2"];
-    // const colorRange = ["#3288BD", "#5E4FA2", "#66C2A5", "#ABDDA4", "#E6F598", "#FFFFBF", "#FEE08B", "#FDAE61", "#F46D43", "#D53E4F", "#9E0142"];
-    let colorScale = d3.scaleOrdinal()
-        .domain(d3.extent(colorDomain))
-        .range(colorRange);
+    const [minColor, maxColor] = d3.extent(data,(d) => d[2]);
+    const diff = maxColor - minColor;
+    let colorScale = d3.scaleLinear()
+        .domain([minColor, minColor+diff/5, minColor+2*diff/5, minColor+3*diff/5, minColor+4*diff/5, maxColor])
+        .range(["red", "orange", "yellow", "green", "blue", "purple"])
+
+
 
 </script>
 
