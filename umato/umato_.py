@@ -26,6 +26,7 @@ import numba
 
 import umato.distances as dist
 import umato.sparse as sparse
+from sklearn.manifold import SpectralEmbedding
 
 from umato.utils import (
     adjacency_matrix,
@@ -164,6 +165,8 @@ def build_global_structure(
         Z /= Z.max()
     elif init_global == "random":
         Z = np.random.random((len(hubs), n_components))
+    elif init_global == "spectral":
+        Z = SpectralEmbedding(n_components=n_components).fit_transform(data[hubs])
     else:
         raise ValueError("Check hub node initializing method!")
 
@@ -565,6 +568,7 @@ class UMATO(BaseEstimator):
         random_state=None,
         angular_rp_forest=False,
         verbose=False,
+        init="pca",
         ll=None,
     ):
         self.n_neighbors = n_neighbors
@@ -587,6 +591,7 @@ class UMATO(BaseEstimator):
         self.verbose = verbose
         self.a = a
         self.b = b
+        self.init = init
 
         self.ll = ll
 
@@ -779,6 +784,7 @@ class UMATO(BaseEstimator):
             n_epochs=self.global_n_epochs,
             verbose=self.verbose,
             label=self.ll,
+            init_global=self.init,
         )
 
         if self.verbose:

@@ -69,7 +69,7 @@ def optimize_global_layout(
             )
 
         if savefig:
-            if i % 4 == 1:
+            if i % 4 == 1 and i < 30:
                 from umato.umato_ import plot_tmptmp
                 plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
 
