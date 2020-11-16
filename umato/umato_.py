@@ -164,7 +164,10 @@ def build_global_structure(
         Z = PCA(n_components=n_components).fit_transform(data[hubs])
         Z /= Z.max()
     elif init_global == "random":
-        Z = np.random.random((len(hubs), n_components))
+        Z = random_state.normal(
+            loc=0.0, scale=0.05, size=list((len(hubs), n_components))
+        ).astype(np.float32)
+        Z /= Z.max()
     elif init_global == "spectral":
         Z = SpectralEmbedding(n_components=n_components).fit_transform(data[hubs])
     else:
@@ -182,8 +185,8 @@ def build_global_structure(
             b=b,
             alpha=alpha,
             n_epochs=n_epochs,
-            verbose=True,
-            savefig=False,
+            verbose=verbose,
+            savefig=verbose,
             label=label[hubs],
         )
     else:

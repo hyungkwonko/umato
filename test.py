@@ -16,9 +16,10 @@ if __name__ == "__main__":
     x, label = get_data(args.data)  # spheres, mnist, fmnist, kmnist
 
     # UMTO
-    # embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num).fit_transform(x)
-    embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init="spectral", verbose=True).fit_transform(x)
+    embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num).fit_transform(x)
+    # embedding = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init="pca").fit_transform(x)
 
     plot_tmptmp(embedding, label, "pic5_fin")
-    path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
-    save_csv(path, alg_name="umato", data=embedding, label=label)
+    # path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
+    # save_csv(path, alg_name="umato", data=embedding, label=label)
+    save_csv('./', alg_name=f"umato_{args.hub_num}", data=embedding, label=label)

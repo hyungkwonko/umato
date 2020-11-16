@@ -91,6 +91,12 @@ def get_data(dname):
         x = df.drop(columns=['label']).to_numpy()
         label = df['label'].to_numpy()
         return x, label
+    elif dname == "spheres_small":
+        path = os.path.join(os.getcwd(), "data", "spheres")
+        df = pd.read_csv(os.path.join(path, 'spheres_small.csv')) # load data
+        x = df.drop(columns=['label']).to_numpy()
+        label = df['label'].to_numpy()
+        return x, label
     elif dname == "mnist":
         path = os.path.join(os.getcwd(), "data", "MNIST", "raw")
         return load_mnist(path=path, kind="train")  # kind="t10k"
