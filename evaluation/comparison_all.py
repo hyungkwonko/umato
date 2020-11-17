@@ -27,11 +27,14 @@ if __name__ == "__main__":
     folder_path = f'./visualization/public/results/{args.data}'
     for filename in glob.glob(os.path.join(folder_path, f'{args.algo}*.csv')):
         with open(filename, 'r') as f:
-            text = f.read()
+
+
             filenamelist = filename.split("/")
             filetarget = filenamelist[-1]
             c = filetarget.split(".")
             cc = c[0] + '.' +  c[1]
+            if args.algo == "isomap":
+                cc = c[0]
 
             # read data & embedding result
             z = get_embed_data(args.data, cc)
