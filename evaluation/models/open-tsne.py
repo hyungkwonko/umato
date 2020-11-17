@@ -38,8 +38,6 @@ if __name__ == "__main__":
                 # save as csv
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
                 save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
-                plot_tmptmp(y, label, "tsne")
-                exit()
     else:
         y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], verbose=True).fit(x)
         path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
