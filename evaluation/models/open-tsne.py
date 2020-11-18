@@ -1,4 +1,3 @@
-# from sklearn.manifold import TSNE
 from openTSNE import TSNE
 from sklearn.decomposition import PCA
 import argparse
@@ -6,7 +5,6 @@ import os
 import numpy as np
 from scipy.stats import loguniform
 from .dataset import get_data, save_csv
-from umato.umato_ import plot_tmptmp
 
 parser = argparse.ArgumentParser(description="t-SNE embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
@@ -33,12 +31,12 @@ if __name__ == "__main__":
                 x, label = get_data(args.data)
 
                 # run TSNE
-                y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], verbose=True).fit(x)
+                y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_jobs=-1, verbose=True).fit(x)
 
                 # save as csv
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
                 save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
     else:
-        y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], verbose=True).fit(x)
+        y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_jobs=-1, verbose=True).fit(x)
         path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
         save_csv(path, alg_name="tsne", data=y, label=label)
