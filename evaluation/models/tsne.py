@@ -4,6 +4,7 @@ import os
 import numpy as np
 from scipy.stats import loguniform
 from .dataset import get_data, save_csv
+from umato.umato_ import plot_tmptmp
 
 parser = argparse.ArgumentParser(description="t-SNE embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
@@ -27,12 +28,13 @@ if __name__ == "__main__":
             for j in range(len(perplexity)):
 
                 # run TSNE
-                y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], random_state=0, verbose=2).fit_transform(x)
+                y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], init="pca", n_jobs=-1, random_state=0, verbose=2).fit_transform(x)
 
                 # save as csv
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
                 save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
     else:
-        y = TSNE(n_components=args.dim, random_state=0, verbose=2).fit_transform(x)
+        y = TSNE(n_components=args.dim, random_state=0, verbose=2, init="pca", n_jobs=-1).fit_transform(x)
         path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
         save_csv(path, alg_name="tsne", data=y, label=label)
+        plot_tmptmp(y, label, "tsne")
