@@ -12,6 +12,7 @@ parser.add_argument("--hub_num", type=int, help="choose number of hubs", default
 parser.add_argument("--n_samples", type=int, help="choose number of samples", default=1500)
 args = parser.parse_args()
 
+
 if __name__ == "__main__":
     # x = load_digits()  # (1797, 64 dim)
     x, label = get_data(args.data, n_samples=args.n_samples)  # spheres, mnist, fmnist, kmnist

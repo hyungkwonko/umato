@@ -7,6 +7,30 @@ import numba
 import numpy as np
 import scipy.sparse
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.manifold import SpectralEmbedding
+
+
+def init_position(x, label, init_type=None):
+    if init_type == "pca":
+        init = PCA(n_components=2).fit_transform(x)
+    elif init_type == "spectral":
+        init = SpectralEmbedding(n_components=2, n_jobs=-1).fit_transform(x)
+    elif init_type == "class":
+        init = np.empty(shape=(0,2))
+        z1 = [1,2,2,1]
+        z2 = [1,1,2,2]
+        for i in range(len(label)):
+            l = label[i] % 4
+            init = np.append(init, np.array([[(-1)**z1[l] * label[i] * 1.5, (-1)**z2[l] * label[i] * 1.5]]), axis=0)
+    elif init_type == "random":
+        init = np.random.normal(
+            loc=0.0, scale=0.05, size=list((len(label), 2))
+        ).astype(np.float32)
+    else:
+        Warning("should set this")
+    init_normed = init / init.max(axis=0)
+    return init_normed
 
 
 def plot_tmptmp(data, label, name):
