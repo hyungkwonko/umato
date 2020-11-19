@@ -159,19 +159,22 @@ def build_global_structure(
     label=None,
     init_global="pca",
 ):
-
-    if init_global == "pca":
-        Z = PCA(n_components=n_components).fit_transform(data[hubs])
-        Z /= Z.max()
-    elif init_global == "random":
-        Z = random_state.normal(
-            loc=0.0, scale=0.05, size=list((len(hubs), n_components))
-        ).astype(np.float32)
-        Z /= Z.max()
-    elif init_global == "spectral":
-        Z = SpectralEmbedding(n_components=n_components).fit_transform(data[hubs])
+    if isinstance(init_global, str):
+        if init_global == "pca":
+            Z = PCA(n_components=n_components).fit_transform(data[hubs])
+            Z /= Z.max()
+        elif init_global == "random":
+            Z = random_state.normal(
+                loc=0.0, scale=0.05, size=list((len(hubs), n_components))
+            ).astype(np.float32)
+            Z /= Z.max()
+        elif init_global == "spectral":
+            Z = SpectralEmbedding(n_components=n_components).fit_transform(data[hubs])
+        else:
+            raise ValueError("Check hub node initializing method!")
     else:
-        raise ValueError("Check hub node initializing method!")
+        Z = init_global[hubs]
+        Z /= Z.max()
 
     P = adjacency_matrix(data[hubs])
     # P /= np.sum(P, axis=1, keepdims=True)
@@ -558,7 +561,7 @@ class UMATO(BaseEstimator):
         global_n_epochs=None,
         local_n_epochs=None,
         global_learning_rate=0.0065,
-        local_learning_rate=0.015,
+        local_learning_rate=0.01,
         min_dist=0.1,
         spread=1.0,
         low_memory=False,

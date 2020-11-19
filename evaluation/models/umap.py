@@ -36,12 +36,22 @@ if __name__ == "__main__":
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
                 save_csv(path, alg_name=f"umap_{n_neighbor[i]}_{min_dist[j]}", data=y, label=label)
     else:
-        init = init_position(x, label, init_type=args.init)
-        y = UMAP(n_components=args.dim, verbose=True, init=init).fit_transform(x)
+        for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
+            for mtd in ['spectral', 'pca', 'random', 'class']:
+                init = init_position(x, label, dname=dt, init_type=mtd)
+                y = UMAP(n_components=args.dim, verbose=True, init=init).fit_transform(x)
+                # y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init="pca", global_learning_rate=0.0015, local_learning_rate=0.2).fit_transform(x)
+
+                plot_tmptmp(y, label, f"pic_umap_{dt}_{mtd}")
+                save_csv('./', alg_name=f"umap_{dt}_{mtd}", data=y, label=label)
+
+
+        # init = init_position(x, label, init_type=args.init)
+        # y = UMAP(n_components=args.dim, verbose=True, init="spectral").fit_transform(x)
         # path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
         # save_csv(path, alg_name="umap", data=y, label=label)
-        plot_tmptmp(y, label, f"umap_{args.data}_{args.init}")
-        save_csv('./', alg_name=f"umap_{args.data}_{args.init}", data=y, label=label)
+        # plot_tmptmp(y, label, f"pic_umap_{args.data}_{args.init}")
+        # save_csv('./', alg_name=f"umap_{args.data}_{args.init}", data=y, label=label)
         # n_epochs = 200
         # init = PCA(n_components=args.dim).fit_transform(x)
         # y = UMAP(n_components=args.dim, verbose=True, n_epochs=n_epochs, init="spectral", gamma=).fit_transform(x)

@@ -45,7 +45,12 @@ if __name__ == "__main__":
                 save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
                 plot_tmptmp(y, label, "tsne")
     else:
-        init = init_position(x, label, init_type=args.init)
-        y = TSNE(n_components=args.dim, n_jobs=40, init=init, random_state=0, verbose=2).fit_transform(x)
-        path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
-        save_csv(path, alg_name="tsne", data=y, label=label)
+        for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
+            for mtd in ['spectral', 'pca', 'random', 'class']:
+                init = init_position(x, label, dname=dt, init_type=mtd)
+                y = TSNE(n_components=args.dim, n_jobs=40, init=init, random_state=0, verbose=2).fit_transform(x)
+                # path = os.path.join(os.getcwd(), "visualization", "public", "results", dt)
+                # save_csv(path, alg_name="tsne", data=y, label=label)
+
+                plot_tmptmp(y, label, f"pic_tsne_{dt}_{mtd}")
+                save_csv('./', alg_name=f"tsne_{dt}_{mtd}", data=y, label=label)

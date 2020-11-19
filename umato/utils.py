@@ -3,19 +3,23 @@
 # License: BSD 3 clause
 
 import time
+import os
 import numba
 import numpy as np
 import scipy.sparse
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-from sklearn.manifold import SpectralEmbedding
+import pandas as pd
 
 
-def init_position(x, label, init_type=None):
+def init_position(x, label, dname, init_type=None):
     if init_type == "pca":
         init = PCA(n_components=2).fit_transform(x)
     elif init_type == "spectral":
-        init = SpectralEmbedding(n_components=2, n_jobs=-1).fit_transform(x)
+        path = os.path.join(os.getcwd(), "visualization", "public", "results", "init", f"{dname}_init.csv")
+        init = pd.read_csv(path)
+        init = np.array(init)
+        # init = SpectralEmbedding(n_components=2, n_jobs=-1).fit_transform(x)
     elif init_type == "class":
         init = np.empty(shape=(0,2))
         z1 = [1,2,2,1]
@@ -23,6 +27,9 @@ def init_position(x, label, init_type=None):
         for i in range(len(label)):
             l = label[i] % 4
             init = np.append(init, np.array([[(-1)**z1[l] * label[i] * 1.5, (-1)**z2[l] * label[i] * 1.5]]), axis=0)
+        init += np.random.normal(
+            scale=0.001, size=[len(label), 2]
+        ).astype(np.float32)
     elif init_type == "random":
         init = np.random.normal(
             loc=0.0, scale=0.05, size=list((len(label), 2))
