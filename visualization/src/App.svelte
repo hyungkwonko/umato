@@ -34,6 +34,7 @@
 				<tr>
 					<td><Head dname={dname}></Head></td>
 					<td><Scatterplot dname={dname} algoname={"pca"}></Scatterplot></td>
+					<td><Scatterplot dname={dname} algoname={"isomap"}></Scatterplot></td>
 					<td><Scatterplot dname={dname} algoname={"tsne"}></Scatterplot></td>
 					<td><Scatterplot dname={dname} algoname={"umap"}></Scatterplot></td>
 					<td><Scatterplot dname={dname} algoname={"topoae"}></Scatterplot></td>
