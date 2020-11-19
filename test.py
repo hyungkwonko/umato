@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # label = label[np.arange(0, 10000, 50)]
 
     # UMTO
-    for dt in ['mnist', 'fmnist', 'kmnist']:
+    for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
         for mtd in ['spectral', 'pca', 'random', 'class']:
             init = init_position(x, label, dname=dt, init_type=mtd)
             y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init=init).fit_transform(x)

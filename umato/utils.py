@@ -24,8 +24,8 @@ def init_position(x, label, dname, init_type=None):
         init = np.empty(shape=(0,2))
         z1 = [1,2,2,1]
         z2 = [1,1,2,2]
-        for i in range(len(label)):
-            l = label[i] % 4
+        for i in range(int(len(label))):
+            l = int(label[i] % 4)
             init = np.append(init, np.array([[(-1)**z1[l] * label[i] * 1.5, (-1)**z2[l] * label[i] * 1.5]]), axis=0)
         init += np.random.normal(
             scale=0.001, size=[len(label), 2]
