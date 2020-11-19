@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser(description="UMAP embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
 parser.add_argument("--dim", type=str, help="choose embedding dimension", default=2)
 parser.add_argument("--hp", type=bool, help="whether to explore hyperparameter settings", default=False)
+parser.add_argument("--n_samples", type=int, help="choose number of samples", default=1500)
 
 args = parser.parse_args()
 
@@ -17,7 +18,7 @@ args = parser.parse_args()
 if __name__ == "__main__":
 
     # read data
-    x, label = get_data(args.data)
+    x, label = get_data(args.data, n_samples=args.n_samples)
 
     if args.hp:
         n_neighbor = np.arange(5, 55, 5)
@@ -38,6 +39,6 @@ if __name__ == "__main__":
         save_csv(path, alg_name="umap", data=y, label=label)
         # n_epochs = 200
         # init = PCA(n_components=args.dim).fit_transform(x)
-        # y = UMAP(n_components=args.dim, verbose=True, n_epochs=n_epochs, init="spectral").fit_transform(x)
+        # y = UMAP(n_components=args.dim, verbose=True, n_epochs=n_epochs, init="spectral", gamma=).fit_transform(x)
         # plot_tmptmp(y, label, "umap_mnist_spectral")
         # save_csv('./', alg_name="umap_mnist_spectral", data=y, label=label)

@@ -84,7 +84,7 @@ def get_flow_data(ROOT):
     x = np.arcsinh(raw_data[selected_columns].values / 150.0).astype(np.float32, order='C')
     return x
 
-def get_data(dname):
+def get_data(dname, n_samples=None):
     if dname == "spheres":
         path = os.path.join(os.getcwd(), "data", "spheres")
         df = pd.read_csv(os.path.join(path, 'spheres.csv')) # load data
@@ -116,11 +116,11 @@ def get_data(dname):
         return x, np.arange(x.shape[0])
     elif dname == "swissroll":
         from sklearn import datasets
-        x, label = datasets.make_swiss_roll(n_samples=1500)
+        x, label = datasets.make_swiss_roll(n_samples=n_samples)
         return x, label
     elif dname == "scurve":
         from sklearn import datasets
-        x, label = datasets.make_s_curve(n_samples=1500)
+        x, label = datasets.make_s_curve(n_samples=n_samples)
         return x, label
     else:
         pass

@@ -8,6 +8,7 @@ parser = argparse.ArgumentParser(description="Isomap embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
 parser.add_argument("--dim", type=str, help="choose embedding dimension", default=2)
 parser.add_argument("--hp", type=bool, help="whether to explore hyperparameter settings", default=False)
+parser.add_argument("--n_samples", type=int, help="choose number of samples", default=1500)
 
 args = parser.parse_args()
 
@@ -15,7 +16,7 @@ args = parser.parse_args()
 if __name__ == "__main__":
 
     # read data
-    x, label = get_data(args.data)
+    x, label = get_data(args.data, n_samples=args.n_samples)
 
     if args.hp:
         nn = np.arange(5, 55, 5)
