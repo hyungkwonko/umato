@@ -19,10 +19,10 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    # read data
-    x, label = get_data(args.data, n_samples=args.n_samples)
-
     if args.hp:
+        # read data
+        x, label = get_data(args.data, n_samples=args.n_samples)
+
         n_neighbor = np.arange(5, 55, 5)
         min_dist = np.arange(0, 1.1, 0.1)
 
@@ -36,7 +36,10 @@ if __name__ == "__main__":
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
                 save_csv(path, alg_name=f"umap_{n_neighbor[i]}_{min_dist[j]}", data=y, label=label)
     else:
-        for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
+        for dt in ['mnist', 'fmnist', 'kmnist']:
+            # read data
+            x, label = get_data(dt, n_samples=args.n_samples)
+
             for mtd in ['spectral', 'pca', 'random', 'class']:
                 init = init_position(x, label, dname=dt, init_type=mtd)
                 y = UMAP(n_components=args.dim, verbose=True, init=init).fit_transform(x)

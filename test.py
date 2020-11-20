@@ -16,14 +16,15 @@ args = parser.parse_args()
 
 
 if __name__ == "__main__":
-    # x = load_digits()  # (1797, 64 dim)
-    x, label = get_data(args.data, n_samples=args.n_samples)  # spheres, mnist, fmnist, kmnist
 
     # x = x[np.arange(0, 10000, 50)]
     # label = label[np.arange(0, 10000, 50)]
 
     # UMTO
-    for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
+    for dt in ['mnist', 'fmnist', 'kmnist']:
+        # x = load_digits()  # (1797, 64 dim)
+        x, label = get_data(dt, n_samples=args.n_samples)  # spheres, mnist, fmnist, kmnist
+
         for mtd in ['spectral', 'pca', 'random', 'class']:
             init = init_position(x, label, dname=dt, init_type=mtd)
             y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init=init).fit_transform(x)

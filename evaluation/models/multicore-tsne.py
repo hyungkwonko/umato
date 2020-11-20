@@ -21,9 +21,6 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    # read data
-    x, label = get_data(args.data, n_samples=args.n_samples)
-
     if args.hp:
         # learning_rate = np.sort(loguniform.rvs(10, 1000, size=1000))[99::100]
         learning_rate = np.array([15.24742297, 23.48066375, 37.34107189, 58.27652395, 87.24048423, 137.33961493, 211.00561713, 374.36120544, 576.90813121, 983.37544116])
@@ -45,7 +42,10 @@ if __name__ == "__main__":
                 save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
                 plot_tmptmp(y, label, "tsne")
     else:
-        for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
+        for dt in ['mnist', 'fmnist', 'kmnist']:
+            # read data
+            x, label = get_data(dt, n_samples=args.n_samples)
+
             for mtd in ['spectral', 'pca', 'random', 'class']:
                 init = init_position(x, label, dname=dt, init_type=mtd)
                 y = TSNE(n_components=args.dim, n_jobs=40, init=init, random_state=0, verbose=2).fit_transform(x)
