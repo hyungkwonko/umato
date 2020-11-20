@@ -633,14 +633,15 @@ class UMATO(BaseEstimator):
                 raise ValueError("n_components must be an int")
         if self.n_components < 1:
             raise ValueError("n_components must be greater than 0")
+
         if self.global_n_epochs is not None and (
-            self.global_n_epochs > 0 or not isinstance(self.global_n_epochs, int)
+            self.global_n_epochs <= 10 or not isinstance(self.global_n_epochs, int)
         ):
-            raise ValueError("global_n_epochs must be a positive integer")
+            raise ValueError("global_n_epochs must be a positive integer of at least 10")
         if self.local_n_epochs is not None and (
-            self.local_n_epochs > 0 or not isinstance(self.local_n_epochs, int)
+            self.local_n_epochs <= 10 or not isinstance(self.local_n_epochs, int)
         ):
-            raise ValueError("local_n_epochs must be a positive integer")
+            raise ValueError("local_n_epochs must be a positive integer of at least 10")
 
         # check sparsity of data
         if scipy.sparse.isspmatrix_csr(self._raw_data):

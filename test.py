@@ -20,6 +20,12 @@ if __name__ == "__main__":
     # x = x[np.arange(0, 10000, 50)]
     # label = label[np.arange(0, 10000, 50)]
 
+    # for epoch in [200, 500, 1000, 2000, 5000]:
+    #     x, label = get_data(args.data, n_samples=args.n_samples)  # spheres, mnist, fmnist, kmnist
+    #     y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, global_n_epochs=epoch).fit_transform(x)
+    #     plot_tmptmp(y, label, f"umato_{args.data}_{epoch}")
+    #     save_csv('./', alg_name=f"umato_{args.data}_{epoch}", data=y, label=label)
+
     # UMTO
     for dt in ['mnist', 'fmnist', 'kmnist']:
         # x = load_digits()  # (1797, 64 dim)
