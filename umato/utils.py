@@ -28,7 +28,7 @@ def init_position(x, label, dname, init_type=None):
             l = int(label[i] % 4)
             init = np.append(init, np.array([[(-1)**z1[l] * label[i] * 1.5, (-1)**z2[l] * label[i] * 1.5]]), axis=0)
         init += np.random.normal(
-            scale=0.001, size=[len(label), 2]
+            scale=0.1, size=[len(label), 2]
         ).astype(np.float32)
     elif init_type == "random":
         init = np.random.normal(
@@ -36,7 +36,8 @@ def init_position(x, label, dname, init_type=None):
         ).astype(np.float32)
     else:
         Warning("should set this")
-    init_normed = init / init.max(axis=0)
+    # init_normed = init / init.max(axis=0)
+    init_normed = (init - init.mean()) / init.max()
     return init_normed
 
 

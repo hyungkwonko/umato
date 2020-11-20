@@ -25,7 +25,7 @@ if __name__ == "__main__":
         # x = load_digits()  # (1797, 64 dim)
         x, label = get_data(dt, n_samples=args.n_samples)  # spheres, mnist, fmnist, kmnist
 
-        for mtd in ['spectral', 'pca', 'random', 'class']:
+        for mtd in ['class']:
             init = init_position(x, label, dname=dt, init_type=mtd)
             y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init=init).fit_transform(x)
             # y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init="pca", global_learning_rate=0.0015, local_learning_rate=0.2).fit_transform(x)

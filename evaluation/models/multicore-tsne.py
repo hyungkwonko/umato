@@ -42,7 +42,7 @@ if __name__ == "__main__":
                 save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
                 plot_tmptmp(y, label, "tsne")
     else:
-        for dt in ['mnist', 'fmnist', 'kmnist']:
+        for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
             # read data
             x, label = get_data(dt, n_samples=args.n_samples)
 

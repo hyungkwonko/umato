@@ -36,7 +36,7 @@ if __name__ == "__main__":
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
                 save_csv(path, alg_name=f"umap_{n_neighbor[i]}_{min_dist[j]}", data=y, label=label)
     else:
-        for dt in ['mnist', 'fmnist', 'kmnist']:
+        for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
             # read data
             x, label = get_data(dt, n_samples=args.n_samples)
 
