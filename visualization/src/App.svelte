@@ -3,12 +3,15 @@
 	import Scatterplot2 from "./Scatterplot2.svelte";
 	import Scatterplot3 from "./Scatterplot3.svelte";
 	import Scatterplot4 from "./Scatterplot4.svelte";
+	import Scatterplot5 from "./Scatterplot5.svelte";
 	import Linechart from "./Linechart.svelte";
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
-	let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
+	let dnames = ["mnist", "fmnist", "kmnist"];
+	// let dnames = ["spheres"];
+	// let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
 	let dnames2 = ["scurve", "swissroll"];
-	let type = 6;
+	let type = 7;
 
 </script>
 
@@ -81,17 +84,41 @@
 				</tr>
 			</table>
 		{/each}
+	{:else if type == 7}
+		<table>
+			<tr>
+				<td><Scatterplot dname={'spheres'} algoname={"class-wise separation"}></Scatterplot></td>
+				<td><Scatterplot dname={'spheres'} algoname={"PCA initialization"}></Scatterplot></td>
+				<td><Scatterplot dname={'spheres'} algoname={"Random initialization"}></Scatterplot></td>
+				<td><Scatterplot dname={'spheres'} algoname={"Spectral embedding"}></Scatterplot></td>
+			</tr>
+		</table>
+	{:else if type == 8}
+		<table>
+			<tr>
+				<td><Scatterplot5 dname={'run'} algoname={'umap_200'} x={-7} y={17}></Scatterplot5></td>
+				<td><Scatterplot5 dname={'run'} algoname={'umap_1000'} x={-7} y={17}></Scatterplot5></td>
+				<td><Scatterplot5 dname={'run'} algoname={'umap_5000'} x={-7} y={17}></Scatterplot5></td>
+			</tr>
+		</table>
+		<table>
+			<tr>
+				<td><Scatterplot5 dname={'run'} algoname={'umato_200'} x={0} y={10}></Scatterplot5></td>
+				<td><Scatterplot5 dname={'run'} algoname={'umato_1000'} x={0} y={10}></Scatterplot5></td>
+				<td><Scatterplot5 dname={'run'} algoname={'umato_5000'} x={0} y={10}></Scatterplot5></td>
+			</tr>
+		</table>
 	{:else}
 		<!-- <h1>UMATO pipeline</h1> -->
 		<table>
 			<tr>
-				<td><Scatterplot2 filename={"(A)_global_init"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"(A)"} mystring={"(A) Hub points_initialization"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 filename={"(B)_global_opt"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"(B)"} mystring={"(B) After optimizing_positions of hubs points"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 filename={"(C)_local_init"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"(C)"} mystring={"(C) After embedding_expanded nearest neighbors"}></Scatterplot2></td>
 				<td><Arrow></Arrow></td>
-				<td><Scatterplot2 filename={"(D)_final_result"}></Scatterplot2></td>
+				<td><Scatterplot2 filename={"(D)"} mystring={"(D) Final result"}></Scatterplot2></td>
 			</tr>
 		</table>
 	{/if}

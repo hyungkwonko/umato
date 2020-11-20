@@ -72,7 +72,7 @@
             {/each}
         </svg>
         <!-- <h2>{algoname.toUpperCase()}</h2> -->
-        <h2>{algoname.replace(/_/g,' ').toUpperCase()}</h2>
-        <!-- <h2>{dname.replace(/_/g,' ').toUpperCase()}</h2> -->
+        <h2>{algoname.replace(/_/g,' ')}</h2>
+        <h2>{dname.replace(/_/g,' ').toUpperCase()}</h2>
     </div>
 </div>
