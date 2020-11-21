@@ -9,7 +9,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description="args for umato")
 parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, kmnist, flow, swissroll, scurve", default="spheres")
-parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=200)
+parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=300)
 parser.add_argument("--n_samples", type=int, help="choose number of samples", default=1500)
 parser.add_argument("--init", type=str, help="choose initialization method", default="pca")
 args = parser.parse_args()
@@ -27,13 +27,13 @@ if __name__ == "__main__":
     #     save_csv('./', alg_name=f"umato_{args.data}_{epoch}", data=y, label=label)
 
     # UMTO
-    for dt in ['mnist', 'fmnist', 'kmnist']:
+    for dt in ['fmnist', 'mnist', 'kmnist']:
         # x = load_digits()  # (1797, 64 dim)
         x, label = get_data(dt, n_samples=args.n_samples)  # spheres, mnist, fmnist, kmnist
 
         for mtd in ['spectral']:
             init = init_position(x, label, dname=dt, init_type=mtd)
-            y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init=init, local_learning_rate=0.5).fit_transform(x)
+            y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init=init, local_learning_rate=0.1).fit_transform(x)
             # y = umato.UMATO(verbose=True, ll=label, hub_num=args.hub_num, init="pca", global_learning_rate=0.0015, local_learning_rate=0.2).fit_transform(x)
 
             plot_tmptmp(y, label, "pic5_fin")
