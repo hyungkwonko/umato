@@ -59,7 +59,7 @@
 </script>
 
 <div class="outer">
-    <div class="inner">
+    <div class="inner" style='margin-right: 20px'>
         <svg {width} {height}>
             <!-- <text fill="currentColor" x="400px" y="400px">asdas</text> -->
             {#each data as d}
@@ -73,6 +73,6 @@
         </svg>
         <!-- <h2>{algoname.toUpperCase()}</h2> -->
         <h2>{algoname.replace(/_/g,' ')}</h2>
-        <h2>{dname.replace(/_/g,' ').toUpperCase()}</h2>
+        <!-- <h2>{dname.replace(/_/g,' ').toUpperCase()}</h2> -->
     </div>
 </div>

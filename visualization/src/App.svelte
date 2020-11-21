@@ -11,7 +11,7 @@
 	// let dnames = ["spheres"];
 	// let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
 	let dnames2 = ["scurve", "swissroll"];
-	let type = 7;
+	let type = 4;
 
 </script>
 
@@ -55,10 +55,9 @@
 	{:else if type == 4}
 		<table>
 			<tr>
-				<td><Scatterplot dname={"local"} algoname={"spheres_lr1.0"}></Scatterplot></td>
-				<td><Scatterplot dname={"local"} algoname={"mnist_lr1.0"}></Scatterplot></td>
-				<td><Scatterplot dname={"local"} algoname={"fmnist_lr1.0"}></Scatterplot></td>
-				<td><Scatterplot dname={"local"} algoname={"kmnist_lr1.0"}></Scatterplot></td>
+				<td><Scatterplot dname={"local"} algoname={"MNIST_LR=0.1"}></Scatterplot></td>
+				<td><Scatterplot dname={"local"} algoname={"FMNIST_LR=0.1"}></Scatterplot></td>
+				<td><Scatterplot dname={"local"} algoname={"KMNIST_LR=0.1"}></Scatterplot></td>
 			</tr>
 		</table>
 	{:else if type == 5}
@@ -88,8 +87,8 @@
 		<table>
 			<tr>
 				<td><Scatterplot dname={'spheres'} algoname={"class-wise separation"}></Scatterplot></td>
-				<td><Scatterplot dname={'spheres'} algoname={"PCA initialization"}></Scatterplot></td>
-				<td><Scatterplot dname={'spheres'} algoname={"Random initialization"}></Scatterplot></td>
+				<td><Scatterplot dname={'spheres'} algoname={"PCA_"}></Scatterplot></td>
+				<td><Scatterplot dname={'spheres'} algoname={"Random"}></Scatterplot></td>
 				<td><Scatterplot dname={'spheres'} algoname={"Spectral embedding"}></Scatterplot></td>
 			</tr>
 		</table>
