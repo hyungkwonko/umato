@@ -8,7 +8,7 @@ from umato.utils import init_position
 import argparse
 
 parser = argparse.ArgumentParser(description="args for umato")
-parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, kmnist, flow, swissroll, scurve", default="spheres")
+parser.add_argument("--data", type=str, help="choose data: spheres, mnist, fmnist, kmnist, flow, swissroll, scurve, single-cell", default="spheres")
 parser.add_argument("--hub_num", type=int, help="choose number of hubs", default=300)
 parser.add_argument("--n_samples", type=int, help="choose number of samples", default=1500)
 parser.add_argument("--init", type=str, help="choose initialization method", default="pca")
@@ -16,6 +16,12 @@ args = parser.parse_args()
 
 
 if __name__ == "__main__":
+
+    x, label = get_data(args.data, n_samples=args.n_samples)
+    print(x.shape)
+    print(label)
+
+    exit()
 
     # x = x[np.arange(0, 10000, 50)]
     # label = label[np.arange(0, 10000, 50)]

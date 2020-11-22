@@ -122,6 +122,17 @@ def get_data(dname, n_samples=None):
         from sklearn import datasets
         x, label = datasets.make_s_curve(n_samples=n_samples)
         return x, label
+    elif dname == "single-cell":
+        path = os.path.join(os.getcwd(), "data", "single-cell")
+        data_path = os.path.join(path, "sc_10x.count.csv")
+        label_path = os.path.join(path, "sc_10x.metadata.csv")
+        x = pd.read_csv(data_path)
+        x = np.asarray(x)
+        label = pd.read_csv(label_path)
+        label = label['cell_line_demuxlet']
+        label = np.asarray(label)
+
+        return x, label
     else:
         pass
 
