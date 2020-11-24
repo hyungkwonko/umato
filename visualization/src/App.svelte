@@ -4,6 +4,8 @@
 	import Scatterplot3 from "./Scatterplot3.svelte";
 	import Scatterplot4 from "./Scatterplot4.svelte";
 	import Scatterplot5 from "./Scatterplot5.svelte";
+	import Scatterplot6 from "./Scatterplot6.svelte";
+	import Scatterplot7 from "./Scatterplot7.svelte";
 	import Linechart from "./Linechart.svelte";
 	import Arrow from "./Arrow.svelte";
 	import Head from "./Head.svelte";
@@ -11,7 +13,7 @@
 	// let dnames = ["spheres"];
 	// let dnames = ["spheres", "mnist", "fmnist", "kmnist"];
 	let dnames2 = ["scurve", "swissroll"];
-	let type = 4;
+	let type = 9;
 
 </script>
 
@@ -105,6 +107,23 @@
 				<td><Scatterplot5 dname={'run'} algoname={'umato_200'} x={0} y={10}></Scatterplot5></td>
 				<td><Scatterplot5 dname={'run'} algoname={'umato_1000'} x={0} y={10}></Scatterplot5></td>
 				<td><Scatterplot5 dname={'run'} algoname={'umato_5000'} x={0} y={10}></Scatterplot5></td>
+			</tr>
+		</table>
+	{:else if type == 9}
+		<table>
+			<tr>
+				<td><Scatterplot6 dname={'allen'} algoname={'tsne'}></Scatterplot6></td>
+				<!-- <td><Scatterplot6 dname={'allen'} algoname={'UMAP_200_epochs'}></Scatterplot6></td>
+				<td><Scatterplot6 dname={'allen'} algoname={'UMAP_2000_epochs'}></Scatterplot6></td> -->
+				<td><Scatterplot7 dname={'allen'} algoname={'UMAP_200_epochs'} x={-15} y={25}></Scatterplot7></td>
+				<td><Scatterplot7 dname={'allen'} algoname={'UMAP_2000_epochs'} x={-15} y={25}></Scatterplot7></td>
+			</tr>
+		</table>
+		<br>
+		<table>
+			<tr>
+				<td><Scatterplot6 dname={'allen'} algoname={'UMATO_100_epochs'}></Scatterplot6></td>
+				<td><Scatterplot6 dname={'allen'} algoname={'UMATO_1000_epochs'}></Scatterplot6></td>
 			</tr>
 		</table>
 	{:else}
