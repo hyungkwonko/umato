@@ -91,6 +91,12 @@ def get_data(dname, n_samples=None):
         x = df.drop(columns=['label']).to_numpy()
         label = df['label'].to_numpy()
         return x, label
+    elif dname == "allen":
+        path = os.path.join(os.getcwd(), "data", "allen")
+        df = pd.read_csv(os.path.join(path, 'allen.csv')) # load data
+        x = df.drop(columns=['label']).to_numpy()
+        label = df['label'].to_numpy()
+        return x, label
     elif dname == "spheres_small":
         path = os.path.join(os.getcwd(), "data", "spheres")
         df = pd.read_csv(os.path.join(path, 'spheres_small.csv')) # load data
@@ -128,11 +134,69 @@ def get_data(dname, n_samples=None):
         label_path = os.path.join(path, "sc_10x.metadata.csv")
         x = pd.read_csv(data_path)
         x = np.asarray(x)
-        label = pd.read_csv(label_path)
-        label = label['cell_line_demuxlet']
-        label = np.asarray(label)
-
-        return x, label
+        x = np.swapaxes(x, 0, 1)
+        labels = pd.read_csv(label_path)
+        labels = labels['cell_line_demuxlet']
+        labels = np.asarray(labels)
+        label_uniq = list(set(labels))
+        label_uniq.sort()
+        for i, label in enumerate(labels):
+            if label == label_uniq[0]:
+                labels[i] = 0
+            elif label == label_uniq[1]:
+                labels[i] = 1
+            else:
+                labels[i] = 2
+        return x, labels
+    elif dname == "single-cell2":
+        path = os.path.join(os.getcwd(), "data", "single-cell")
+        data_path = os.path.join(path, "sc_10x_5cl.count.csv")
+        label_path = os.path.join(path, "sc_10x_5cl.metadata.csv")
+        x = pd.read_csv(data_path)
+        x = np.asarray(x)
+        x = np.swapaxes(x, 0, 1)
+        labels = pd.read_csv(label_path)
+        labels = labels['cell_line_demuxlet']
+        labels = np.asarray(labels)
+        label_uniq = list(set(labels))
+        label_uniq.sort()
+        print(label_uniq)
+        for i, label in enumerate(labels):
+            if label == label_uniq[0]:
+                labels[i] = 0
+            elif label == label_uniq[1]:
+                labels[i] = 1
+            elif label == label_uniq[2]:
+                labels[i] = 2
+            elif label == label_uniq[3]:
+                labels[i] = 3
+            else:
+                labels[i] = 4
+        return x, labels
+    elif dname == "single-cell3":
+        path = os.path.join(os.getcwd(), "data", "single-cell")
+        data_path = os.path.join(path, "sc_celseq2_5cl_p1.count.csv")
+        label_path = os.path.join(path, "sc_celseq2_5cl_p1.metadata.csv")
+        x = pd.read_csv(data_path)
+        x = np.asarray(x)
+        x = np.swapaxes(x, 0, 1)
+        labels = pd.read_csv(label_path)
+        labels = labels['cell_line_demuxlet']
+        labels = np.asarray(labels)
+        label_uniq = list(set(labels))
+        label_uniq.sort()
+        for i, label in enumerate(labels):
+            if label == label_uniq[0]:
+                labels[i] = 0
+            elif label == label_uniq[1]:
+                labels[i] = 1
+            elif label == label_uniq[2]:
+                labels[i] = 2
+            elif label == label_uniq[3]:
+                labels[i] = 3
+            else:
+                labels[i] = 4
+        return x, labels
     else:
         pass
 

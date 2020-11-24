@@ -1,0 +1,1 @@
+wget -P . https://rapids-single-cell-examples.s3.us-east-2.amazonaws.com/krasnow_hlca_10x.sparse.h5ad

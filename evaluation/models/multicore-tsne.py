@@ -21,36 +21,41 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    if args.hp:
-        # learning_rate = np.sort(loguniform.rvs(10, 1000, size=1000))[99::100]
-        learning_rate = np.array([15.24742297, 23.48066375, 37.34107189, 58.27652395, 87.24048423, 137.33961493, 211.00561713, 374.36120544, 576.90813121, 983.37544116])
-        perplexity = np.arange(5, 55, 5)
+    x, label = get_data(args.data, n_samples=args.n_samples)
+    y = TSNE(n_components=args.dim, n_jobs=40, verbose=2).fit_transform(x)
+    plot_tmptmp(y, label, f"tsne")
+    save_csv('./', alg_name=f"tsne", data=y, label=label)
 
-        for i in range(len(learning_rate)):
-            for j in range(len(perplexity)):
+    # if args.hp:
+    #     # learning_rate = np.sort(loguniform.rvs(10, 1000, size=1000))[99::100]
+    #     learning_rate = np.array([15.24742297, 23.48066375, 37.34107189, 58.27652395, 87.24048423, 137.33961493, 211.00561713, 374.36120544, 576.90813121, 983.37544116])
+    #     perplexity = np.arange(5, 55, 5)
 
-                # read data
-                x, label = get_data(args.data)
+    #     for i in range(len(learning_rate)):
+    #         for j in range(len(perplexity)):
 
-                init = init_position(x, label, init_type=args.init)
+    #             # read data
+    #             x, label = get_data(args.data)
 
-                # run TSNE
-                y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], init=init, n_iter=1500, n_jobs=40, random_state=0, verbose=2).fit_transform(x)
+    #             init = init_position(x, label, init_type=args.init)
 
-                # save as csv
-                path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
-                save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
-                plot_tmptmp(y, label, "tsne")
-    else:
-        for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
-            # read data
-            x, label = get_data(dt, n_samples=args.n_samples)
+    #             # run TSNE
+    #             y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], init=init, n_iter=1500, n_jobs=40, random_state=0, verbose=2).fit_transform(x)
 
-            for mtd in ['spectral', 'pca', 'random', 'class']:
-                init = init_position(x, label, dname=dt, init_type=mtd)
-                y = TSNE(n_components=args.dim, n_jobs=40, init=init, random_state=0, verbose=2).fit_transform(x)
-                # path = os.path.join(os.getcwd(), "visualization", "public", "results", dt)
-                # save_csv(path, alg_name="tsne", data=y, label=label)
+    #             # save as csv
+    #             path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
+    #             save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
+    #             plot_tmptmp(y, label, "tsne")
+    # else:
+    #     for dt in ['spheres', 'mnist', 'fmnist', 'kmnist']:
+    #         # read data
+    #         x, label = get_data(dt, n_samples=args.n_samples)
 
-                plot_tmptmp(y, label, f"pic_tsne_{dt}_{mtd}")
-                save_csv('./', alg_name=f"tsne_{dt}_{mtd}", data=y, label=label)
+    #         for mtd in ['spectral', 'pca', 'random', 'class']:
+    #             init = init_position(x, label, dname=dt, init_type=mtd)
+    #             y = TSNE(n_components=args.dim, n_jobs=40, init=init, random_state=0, verbose=2).fit_transform(x)
+    #             # path = os.path.join(os.getcwd(), "visualization", "public", "results", dt)
+    #             # save_csv(path, alg_name="tsne", data=y, label=label)
+
+    #             plot_tmptmp(y, label, f"pic_tsne_{dt}_{mtd}")
+    #             save_csv('./', alg_name=f"tsne_{dt}_{mtd}", data=y, label=label)

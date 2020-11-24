@@ -2,6 +2,7 @@ from sklearn.decomposition import PCA
 import argparse
 import os
 from .dataset import get_data, save_csv
+from umato.umato_ import plot_tmptmp
 
 parser = argparse.ArgumentParser(description="PCA embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
@@ -21,4 +22,5 @@ if __name__ == "__main__":
 
     # save as csv
     path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
+    plot_tmptmp(y, label, "pca")
     save_csv(path, alg_name="pca", data=y, label=label)
