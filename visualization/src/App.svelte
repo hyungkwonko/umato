@@ -115,15 +115,15 @@
 				<td><Scatterplot6 dname={'allen'} algoname={'tsne'}></Scatterplot6></td>
 				<!-- <td><Scatterplot6 dname={'allen'} algoname={'UMAP_200_epochs'}></Scatterplot6></td>
 				<td><Scatterplot6 dname={'allen'} algoname={'UMAP_2000_epochs'}></Scatterplot6></td> -->
-				<td><Scatterplot7 dname={'allen'} algoname={'UMAP_200_epochs'} x={-15} y={25}></Scatterplot7></td>
-				<td><Scatterplot7 dname={'allen'} algoname={'UMAP_2000_epochs'} x={-15} y={25}></Scatterplot7></td>
+				<td><Scatterplot7 dname={'allen'} algoname={'UMAP_200_epochs_(default)'} x={-15} y={25}></Scatterplot7></td>
+				<td><Scatterplot7 dname={'allen'} algoname={'UMAP_2000_epochs_(10x)'} x={-15} y={25}></Scatterplot7></td>
 			</tr>
 		</table>
 		<br>
 		<table>
 			<tr>
-				<td><Scatterplot6 dname={'allen'} algoname={'UMATO_100_epochs'}></Scatterplot6></td>
-				<td><Scatterplot6 dname={'allen'} algoname={'UMATO_1000_epochs'}></Scatterplot6></td>
+				<td><Scatterplot6 dname={'allen'} algoname={'UMATO_100_epochs_(default)'}></Scatterplot6></td>
+				<td><Scatterplot6 dname={'allen'} algoname={'UMATO_1000_epochs_(10x)'}></Scatterplot6></td>
 			</tr>
 		</table>
 	{:else}
