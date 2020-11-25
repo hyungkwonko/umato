@@ -60,7 +60,7 @@ npm install
 npm run dev
 ```
 
-### Embedding results of four datasets for each algorithm
+### Embedding results of the Spheres dataset for each algorithm
 
 |             2D visualization           |
 |:--------------------------------------:|
