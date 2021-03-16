@@ -1,15 +1,29 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from sklearn.utils import shuffle
+import argparse
+
+parser = argparse.ArgumentParser(description="spheres data generation")
+parser.add_argument("--fname", type=str, help="choose dataset", default="spheres_save")
+parser.add_argument("--total_samples", type=int, help="choose total_samples", default=10000)
+parser.add_argument("--n_spheres", type=int, help="choose number of inner spheres", default=10)
+parser.add_argument("--d", type=int, help="choose dimension", default=101)
+parser.add_argument("--r", type=int, help="choose inner sphere's radius", default=5)
+parser.add_argument("--r_out", type=int, help="choose outer sphere's radius", default=25)
+parser.add_argument("--seed", type=int, help="choose seed", default=42)
+parser.add_argument("--plot", type=bool, help="choose whether to save fig", default=False)
+
+args = parser.parse_args()
 
 
 def dsphere(n=100, d=2, r=1, noise=None):
 
-    data = np.random.randn(n, d + 1)
+    data = np.random.randn(n, d)
 
-    # Normalize points to the sphere
+    # Normalization
     data = r * data / np.sqrt(np.sum(data ** 2, 1)[:, None])
 
     if noise:
@@ -18,37 +32,37 @@ def dsphere(n=100, d=2, r=1, noise=None):
     return data
 
 
-def create_sphere_dataset(n_samples=500, d=100, n_spheres=11, r=5, plot=False, seed=42):
+def create_sphere_dataset(total_samples=10000, d=100, n_spheres=10, r=5, r_out=25, seed=42, plot=False):
     np.random.seed(seed)
 
-    # it seemed that rescaling the shift variance by sqrt of d lets big sphere stay around the inner spheres
-    variance = r / np.sqrt(d)
+    variance = r / np.sqrt(d-1)
 
-    shift_matrix = np.random.normal(0, variance, [n_spheres, d + 1])
+    shift_matrix = np.random.normal(0, variance, [n_spheres, d])
 
     spheres = []
     n_datapoints = 0
-    for i in np.arange(n_spheres - 1):
+    n_samples = total_samples // (2 * n_spheres)
+
+    for i in np.arange(n_spheres):
         sphere = dsphere(n=n_samples, d=d, r=r)
         sphere_shifted = sphere + shift_matrix[i, :]
         spheres.append(sphere_shifted)
         n_datapoints += n_samples
 
-    # Additional big surrounding sphere:
-    n_samples_big = 10 * n_samples  # int(n_samples/2)
-    big = dsphere(n=n_samples_big, d=d, r=r * 5)
+    # Big surrounding sphere:
+    n_samples_big = total_samples - n_datapoints
+    big = dsphere(n=n_samples_big, d=d, r=r_out)
     spheres.append(big)
     n_datapoints += n_samples_big
 
     if plot:
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
-        colors = matplotlib.cm.rainbow(np.linspace(0, 1, n_spheres))
+        ax = fig.gca(projection='3d')
+        colors = matplotlib.cm.rainbow(np.linspace(0, 1, n_spheres+1))
         for data, color in zip(spheres, colors):
-            ax.scatter(data[:, 0], data[:, 1], data[:, 2], c=[color])
-        plt.show()
+            ax.scatter(data[:, 0], data[:, 1], data[:, 2], c=[color], s=5.0)
+        plt.savefig("sample.png")
 
-    # Create Dataset:
     dataset = np.concatenate(spheres, axis=0)
 
     labels = np.zeros(n_datapoints)
@@ -62,12 +76,11 @@ def create_sphere_dataset(n_samples=500, d=100, n_spheres=11, r=5, plot=False, s
 
 
 if __name__ == "__main__":
-    # d, l = create_sphere_dataset(n_samples=30, d=2, r=5, plot=True)
-    d, l = create_sphere_dataset()
+    d, l = create_sphere_dataset(total_samples=args.total_samples, n_spheres=args.n_spheres,
+        d=args.d, r=args.r, r_out=args.r_out, seed=args.seed, plot=args.plot)
     df = pd.DataFrame(d)
     df["label"] = l
 
-    # randomize
+    # randomize data order
     # df = shuffle(df).reset_index(drop=True)
-
-    df.to_csv(f"./spheres.csv", index=False)
+    df.to_csv(f"./{args.fname}.csv", index=False)
