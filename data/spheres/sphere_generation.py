@@ -13,6 +13,7 @@ parser.add_argument("--n_spheres", type=int, help="choose number of inner sphere
 parser.add_argument("--d", type=int, help="choose dimension", default=101)
 parser.add_argument("--r", type=int, help="choose inner sphere's radius", default=5)
 parser.add_argument("--r_out", type=int, help="choose outer sphere's radius", default=25)
+parser.add_argument("--var", type=float, help="choose variance btwn inner spheres", default=1.0)
 parser.add_argument("--seed", type=int, help="choose seed", default=42)
 parser.add_argument("--plot", type=bool, help="choose whether to save fig", default=False)
 
@@ -32,10 +33,10 @@ def dsphere(n=100, d=2, r=1, noise=None):
     return data
 
 
-def create_sphere_dataset(total_samples=10000, d=100, n_spheres=10, r=5, r_out=25, seed=42, plot=False):
+def create_sphere_dataset(total_samples=10000, d=100, n_spheres=10, r=5, r_out=25, var=1.0, seed=42, plot=False):
     np.random.seed(seed)
 
-    variance = r / np.sqrt(d-1)
+    variance = r / np.sqrt(d-1) * var
 
     shift_matrix = np.random.normal(0, variance, [n_spheres, d])
 
@@ -77,7 +78,7 @@ def create_sphere_dataset(total_samples=10000, d=100, n_spheres=10, r=5, r_out=2
 
 if __name__ == "__main__":
     d, l = create_sphere_dataset(total_samples=args.total_samples, n_spheres=args.n_spheres,
-        d=args.d, r=args.r, r_out=args.r_out, seed=args.seed, plot=args.plot)
+        d=args.d, r=args.r, r_out=args.r_out, var=args.var, seed=args.seed, plot=args.plot)
     df = pd.DataFrame(d)
     df["label"] = l
 
