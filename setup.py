@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
 	name="umato",
-	version="0.0.1",
+	version="0.0.4",
 	author="Hyeon Jeon",
 	author_email="hj@hcil.snu.ac.kr",
 	description="Implementation of UMATO (Uniform Manifold Approximation with Two-Phase Optimization)", 
@@ -22,6 +22,10 @@ setuptools.setup(
 		"numba",
 		"scipy",
 		"scikit-learn",
+		"joblib",
+		"matplotlib",
+		"pandas",
+		"fcsparser",
 	],
 	package_dir={"": "src"},
 	packages=setuptools.find_packages(where="src"),

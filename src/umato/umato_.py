@@ -1,5 +1,5 @@
 """
-Auhtor: Hyung-Kwon Ko (hkko@hcil.snu.ac.kr)
+Author: Hyung-Kwon Ko (hkko@hcil.snu.ac.kr)
 """
 
 from __future__ import print_function
@@ -573,7 +573,6 @@ class UMATO(BaseEstimator):
         b=None,
         random_state=None,
         angular_rp_forest=False,
-        verbose=False,
         init="pca",
         ll=None,
     ):
@@ -594,7 +593,7 @@ class UMATO(BaseEstimator):
         self.negative_sample_rate = negative_sample_rate
         self.random_state = random_state
         self.angular_rp_forest = angular_rp_forest
-        self.verbose = verbose
+        self.verbose = False
         self.a = a
         self.b = b
         self.init = init

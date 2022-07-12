@@ -11,17 +11,20 @@ Next, we initialize and optimize other points using the nearest neighbor graph. 
 - numba
 - pandas (to read csv files)
 
-## Run
-You can try the following code to see the result:
+### Installation 
+
+UMATO is available via pip.
+
+```sh
+pip install umato
+```
+
 ```python
-# install requirements
-pip install scikit-learn numpy numba pandas
+import umato
+from sklearn.datasets import load_iris
 
-# download specific (e.g., MNIST) datasets
-bash download.sh mnist
-
-# run UMATO
-python test.py --data=mnist
+X, y = load_iris(return_X_y=True)
+emb = umato.UMATO(hub_num=20).fit_transform(X)
 ```
 
 # Evaluation
