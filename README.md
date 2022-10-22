@@ -2,9 +2,12 @@
 
 ### Notice
 
-Thank you for all the interests in UMATO! We'll soon work on cleaning the codes and resolving the bugs (within Nov 2022). Thank you!
+*Appreciate all the interests in UMATO at VIS 2022! We'll soon work on cleaning the codes and resolving the bugs (within Nov 2022). Thank you!*
 
-### 
+**If there is an urgent bug in using UMATO in your project, please directly send report in the Issues tab.**
+
+-----
+
 
 Uniform Manifold Approximation with Two-phase Optimization (UMATO) is a dimensionality reduction technique, which can preserve the global as well as the local structure of high-dimensional data. Most existing dimensionality reduction algorithms focus on either of the two aspects, however, such insufficiency can lead to overlooking or misinterpreting important patterns in the data. For this aim, we propose a two-phase optimization: global optimization and local optimization. First, we obtain the global structure by selecting and optimizing the hub points.
 Next, we initialize and optimize other points using the nearest neighbor graph. Our experiments with one synthetic and three real world datasets show that UMATO can outperform the baseline algorithms, such as PCA, [t-SNE](https://lvdmaaten.github.io/tsne/), [Isomap](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.Isomap.html), [UMAP](https://github.com/lmcinnes/umap), [Topological Autoencoders](https://github.com/BorgwardtLab/topological-autoencoders) and [Anchor t-SNE](https://github.com/ZJULearning/AtSNE), in terms of global measures and qualitative projection results.
