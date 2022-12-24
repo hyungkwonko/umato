@@ -2,9 +2,8 @@
 
 ### Notice
 
-*Appreciate all the interests in UMATO at VIS 2022! We'll soon work on cleaning the codes and resolving the bugs (within Nov 2022). Thank you!*
+*Appreciate all the interests in UMATO at VIS 2022! We'll soon work on cleaning the codes and resolving the bugs (within Early 2023). Thank you!*
 
-**If there is an urgent bug in using UMATO in your project, please directly send report in the Issues tab.**
 
 -----
 
