@@ -575,6 +575,7 @@ class UMATO(BaseEstimator):
         angular_rp_forest=False,
         init="pca",
         ll=None,
+        verbose=False,
     ):
         self.n_neighbors = n_neighbors
         self.hub_num = hub_num
@@ -593,7 +594,7 @@ class UMATO(BaseEstimator):
         self.negative_sample_rate = negative_sample_rate
         self.random_state = random_state
         self.angular_rp_forest = angular_rp_forest
-        self.verbose = False
+        self.verbose = verbose
         self.a = a
         self.b = b
         self.init = init
