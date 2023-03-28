@@ -73,47 +73,89 @@ def build_knn_graph(
 ):
     sorted_index_c = sorted_index.copy()
 
-    leaf_num = int(np.ceil(data.shape[0] / hub_num))
+    index_map = [0] * len(sorted_index_c)
+    for i, val in enumerate(sorted_index_c):
+        index_map[val] = i
+    index_map = np.array(index_map)
+
     disjoints = []
 
-    for i in range(hub_num):
-        tmp = 0
+    real_point_count = data.shape[0]
+    # the number of nodes per KNN, i.e. the K value
+    leaf_num = int(np.ceil(real_point_count / hub_num))
+
+    # the number of points to be appended to the disjoints list
+    total_disjoints_count = leaf_num * hub_num
+
+    # the number of padding points, having index value -1
+    # this number will be smaller than leaf_num, as empty KNNs won't be created
+    padding_point_count = (total_disjoints_count - real_point_count) % leaf_num
+
+    # the number of hubs with no padding points
+    full_real_knn_hub_count = int(np.floor(real_point_count / leaf_num))
+
+    last_source_loc = -1
+
+    # deal with hubs with no padding points first
+    for i in range(full_real_knn_hub_count):
+        # append the first element
+        for j in range(last_source_loc + 1, len(sorted_index_c)):
+            if sorted_index_c[j] > -1:
+                source = sorted_index_c[j]
+                sorted_index_c[j] = -1
+                last_source_loc = j
+                break
+        else:
+            # No hub source found!
+            raise AssertionError("Logic should not reach this block.")
+
+        # get distance for each element
+        distances_squared = np.full(len(sorted_index_c), np.inf)
+        targets = sorted_index[sorted_index_c != -1]
+        for target in targets:
+            distance_squared = np.sum((data[source] - data[target]) ** 2)
+            distances_squared[target] = distance_squared
+
+        # append other elements
+        # it is guaranteed that the distances aren't inf
+        sorted_distance_indexes = np.argsort(distances_squared)[:leaf_num - 1]
+
+        # create KNN
+        disjoint = [source] + list(sorted_distance_indexes)
+
+        # mark indexes as used
+        sorted_index_c[index_map[sorted_distance_indexes]] = -1
+
+        disjoints.append(disjoint)
+
+    if padding_point_count:
         source = -1
         disjoint = []
 
         # append the first element
-        for j in range(len(sorted_index_c)):
+        for j in range(last_source_loc + 1, len(sorted_index_c)):
             if sorted_index_c[j] > -1:
                 source = sorted_index_c[j]
                 disjoint.append(source)
                 sorted_index_c[j] = -1
-                tmp += 1
+                last_source_loc = j
                 break
         if source == -1:
-            break  # break if all indices == -1
+            # No hub source found!
+            raise AssertionError("Logic should not reach this block.")
 
         # get distance for each element
-        distances = np.ones(len(sorted_index_c)) * np.inf
-        for k in range(len(sorted_index_c)):
-            distance = 0.0
-            if sorted_index_c[k] > -1:
-                target = sorted_index_c[k]
-                for d in range(data.shape[1]):
-                    distance += (data[source][d] - data[target][d]) ** 2
-                distances[target] = np.sqrt(distance)
+        distances_squared = np.full(len(sorted_index_c), np.inf)
+        targets = sorted_index[sorted_index_c != -1]
+        for target in targets:
+            distance_squared = np.sum((data[source] - data[target]) ** 2)
+            distances_squared[target] = distance_squared
 
         # append other elements
-        for _ in range(leaf_num - 1):
-            val = min(distances)
-            if np.isinf(val):
-                disjoint = disjoint + [-1] * (leaf_num - tmp)
-                break
-            else:
-                min_index = np.argmin(distances)
-                disjoint.append(min_index)
-                distances[min_index] = np.inf
-                sorted_index_c[sorted_index_c == min_index] = -1
-                tmp += 1
+        real_elements = leaf_num - padding_point_count
+        sorted_distance_indexes = np.argsort(distances_squared)[:real_elements - 1]
+        disjoint = [source] + list(sorted_distance_indexes) + [-1] * padding_point_count
+        sorted_index_c[index_map[sorted_distance_indexes]] = -1
 
         disjoints.append(disjoint)
 
