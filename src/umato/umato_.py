@@ -66,7 +66,7 @@ INT32_MAX = np.iinfo(np.int32).max - 1
 
 @numba.njit(
     # parallel=True,  # can SABOTAGE the array order (should be used with care)
-    fastmath=True,
+    fastmath={'nnan', 'nsz', 'arcp', 'contract', 'afn', 'reassoc'},
 )
 def build_knn_graph(
     data, sorted_index, hub_num,
