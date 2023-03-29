@@ -4,9 +4,9 @@ if [[ "$invalue" = "" ]]
 then
    for dname in mnist spheres fmnist cifar10;
         do
-            # cd evaluation/models/topoae
-            # sh run-topoae.sh $dname
-            # cd ../../..
+            cd evaluation/models/topoae
+            sh run-topoae.sh $dname
+            cd ../../..
 
             echo "[RUN-PCA INFO] PCA embedding using $invalue dataset..."
             python3 evaluation/models/pca.py --data=$invalue
