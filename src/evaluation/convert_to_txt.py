@@ -4,7 +4,7 @@ This convert data into txt (preparation for fvecs)
 
 import numpy as np
 import argparse
-from evaluation.models.dataset import get_data
+from .models.dataset import get_data
 # import pandas as pd
 
 parser = argparse.ArgumentParser(

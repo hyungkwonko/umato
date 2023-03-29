@@ -4,7 +4,8 @@ import argparse
 import os
 import numpy as np
 from scipy.stats import loguniform
-from .dataset import get_data, save_csv
+from dataset import get_data, save_csv
+import time
 
 parser = argparse.ArgumentParser(description="t-SNE embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
@@ -15,6 +16,8 @@ args = parser.parse_args()
 
 
 if __name__ == "__main__":
+
+    alg_name = f"tsne"
 
     # read data
     x, label = get_data(args.data)
@@ -31,12 +34,21 @@ if __name__ == "__main__":
                 x, label = get_data(args.data)
 
                 # run TSNE
+                start = time.time()
                 y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_jobs=-1, verbose=True).fit(x)
+                end = time.time()
+
+                print(f"{alg_name} elapsed time: {end-start}")
 
                 # save as csv
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
-                save_csv(path, alg_name=f"tsne_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
+                save_csv(path, alg_name=f"{alg_name}_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
     else:
+        start = time.time()
         y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_jobs=-1, verbose=True).fit(x)
+        end = time.time()
+
+        print(f"{alg_name} elapsed time: {end-start}")
+        
         path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
-        save_csv(path, alg_name="tsne", data=y, label=label)
+        save_csv(path, alg_name=alg_name, data=y, label=label)

@@ -5,7 +5,7 @@ import argparse
 import os
 import numpy as np
 from scipy.stats import loguniform
-from .dataset import get_data, save_csv
+from dataset import get_data, save_csv
 from umato.utils import init_position
 from umato.umato_ import plot_tmptmp
 
