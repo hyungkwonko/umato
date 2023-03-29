@@ -154,7 +154,7 @@ def build_global_structure(
     random_state,
     alpha=0.0065,
     n_epochs=30,
-    verbose=False,
+    verbose=Trues,
     label=None,
     init_global="pca",
 ):

@@ -9,6 +9,7 @@ from sacred.utils import apply_backspaces_and_linefeeds
 import torch
 import numpy as np
 import pandas as pd
+import time
 
 from src.callbacks import Callback, SaveReconstructedImages, \
     SaveLatentRepresentation, Progressbar
@@ -86,6 +87,8 @@ class NewlineCallback(Callback):
 @EXP.automain
 def train(dname, n_epochs, batch_size, learning_rate, weight_decay, val_size,
           early_stopping, device, quiet, evaluation, _run, _log, _seed, _rnd):
+    
+    alg_name = f"TopoAE"
     """Sacred wrapped function to run training of model."""
     torch.manual_seed(_seed)
 
@@ -137,7 +140,12 @@ def train(dname, n_epochs, batch_size, learning_rate, weight_decay, val_size,
         device, callbacks
     )
     # Run training
+
+    start = time.time()
     training_loop()
+    end = time.time()
+
+    print(f"{alg_name} elapsed time: {end-start}")
 
     if rundir:
         # Save model state (and entire model)

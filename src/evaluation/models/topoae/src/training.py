@@ -4,6 +4,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from .datasets.splitting import split_dataset
 import numpy as np
+import time
 
 class TrainingLoop():
     """Training a model using a dataset."""
@@ -78,7 +79,8 @@ class TrainingLoop():
         for epoch in range(1, n_epochs+1):
             if self.on_epoch_begin(remove_self(locals())):
                 break
-
+            start = time.time()
+            
             for batch, (img, label) in enumerate(train_loader):
                 if self.device == 'cuda':
                     img = img.cuda(non_blocking=True)
@@ -96,7 +98,8 @@ class TrainingLoop():
 
                 # Call callbacks
                 self.on_batch_end(remove_self(locals()))
-
+            end = time.time()
+            print("epoch", epoch, "-", end-start, "seconds")
             if self.on_epoch_end(remove_self(locals())):
                 break
         return epoch

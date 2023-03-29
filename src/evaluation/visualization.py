@@ -3,7 +3,7 @@ This will include functions to visualize embedding result
 '''
 
 import numpy as np
-from evaluation.models.dataset import get_embed_data, save_csv, get_data
+from .models.dataset import get_embed_data, save_csv, get_data
 
 def plot_tmptmp(data, label, name):
     import matplotlib.pyplot as plt

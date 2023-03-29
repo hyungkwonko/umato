@@ -593,7 +593,7 @@ class UMATO(BaseEstimator):
         self.negative_sample_rate = negative_sample_rate
         self.random_state = random_state
         self.angular_rp_forest = angular_rp_forest
-        self.verbose = False
+        self.verbose = True
         self.a = a
         self.b = b
         self.init = init
