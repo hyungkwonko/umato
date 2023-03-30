@@ -64,9 +64,19 @@ INT32_MIN = np.iinfo(np.int32).min + 1
 INT32_MAX = np.iinfo(np.int32).max - 1
 
 
+@numba.njit(parallel=True, fastmath=True)
+def calculate_distances(data, source, targets):
+    distances_squared = np.zeros(len(targets), dtype=data.dtype)
+    for target_idx in numba.prange(len(targets)):
+        target = targets[target_idx]
+        distance_squared = np.sum((data[source] - data[target]) ** 2)
+        distances_squared[target_idx] = distance_squared
+    return distances_squared
+
+
 @numba.njit(
     # parallel=True,  # can SABOTAGE the array order (should be used with care)
-    fastmath={'nnan', 'nsz', 'arcp', 'contract', 'afn', 'reassoc'},
+    fastmath=True,
 )
 def build_knn_graph(
     data, sorted_index, hub_num,
@@ -110,15 +120,11 @@ def build_knn_graph(
             raise AssertionError("Logic should not reach this block.")
 
         # get distance for each element
-        distances_squared = np.full(len(sorted_index_c), np.inf)
         targets = sorted_index[sorted_index_c != -1]
-        for target in targets:
-            distance_squared = np.sum((data[source] - data[target]) ** 2)
-            distances_squared[target] = distance_squared
+        distances_squared = calculate_distances(data, source, targets)
 
         # append other elements
-        # it is guaranteed that the distances aren't inf
-        sorted_distance_indexes = np.argsort(distances_squared)[:leaf_num - 1]
+        sorted_distance_indexes = targets[np.argsort(distances_squared)[:leaf_num - 1]].astype('int64')
 
         # create KNN
         disjoint = [source] + list(sorted_distance_indexes)
@@ -145,16 +151,17 @@ def build_knn_graph(
             raise AssertionError("Logic should not reach this block.")
 
         # get distance for each element
-        distances_squared = np.full(len(sorted_index_c), np.inf)
         targets = sorted_index[sorted_index_c != -1]
-        for target in targets:
-            distance_squared = np.sum((data[source] - data[target]) ** 2)
-            distances_squared[target] = distance_squared
+        distances_squared = calculate_distances(data, source, targets)
 
         # append other elements
         real_elements = leaf_num - padding_point_count
-        sorted_distance_indexes = np.argsort(distances_squared)[:real_elements - 1]
+        sorted_distance_indexes = targets[np.argsort(distances_squared)[:real_elements - 1]].astype('int64')
+
+        # create KNN
         disjoint = [source] + list(sorted_distance_indexes) + [-1] * padding_point_count
+
+        # mark indexes as used
         sorted_index_c[index_map[sorted_distance_indexes]] = -1
 
         disjoints.append(disjoint)
