@@ -6,7 +6,7 @@ import argparse
 import os
 import numpy as np
 from scipy.stats import loguniform
-from evaluation.models.dataset import get_data, save_csv
+from .models.dataset import get_data, save_csv
 import time
 
 parser = argparse.ArgumentParser(description="t-SNE embedding")

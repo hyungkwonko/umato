@@ -2,7 +2,7 @@ import fcsparser
 import os
 import numpy as np
 import pandas as pd
-from evaluation.models.dataset import get_data, save_csv
+from .models.dataset import get_data, save_csv
 from MulticoreTSNE import MulticoreTSNE as TSNE
 from umap import UMAP
 from umato import UMATO

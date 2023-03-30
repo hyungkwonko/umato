@@ -1,6 +1,6 @@
 import umato
 from sklearn.datasets import load_digits
-from evaluation.models.dataset import get_data, save_csv
+from .models.dataset import get_data, save_csv
 import os
 import numpy as np
 from umato.umato_ import plot_tmptmp
