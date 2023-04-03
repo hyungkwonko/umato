@@ -162,7 +162,7 @@ X : array, shape (n_samples, n_features) or (n_samples, n_samples)
            
  If the metric is 'precomputed' X must be a square distance matrix. Otherwise it contains a sample per row. If the method is 'exact', X may be a sparse matrix of type 'csr', 'csc' or 'coo'.
 
----
+#
 ### fit_transform
 
 ```python
@@ -184,7 +184,7 @@ If the metric is ‘precomputed’ X must be a square distance matrix. Otherwise
 Embedding of the training data in low-dimensional space.
 
 
----
+#
 
 
 # Useful Functions
