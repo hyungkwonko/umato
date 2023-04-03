@@ -76,10 +76,12 @@ class TrainingLoop():
             weight_decay=self.weight_decay)
 
         epoch = 1
+        alg_name = f"TOPO-AE"
+        start = time.time()
         for epoch in range(1, n_epochs+1):
             if self.on_epoch_begin(remove_self(locals())):
                 break
-            start = time.time()
+            t2 = time.time()
             
             for batch, (img, label) in enumerate(train_loader):
                 if self.device == 'cuda':
@@ -98,10 +100,12 @@ class TrainingLoop():
 
                 # Call callbacks
                 self.on_batch_end(remove_self(locals()))
-            end = time.time()
-            print("epoch", epoch, "-", end-start, "seconds")
+            t1 = time.time()
+            print("epoch", epoch, "-", t2-t1, "seconds")
             if self.on_epoch_end(remove_self(locals())):
                 break
+        end = time.time()
+        print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
         return epoch
 
 

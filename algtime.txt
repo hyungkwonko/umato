@@ -1,0 +1,16 @@
+[spheres]
+PCA elapsed time: 0.07394862174987793
+T-SNE elapsed time: 22.630682945251465
+UMAP elapsed time: 24.441976308822632
+[mnist]
+PCA elapsed time: 2.594827651977539
+T-SNE elapsed time: 268.34525513648987
+UMAP elapsed time: 43.752599000930786
+[fmnist]
+PCA elapsed time: 2.7900450229644775
+T-SNE elapsed time: 268.3034315109253
+UMAP elapsed time: 47.97197246551514
+[cifar10]
+PCA elapsed time: 4.842236042022705
+T-SNE elapsed time: 344.1224513053894
+UMAP elapsed time: 59.733540296554565
