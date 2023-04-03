@@ -47,7 +47,7 @@ class UMATO(BaseEstimator):
     def __init__(
         self,
         n_neighbors=50,
-				min_dist=0.1,
+	min_dist=0.1,
         n_components=2,
         hub_num=300,
         metric="euclidean",
@@ -64,7 +64,7 @@ class UMATO(BaseEstimator):
         random_state=None,
         angular_rp_forest=False,
         init="pca",
-				verbose=False
+	verbose=False
     ):
 
 ```
