@@ -1,9 +1,9 @@
 <p align="center">
-  <h1 align="center">UMATO</h1>
+  <h2 align="center">UMATO</h2>
 	<h3 align="center">Uniform Manifold Approximation with Two-phase Optimization</h3>
 </p>
 
-
+---
 
 
 
