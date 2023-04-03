@@ -651,6 +651,8 @@ class UMATO(BaseEstimator):
         self.ll = ll
 
     def _validate_parameters(self):
+        if self.hub_num >= self._raw_data.shape[0]:
+            raise ValueError("hub_num must be less than the number of data points")
         if self.set_op_mix_ratio < 0.0 or self.set_op_mix_ratio > 1.0:
             raise ValueError("set_op_mix_ratio must be between 0.0 and 1.0")
         if self.gamma < 0.0:
