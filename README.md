@@ -287,3 +287,20 @@ python -m evaluation.comparison --algo=all --data=spheres --measure=all
 - McInnes, L., Healy, J., & Melville, J. (2018). Umap: Uniform manifold approximation and projection for dimension reduction. arXiv preprint arXiv:1802.03426.
 - Moor, M., Horn, M., Rieck, B., & Borgwardt, K. (2020). Topological autoencoders. ICML.
 - Fu, C., Zhang, Y., Cai, D., & Ren, X. (2019, July). AtSNE: Efficient and Robust Visualization on GPU through Hierarchical Optimization. In Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining (pp. 176-186).
+
+## Citation
+
+UMATO can be cited as follows:
+
+```bibtex
+@inproceedings{jeon2022vis,
+  title={Uniform Manifold Approximation with Two-phase Optimization},
+  author={Jeon, Hyeon and Ko, Hyung-Kwon and Lee, Soohyun and Jo, Jaemin and Seo, Jinwook},
+  booktitle={2022 IEEE Visualization and Visual Analytics (VIS)},
+  pages={80--84},
+  year={2022},
+  organization={IEEE}
+}
+```
+
+Jeon, H., Ko, H. K., Lee, S., Jo, J., & Seo, J. (2022, October). Uniform Manifold Approximation with Two-phase Optimization. In 2022 IEEE Visualization and Visual Analytics (VIS) (pp. 80-84). IEEE.
