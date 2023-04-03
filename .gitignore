@@ -176,3 +176,6 @@ visualization/public/results/stability/*_*.csv
 
 /etc/*
 /etc2/*
+
+algtime.txt
+elapsed_time.csv
