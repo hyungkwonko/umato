@@ -57,26 +57,6 @@ bash run-benchmark.sh mnist
 This will cover PCA, t-SNE, UMAP and Topological Autoencoders. To run Anchor t-SNE, you need CUDA and GPU. Please refer to [here](https://github.com/ZJULearning/AtSNE) for specification.
 
 
-## Qualitative evaluation
-For the qualitative evaluation, we can compare the 2D visualization of each algorithm. We used the [svelte web framework](https://svelte.dev/) and [d3](https://d3js.org/) for the visualization.
-
-```python
-# see visualization
-cd visualization
-
-# install requirements
-npm install
-
-# run svelte app
-npm run dev
-```
-
-### Embedding results of the Spheres dataset for each algorithm
-
-|             2D visualization           |
-|:--------------------------------------:|
-![Comparing result](./figures/result.png)|
-
 
 
 ## Quantitative evaluation
