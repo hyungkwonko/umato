@@ -20,7 +20,7 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    alg_name = f"umap"
+    alg_name = f"UMAP"
 
     x, label = get_data(args.data, n_samples=args.n_samples)
     
@@ -28,11 +28,11 @@ if __name__ == "__main__":
     y = umap.UMAP(n_components=args.dim, verbose=True).fit_transform(x)
     end = time.time()
 
-    print(f"{alg_name} elapsed time: {end-start}")
+    print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
 
     path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
     plot_tmptmp(y, label, alg_name)
-    save_csv('./', alg_name=alg_name, data=y, label=label)
+    save_csv(path, alg_name=alg_name, data=y, label=label)
 
 
     # if args.hp:

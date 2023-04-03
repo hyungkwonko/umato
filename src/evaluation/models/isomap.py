@@ -16,7 +16,7 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    alg_name = f"Isomap"
+    alg_name = f"ISOMAP"
     # read data
     x, label = get_data(args.data, n_samples=args.n_samples)
 
@@ -30,7 +30,7 @@ if __name__ == "__main__":
             y = Isomap(n_components=args.dim, n_jobs=-1, n_neighbors=nn[i]).fit_transform(x)
             end = time.time()
 
-            print(f"{alg_name} elapsed time: {end-start}")
+            print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
 
             # save as csv
             path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)

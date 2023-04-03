@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
-    alg_name = f"tsne"
+    alg_name = f"T-SNE"
 
     # read data
     x, label = get_data(args.data)
@@ -35,7 +35,7 @@ if __name__ == "__main__":
                 y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], init="pca", n_jobs=-1, random_state=0, verbose=2).fit_transform(x)
                 end = time.time()
 
-                print(f"{alg_name} elapsed time: {end-start}")
+                print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
 
                 # save as csv
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         y = TSNE(n_components=args.dim, random_state=0, verbose=2, init="pca", n_jobs=-1).fit_transform(x)
         end = time.time()
 
-        print(f"{alg_name} elapsed time: {end-start}")
+        print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
 
         path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
         save_csv(path, alg_name="tsne", data=y, label=label)
