@@ -137,7 +137,6 @@ These parameters, along with their conditions and constraints, control various a
 
 Whether to utilize an angular random projection forest for initializing the approximate nearest neighbor search. This approach can offer improved speed, but it is primarily beneficial for metrics employing an angular-style distance, such as cosine, correlation, and others. For these metrics, angular forests will be automatically selected.
 
-#
 
 # Functions
 
@@ -184,7 +183,6 @@ If the metric is ‘precomputed’ X must be a square distance matrix. Otherwise
 Embedding of the training data in low-dimensional space.
 
 
-#
 
 
 # Useful Functions
