@@ -11,7 +11,7 @@ Uniform Manifold Approximation with Two-phase Optimization (UMATO) is a dimensio
 Next, we initialize and optimize other points using the nearest neighbor graph. Our experiments with one synthetic and three real world datasets show that UMATO can outperform the baseline algorithms, such as PCA, [t-SNE](https://lvdmaaten.github.io/tsne/), [Isomap](https://scikit-learn.org/stable/modules/generated/sklearn.manifold.Isomap.html), [UMAP](https://github.com/lmcinnes/umap), [Topological Autoencoders](https://github.com/BorgwardtLab/topological-autoencoders) and [Anchor t-SNE](https://github.com/ZJULearning/AtSNE), in terms of global measures and qualitative projection results.
 
 ## System Requirements
-- Python 3.6 or greater
+- Python 3.8 or greater
 - scikit-learn
 - numpy
 - scipy
