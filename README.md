@@ -31,7 +31,7 @@ import umato
 from sklearn.datasets import load_iris
 
 X, y = load_iris(return_X_y=True)
-emb = umato.UMATO(hub_num=300).fit_transform(X)
+emb = umato.UMATO(hub_num=50).fit_transform(X)
 ```
 
 ## API
@@ -177,7 +177,7 @@ Whether to utilize an angular random projection forest for initializing the appr
 init = "pca"
 ```
 
-The initialization method to use for the embedding. It must be a string or a numpy array. If a string is passed it must match one of the following: `init`, `randobm`, `spectral`.
+The initialization method to use for the embedding. It must be a string or a numpy array. If a string is passed it must match one of the following: `init`, `random`, `spectral`.
 
 
 ```python
