@@ -124,7 +124,7 @@ def build_knn_graph(
         distances_squared = calculate_distances(data, source, targets)
 
         # append other elements
-        sorted_distance_indexes = targets[np.argsort(distances_squared)[:leaf_num - 1]].astype('int64')
+        sorted_distance_indexes = targets[np.argsort(distances_squared)[:leaf_num - 1]].astype(np.int64)
 
         # create KNN
         disjoint = [source] + list(sorted_distance_indexes)
@@ -156,7 +156,7 @@ def build_knn_graph(
 
         # append other elements
         real_elements = leaf_num - padding_point_count
-        sorted_distance_indexes = targets[np.argsort(distances_squared)[:real_elements - 1]].astype('int64')
+        sorted_distance_indexes = targets[np.argsort(distances_squared)[:real_elements - 1]].astype(np.int64)
 
         # create KNN
         disjoint = [source] + list(sorted_distance_indexes) + [-1] * padding_point_count
@@ -239,7 +239,7 @@ def build_global_structure(
             n_epochs=n_epochs,
             verbose=verbose,
             savefig=verbose,
-            label=label[hubs],
+            label=label[hubs] if label is not None else None,
         )
     else:
         result = optimize_global_layout(
@@ -266,7 +266,7 @@ def embed_others_nn(
             if len(init) > len(hubs) and verbose:
                 print(f"len(hubs) {len(hubs)} is smaller than len(init) {len(init)}")
             break
-
+		
     # generate random normal distribution
     random_normal = random_state.normal(
         loc=0.0, scale=0.05, size=list(init.shape)
@@ -282,7 +282,7 @@ def embed_others_nn(
         original_hubs=original_hubs,
         hub_nn=hub_nn,
         random=random_normal,
-        nn_consider=10, # number of hubs to consider
+        nn_consider=10 if len(original_hubs) >= 10 else len(original_hubs), # number of hubs to consider
     )
 
     # np.array of hub information (hubs = 2, hub_nn = 1, outliers = 0)
@@ -291,8 +291,8 @@ def embed_others_nn(
     hub_info[original_hubs] = 2
 
     # save figure2
-    if verbose:
-        plot_tmptmp(data=init[hubs], label=label[hubs], name=f"pic2")
+    # if verbose:
+    #     plot_tmptmp(data=init[hubs], label=label[hubs] if label is not None else None, name=f"pic2")
 
     return init, hub_info, hubs
 
@@ -316,8 +316,8 @@ def embed_outliers(
         )
 
     # save figure3
-    if verbose:
-        plot_tmptmp(data=init, label=label, name="pic4_disjoint")
+    # if verbose:
+    #     plot_tmptmp(data=init, label=label, name="pic4_disjoint")
 
     return init
 
@@ -404,6 +404,7 @@ def nn_initialize(
     num_log = np.zeros(data.shape[0], dtype=np.float32)
     num_log[original_hubs] = -1
     num_log[hub_nn] = -1
+
 
     for i in numba.prange(len(hub_nn)):
         # find nearest hub nodes
