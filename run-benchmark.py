@@ -46,18 +46,15 @@ if args.paramfile is None:
         s_list = s.split('=')
         # try to convert value into int, float, or boolean if possible
         try:
-            print(s_list[1], type(s_list[1]))
             s_list[1] = int(s_list[1])
         except:
             try:
-                print(s_list[1], type(s_list[1]))
                 s_list[1] = float(s_list[1])
             except:
                 try:
-                    print(s_list[1], type(s_list[1]))
                     s_list[1] = bool(s_list[1])
                 except:
-                    print(s_list[1], type(s_list[1]))
+                    pass
         hp_dict[s_list[0]] = s_list[1]
         s = input()
 # if paramfile is given
