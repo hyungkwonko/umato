@@ -281,6 +281,10 @@ python -m evaluation.comparison --algo=all --data=spheres --measure=all
 - DTM & KL divergence: Lower is better
 - The winnder and runner-up is in bold.
 
+## Examples
+
+![img](https://user-images.githubusercontent.com/38465539/235966201-845dd47a-acad-460e-8ac8-af4d9f5f35fc.png)
+
 
 ## References
 - Maaten, L. V. D., & Hinton, G. (2008). Visualizing data using t-SNE. JMLR, 9(Nov), 2579-2605.
