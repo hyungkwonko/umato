@@ -101,9 +101,9 @@ for datadir in dataset_list:
         y = alg_class(**hp_dict).fit_transform(x)
         end = time.time()
         print(f"[{args.classname}, {datadir}] elapsed time: {end-start}")
-        elapsed_time.append()
+        elapsed_time.append(end-start)
     
-    print(f"[{args.classname}, {datadir}] average time of {args.repeat} trials: {end-start}")
+    print(f"[{args.classname}, {datadir}] average time of {args.repeat} trials: {sum(elapsed_time) / len(elapsed_time)}")
 
     # save train results into csv and image
     path = os.path.join(os.getcwd(), "visualization", "public", "results", datadir)
