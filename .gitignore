@@ -155,6 +155,7 @@ evaluation/models/AtSNE/*
 *.pth
 
 # data
+umato_exp/
 data/spheres/*/*
 data/MNIST/*/*
 data/FashionMNIST/*/*
