@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
 	name="umato",
-	version="0.1.1",
+	version="0.1.2",
 	author="Hyeon Jeon",
 	author_email="hj@hcil.snu.ac.kr",
 	description="Python Implementation of UMATO (Uniform Manifold Approximation with Two-Phase Optimization)", 
