@@ -11,29 +11,29 @@ import time
 parser = argparse.ArgumentParser(description="UMAP embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
 parser.add_argument("--dim", type=str, help="choose embedding dimension", default=2)
-parser.add_argument("--init", type=str, help="choose initialization method", default="pca")
-parser.add_argument("--hp", type=bool, help="whether to explore hyperparameter settings", default=False)
-parser.add_argument("--n_samples", type=int, help="choose number of samples", default=1500)
+parser.add_argument(
+    "--init", type=str, help="choose initialization method", default="pca"
+)
+parser.add_argument(
+    "--hp", type=bool, help="whether to explore hyperparameter settings", default=False
+)
+parser.add_argument(
+    "--n_samples", type=int, help="choose number of samples", default=1500
+)
 
 args = parser.parse_args()
 
 
 if __name__ == "__main__":
-
     alg_name = f"UMAP"
 
     x, label = get_data(args.data, n_samples=args.n_samples)
-    
-    start = time.time()
-    y = umap.UMAP(n_components=args.dim, verbose=True).fit_transform(x)
-    end = time.time()
 
-    print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
+    y = umap.UMAP(n_components=args.dim, verbose=True).fit_transform(x)
 
     path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
     plot_tmptmp(y, label, alg_name)
     save_csv(path, alg_name=alg_name, data=y, label=label)
-
 
     # if args.hp:
     #     # read data

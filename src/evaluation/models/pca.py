@@ -8,24 +8,20 @@ import time
 parser = argparse.ArgumentParser(description="PCA embedding")
 parser.add_argument("--data", type=str, help="choose dataset", required=True)
 parser.add_argument("--dim", type=str, help="choose embedding dimension", default=2)
-parser.add_argument("--n_samples", type=int, help="choose number of samples", default=1500)
+parser.add_argument(
+    "--n_samples", type=int, help="choose number of samples", default=1500
+)
 
 args = parser.parse_args()
 
 
 if __name__ == "__main__":
-
     alg_name = f"PCA"
 
     # read data
     x, label = get_data(args.data, n_samples=args.n_samples)
 
-    # run PCA
-    start = time.time()
     y = PCA(n_components=args.dim).fit_transform(x)
-    end = time.time()
-
-    print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
 
     # save as csv
     path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)

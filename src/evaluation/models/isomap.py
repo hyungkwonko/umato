@@ -25,12 +25,7 @@ if __name__ == "__main__":
 
         for i in range(len(nn)):
             # run ISOMAP
-
-            start = time.time()
             y = Isomap(n_components=args.dim, n_jobs=-1, n_neighbors=nn[i]).fit_transform(x)
-            end = time.time()
-
-            print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
 
             # save as csv
             path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
