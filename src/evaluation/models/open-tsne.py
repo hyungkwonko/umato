@@ -34,21 +34,13 @@ if __name__ == "__main__":
                 x, label = get_data(args.data)
 
                 # run TSNE
-                start = time.time()
                 y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_jobs=-1, verbose=True).fit(x)
-                end = time.time()
-
-                print(f"{alg_name} elapsed time: {end-start}", file = open('algtime.txt', 'a'))
 
                 # save as csv
                 path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
                 save_csv(path, alg_name=f"{alg_name}_{perplexity[j]}_{learning_rate[i]}", data=y, label=label)
     else:
-        start = time.time()
         y = TSNE(n_components=args.dim, perplexity=perplexity[j], learning_rate=learning_rate[i], n_jobs=-1, verbose=True).fit(x)
-        end = time.time()
 
-        print("epoch", epoch, "-", end-start, "seconds\n", file = open('algtime.txt', 'a'))
-        
         path = os.path.join(os.getcwd(), "visualization", "public", "results", args.data)
         save_csv(path, alg_name=alg_name, data=y, label=label)
