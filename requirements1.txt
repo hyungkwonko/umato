@@ -8,7 +8,7 @@ numpy==1.24.3
 openTSNE==0.7.1
 pandas<2.0.0
 pynndescent==0.5.10
-requests==2.30.0
+requests==2.31.0
 sacred==0.8.4
 scikit_learn==1.2.2
 scipy==1.10.1
