@@ -452,7 +452,7 @@ def select_from_knn(
 
     for i in numba.prange(knn_indices.shape[0]):
         if hub_info[i] > 0:
-            for j in numba.prange(knn_indices.shape[1]):
+            for j in range(knn_indices.shape[1]):
                 # append directly if it is not an outlier
                 if hub_info[knn_indices[i, j]] > 0:
                     out_indices[i, counts[i]] = knn_indices[i, j]
