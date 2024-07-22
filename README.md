@@ -35,52 +35,7 @@ X, y = load_iris(return_X_y=True)
 emb = umato.UMATO(hub_num=50).fit_transform(X)
 ```
 
-## API
-
-### Default Class: UMATO
-
-Umato has only one class ```UMATO```. Note that UMATO shares a bunch of parameters with UMAP. For more details, please refer to [UMAP API](https://umap-learn.readthedocs.io/en/latest/api.html).
-
-
-
-```python
-class UMATO(BaseEstimator):
-    def __init__(
-        self,
-        n_neighbors=50,
-	min_dist=0.1,
-        n_components=2,
-        hub_num=300,
-        metric="euclidean",
-        global_n_epochs=None,
-        local_n_epochs=None,
-        global_learning_rate=0.0065,
-        local_learning_rate=0.01,
-        spread=1.0,
-        low_memory=False,
-        set_op_mix_ratio=1.0,
-        local_connectivity=1.0,
-        gamma=0.1,
-        negative_sample_rate=5,
-        random_state=None,
-        angular_rp_forest=False,
-        init="pca",
-	verbose=False
-    ):
-
-```
-
-### Function `fit`
-
-```python 
-def fit(self, X):
-```
-
-This ```fit``` function embeds the input data X into a lower-dimensional space. It handles optional arguments, validates parameters, checks the data sparsity, and builds the nearest neighbor graph structure. It also computes global and local optimization, initializes the embedding using the original hub information, and embeds outliers.
-
-After validating the input data and setting default values for optional arguments, the function checks if the metric is supported by ```PyNNDescent``` and computes the nearest neighbors accordingly. It then builds the k-nearest neighbor graph structure, runs global and local optimization, and embeds the remaining data points. Finally, it embeds outliers and returns the **fitted model**.
-
-For detailed parameter usage, check the API listed under Wiki.
+For detailed information on the algorithm and parameter usage, check the API listed under Wiki.
 
 
 ## Citation
