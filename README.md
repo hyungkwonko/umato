@@ -53,7 +53,7 @@ Ranking of DR techniques determined by local and global quality metrics in accur
 
 #### Figure 3: Scalability with Large Datasets
 <div align="center">
-    <img src="images/figure3.png" width="80%">
+    <img src="images/figure3.png" width="60%">
 </div>  
 The results of the scalability analysis with large datasets. The number of points (size) and dimensionality (dim.) are depicted on the left side of each dataset’s name. We depict the runtime of each DR technique in mm:ss format. UMATO outperformed every competitor except PCA, with an average speedup of ×14.3 over UMAP.
 
