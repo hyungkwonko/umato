@@ -298,7 +298,7 @@ def embed_others_nn(
 
 
 def embed_outliers(
-    data, init, hubs, disjoints, random_state, label, verbose=False,
+    data, init, hubs, disjoints, random_state, label, n_neighbors, verbose=False,
 ):
     # generate random normal distribution
     random_normal = random_state.normal(scale=0.02, size=list(init.shape)).astype(
@@ -307,7 +307,7 @@ def embed_outliers(
 
     # append other nodes using NN disjoint information
     init, nodes_number = disjoint_initialize(
-        data=data, init=init, hubs=hubs, disjoints=disjoints, random=random_normal,
+        data=data, init=init, hubs=hubs, disjoints=disjoints, random=random_normal, nn_consider=n_neighbors
     )
 
     if len(init) != len(nodes_number):
@@ -324,7 +324,7 @@ def embed_outliers(
 
 @numba.njit()
 def disjoint_initialize(
-    data, init, hubs, disjoints, random, nn_consider=1.0,
+    data, init, hubs, disjoints, random, nn_consider
 ):
 
     hubs_true = np.zeros(data.shape[0])
@@ -360,7 +360,6 @@ def disjoint_initialize(
                     target_ix = indices[ix]
                     init[j] += init[target_ix]
                 init[j] /= nn_consider_tmp
-                init[j] += random[j]  # add random value
 
                 hubs.add(j)
 
@@ -939,6 +938,7 @@ class UMATO(BaseEstimator):
             disjoints=disjoints,
             random_state=random_state,
             label=self.ll,
+						n_neighbors=self.n_neighbors,
             verbose=self.verbose,
         )
 
