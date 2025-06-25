@@ -716,7 +716,7 @@ class UMATO(BaseEstimator):
             else:
                 self._input_distance_func = dist.named_distances[self.metric]
 	elif self.metric == 'precomputed':
-		pass
+		self._input_distance_func = 'precomputed'
 	else:
             raise ValueError("metric is not a recognised string")
 
