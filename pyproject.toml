@@ -44,7 +44,4 @@ dependencies = [
 Homepage = "https://github.com/hyungkwonko/umato"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
+packages = ["umato"]
