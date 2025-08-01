@@ -32,7 +32,6 @@ from umato.utils import (
     adjacency_matrix,
     ts,
     csr_unique,
-    plot_tmptmp,
 )
 
 from umato.layouts import (
@@ -238,8 +237,6 @@ def build_global_structure(
             alpha=alpha,
             n_epochs=n_epochs,
             verbose=verbose,
-            savefig=verbose,
-            label=label[hubs] if label is not None else None,
         )
     else:
         result = optimize_global_layout(
@@ -290,10 +287,6 @@ def embed_others_nn(
     hub_info[hub_nn] = 1
     hub_info[original_hubs] = 2
 
-    # save figure2
-    # if verbose:
-    #     plot_tmptmp(data=init[hubs], label=label[hubs] if label is not None else None, name=f"pic2")
-
     return init, hub_info, hubs
 
 
@@ -314,10 +307,6 @@ def embed_outliers(
         raise ValueError(
             f"total data # ({len(init)}) != total embedded # ({len(nodes_number)})!"
         )
-
-    # save figure3
-    # if verbose:
-    #     plot_tmptmp(data=init, label=label, name="pic4_disjoint")
 
     return init
 

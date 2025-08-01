@@ -34,8 +34,6 @@ def optimize_global_layout(
     alpha,
     n_epochs,
     verbose=False,
-    savefig=False,
-    label=None
 ):
 
     costs = []
@@ -68,11 +66,6 @@ def optimize_global_layout(
                 f"[INFO] Current loss: {cost:.6f}, @ iteration: {i+1}/{n_epochs}"
             )
 
-        # if savefig:
-        #     if i < 10 or i == 30:
-        #         from umato.umato_ import plot_tmptmp
-        #         plot_tmptmp(data=Z, label=label, name=f"pic1_global{i}")
-
     return Z
 
 
@@ -93,8 +86,6 @@ def nn_layout_optimize(
     negative_sample_rate=5.0,
     parallel=False,
     verbose=False,
-    k=0,
-    label=None,
 ):
 
     (_, dim) = head_embedding.shape
@@ -131,12 +122,6 @@ def nn_layout_optimize(
         )
 
         alpha = learning_rate * (1.0 - (float(n) / float(n_epochs)))
-
-        # if verbose and n % 10 == 0:
-        #     from umato.umato_ import plot_tmptmp
-
-        #     plot_tmptmp(data=head_embedding, label=label, name=f"pic3_{k}_local{n}")
-        #     print("\tcompleted ", n, " / ", n_epochs, "epochs")
 
     return head_embedding
 
