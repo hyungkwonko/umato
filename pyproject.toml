@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "umato"
+version = "0.1.2"
+description = "Python Implementation of UMATO (Uniform Manifold Approximation with Two-Phase Optimization)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+keywords = [
+    "UMATO",
+    "UMAP",
+    "Uniform Manifold Approximation",
+    "Two-Phase Optimization",
+    "Dimensionality Reduction",
+    "Machine Learning",
+    "Data Science"
+]
+
+authors = [
+    { name = "Hyeon Jeon", email = "hj@hcil.snu.ac.kr" }
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+
+dependencies = [
+    "numpy",
+    "numba",
+    "scipy",
+    "scikit-learn",
+    "joblib",
+    "matplotlib",
+    "pandas",
+    "fcsparser"
+]
+
+[project.urls]
+Homepage = "https://github.com/hyungkwonko/umato"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
