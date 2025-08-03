@@ -34,7 +34,7 @@ X, y = load_iris(return_X_y=True)
 emb = umato.UMATO(hub_num=50).fit_transform(X)
 ```
 
-For detailed information on the algorithm and parameter usage, check the API listed under Wiki.
+For detailed information on the algorithm and parameter usage, check the [API documentation](https://github.com/hyungkwonko/umato/wiki/API) listed under the Wiki.
 
 ## Findings
 
