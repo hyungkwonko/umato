@@ -582,8 +582,7 @@ def local_optimize_nn(
         learning_rate=learning_rate,
         negative_sample_rate=negative_sample_rate,
         parallel=parallel,
-        verbose=verbose,
-        label=label,
+        verbose=verbose
     )
 
     return embedding
