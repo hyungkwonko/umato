@@ -12,9 +12,11 @@ license = {text = "MIT"}
 keywords = [
     "UMATO",
     "UMAP",
+    "T-SNE",
     "Uniform Manifold Approximation",
     "Two-Phase Optimization",
     "Dimensionality Reduction",
+    "Manifold"
     "Machine Learning",
     "Data Science"
 ]
@@ -30,14 +32,11 @@ classifiers = [
 ]
 
 dependencies = [
-    "numpy",
-    "numba",
-    "scipy",
     "scikit-learn",
-    "joblib",
-    "matplotlib",
-    "pandas",
-    "fcsparser"
+    "numpy",
+    "scipy",
+    "numba",
+    "joblib"
 ]
 
 [project.urls]

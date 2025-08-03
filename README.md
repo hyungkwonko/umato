@@ -17,7 +17,6 @@ Next, we initialize and optimize other points using the nearest neighbor graph. 
 - numpy
 - scipy
 - numba
-- pandas (to read csv files)
 
 ## Installation 
 
