@@ -7,19 +7,14 @@ import os
 import numba
 import numpy as np
 import scipy.sparse
-import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-import pandas as pd
-
+from sklearn.manifold import SpectralEmbedding
 
 def init_position(x, label, dname, init_type=None):
     if init_type == "pca":
         init = PCA(n_components=2).fit_transform(x)
     elif init_type == "spectral":
-        path = os.path.join(os.getcwd(), "visualization", "public", "results", "init", f"{dname}_init.csv")
-        init = pd.read_csv(path)
-        init = np.array(init)
-        # init = SpectralEmbedding(n_components=2, n_jobs=-1).fit_transform(x)
+        init = SpectralEmbedding(n_components=2, n_jobs=-1).fit_transform(x)
     elif init_type == "class":
         init = np.empty(shape=(0,2))
         z1 = [1,2,2,1]
