@@ -1,3 +1,0 @@
-[submodule "evaluation/models/AtSNE"]
-	path = evaluation/models/AtSNE
-	url = https://github.com/ZJULearning/AtSNE.git

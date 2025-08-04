@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "umato"
+version = "1.0.0"
+description = "Python Implementation of UMATO (Uniform Manifold Approximation with Two-Phase Optimization)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT (includes BSD-licensed components from UMAP)"}
+keywords = [
+    "UMATO",
+    "UMAP",
+    "T-SNE",
+    "Uniform Manifold Approximation",
+    "Two-Phase Optimization",
+    "Dimensionality Reduction",
+    "Manifold",
+    "Machine Learning",
+    "Data Science"
+]
+
+authors = [
+    { name = "Hyeon Jeon", email = "hj@hcil.snu.ac.kr" },
+    { name = "Kwon Ko", email = "kwonko@stanford.edu" },
+    { name = "Soohyun Lee", email = "shlee@hcil.snu.ac.kr" },
+    { name = "Jake Hyun", email = "jakehyun@snu.ac.kr" },
+    { name = "Taehyun Yang", email = "0705danny@snu.ac.kr" },
+    { name = "Gyehun Go", email = "rotation_430@snu.ac.kr" },
+    { name = "Jaemin Jo", email = "jmjo@skku.edu" },
+    { name = "Jinwook Seo", email = "jseo@snu.ac.kr" }
+]
+
+maintainers = [
+    { name = "Hyeon Jeon", email = "hj@hcil.snu.ac.kr" }
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+
+dependencies = [
+    "scikit-learn",
+    "numpy",
+    "scipy",
+    "numba",
+    "joblib"
+]
+
+[project.urls]
+Homepage = "https://github.com/hyungkwonko/umato"
+
+[tool.setuptools]
+packages = ["umato"]
