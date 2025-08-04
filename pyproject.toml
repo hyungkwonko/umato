@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "umato"
-version = "0.1.2"
+version = "1.0.0"
 description = "Python Implementation of UMATO (Uniform Manifold Approximation with Two-Phase Optimization)"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
+license = {text = "MIT (includes BSD-licensed components from UMAP)"}
 keywords = [
     "UMATO",
     "UMAP",
@@ -22,6 +22,17 @@ keywords = [
 ]
 
 authors = [
+    { name = "Hyeon Jeon", email = "hj@hcil.snu.ac.kr" },
+    { name = "Kwon Ko", email = "kwonko@stanford.edu" },
+    { name = "Soohyun Lee", email = "shlee@hcil.snu.ac.kr" },
+    { name = "Jake Hyun", email = "jakehyun@snu.ac.kr" },
+    { name = "Taehyun Yang", email = "0705danny@snu.ac.kr" },
+    { name = "Gyehun Go", email = "rotation_430@snu.ac.kr" },
+    { name = "Jaemin Jo", email = "jmjo@skku.edu" },
+    { name = "Jinwook Seo", email = "jseo@snu.ac.kr" }
+]
+
+maintainers = [
     { name = "Hyeon Jeon", email = "hj@hcil.snu.ac.kr" }
 ]
 
