@@ -44,7 +44,73 @@ X, y = load_iris(return_X_y=True)
 emb = umato.UMATO(hub_num=50).fit_transform(X)
 ```
 
-For detailed algorithm and parameter usage, see the [API documentation](https://github.com/hyungkwonko/umato/wiki/API).
+For detailed algorithm background, see the [API documentation](https://github.com/hyungkwonko/umato/wiki/API).
+
+## API Reference
+
+### Main Class
+
+```python
+from umato import UMATO
+
+model = UMATO(
+    n_neighbors=50,
+    n_components=2,
+    hub_num=300,
+    metric="euclidean",
+    global_n_epochs=100,
+    local_n_epochs=50,
+    global_learning_rate=0.0065,
+    local_learning_rate=0.01,
+    min_dist=0.1,
+    spread=1.0,
+    gamma=0.1,
+    negative_sample_rate=5,
+    init="pca",
+    random_state=42,
+    verbose=False,
+)
+```
+
+### Key Parameters
+
+- `n_neighbors` (int, default=50): neighborhood size used to build local structure.
+- `hub_num` (int, default=300): number of representative hubs used in the global phase (`2 <= hub_num < n_samples`).
+- `n_components` (int, default=2): output embedding dimensionality.
+- `metric` (str, default=`"euclidean"`): distance metric for neighbor search (e.g., `"euclidean"`, `"cosine"`, `"precomputed"`).
+- `init` (`"pca" | "random" | "spectral"` or ndarray, default=`"pca"`): initialization for hub layout.
+- `global_n_epochs` / `local_n_epochs` (int): optimization epochs for each phase (defaults: 100 / 50).
+- `global_learning_rate` / `local_learning_rate` (float): learning rates for global and local optimization.
+- `min_dist`, `spread`: shape parameters controlling embedding compactness and spacing.
+- `gamma` (float, default=0.1): repulsion strength in local optimization.
+- `negative_sample_rate` (int, default=5): number of negative samples per positive edge.
+- `random_state`: seed or `RandomState` for reproducibility.
+- `verbose` (bool): print progress logs.
+
+### Methods
+
+- `fit(X)`: learn embedding from input `X`.
+- `fit_transform(X) -> ndarray`: fit and return low-dimensional embedding.
+
+### Attributes (after fitting)
+
+- `embedding_`: final embedding of shape `(n_samples, n_components)`.
+- `graph_`: fuzzy simplicial graph used in optimization.
+
+### Example
+
+```python
+import umato
+from sklearn.datasets import load_iris
+
+X, y = load_iris(return_X_y=True)
+emb = umato.UMATO(
+    n_neighbors=30,
+    hub_num=50,
+    init="pca",
+    random_state=42,
+).fit_transform(X)
+```
 
 ## When to Use UMATO
 
