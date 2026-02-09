@@ -83,3 +83,6 @@ UMATO can be cited as follows:
 ```
 
 Jeon, H., Ko, H. K., Lee, S., Jo, J., & Seo, J. (2022, October). Uniform Manifold Approximation with Two-phase Optimization. In 2022 IEEE Visualization and Visual Analytics (VIS) (pp. 80-84). IEEE.
+
+
+> Test commit: connectivity check by OpenClaw assistant on 2026-02-09.
