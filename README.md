@@ -69,6 +69,8 @@ model = UMATO(
     init="pca",
     random_state=42,
     verbose=False,
+    n_jobs=None,
+    execution_mode="deterministic",
 )
 ```
 
@@ -86,6 +88,14 @@ model = UMATO(
 - `negative_sample_rate` (int, default=5): number of negative samples per positive edge.
 - `random_state`: seed or `RandomState` for reproducibility.
 - `verbose` (bool): print progress logs.
+- `n_jobs` (`int | None`, default=`None`): thread count for internal computation. Use `-1` to use all available CPU cores; use a positive integer to pin a specific thread count.
+- `execution_mode` (`str`, default=`"deterministic"`): optimization mode. Allowed values are `"deterministic"` and `"fast"`.
+  - `"deterministic"`: recommended default for reproducibility.
+  - `"fast"`: may reduce runtime on large datasets by enabling more aggressive parallel updates.
+  - invalid values raise `ValueError`.
+- Validation constraints:
+  - `n_jobs` must be `None`, `-1`, or a positive integer. `0` and values below `-1` raise `ValueError`.
+  - `execution_mode` must be one of `"deterministic"` or `"fast"`; any other value raises `ValueError`.
 
 ### Methods
 
@@ -111,6 +121,28 @@ emb = umato.UMATO(
     random_state=42,
 ).fit_transform(X)
 ```
+
+### Speed-oriented Example
+
+```python
+import umato
+from sklearn.datasets import load_iris
+
+X, y = load_iris(return_X_y=True)
+emb = umato.UMATO(
+    n_neighbors=30,
+    hub_num=50,
+    init="pca",
+    random_state=42,
+    n_jobs=-1,
+    execution_mode="fast",
+).fit_transform(X)
+```
+
+### Execution Modes
+
+- `deterministic` (default, recommended): prioritizes reproducibility and stable behavior across runs.
+- `fast`: may reduce runtime on large datasets. Because updates are applied in parallel order, small embedding differences can occur compared with deterministic mode.
 
 ## When to Use UMATO
 

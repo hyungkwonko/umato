@@ -170,6 +170,7 @@ def nearest_neighbors(
     low_memory=False,
     use_pynndescent=True,
     verbose=False,
+    n_jobs=None,
 ):
     """Compute the ``n_neighbors`` nearest points for each data point in ``X``
     under ``metric``. This may be exact, but more likely is approximated via
@@ -242,6 +243,7 @@ def nearest_neighbors(
                 max_candidates=60,
                 low_memory=low_memory,
                 verbose=verbose,
+                n_jobs=n_jobs,
             )
             knn_indices, knn_dists = nnd.neighbor_graph
             rp_forest = nnd

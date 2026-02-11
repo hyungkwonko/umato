@@ -8,6 +8,19 @@ from umato.utils import (
     rdist,
 )
 
+_OPTIMIZE_FN_CACHE: dict[bool, object] = {}
+
+
+def _get_nn_layout_optimize_fn(parallel: bool):
+    key = bool(parallel)
+    fn = _OPTIMIZE_FN_CACHE.get(key)
+    if fn is None:
+        fn = numba.njit(
+            _nn_layout_optimize_single_epoch, fastmath=True, parallel=parallel
+        )
+        _OPTIMIZE_FN_CACHE[key] = fn
+    return fn
+
 
 def get_CE(P, Y, d_squared, a, b):
     Q = pow(1 + a * d_squared ** b, -1)
@@ -98,9 +111,7 @@ def nn_layout_optimize(
     epoch_of_next_negative_sample = epochs_per_negative_sample.copy()
     epoch_of_next_sample = epochs_per_sample.copy()
 
-    optimize_fn = numba.njit(
-        _nn_layout_optimize_single_epoch, fastmath=True, parallel=parallel
-    )
+    optimize_fn = _get_nn_layout_optimize_fn(parallel)
     for n in range(n_epochs):
         optimize_fn(
             head_embedding,

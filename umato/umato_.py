@@ -8,6 +8,9 @@ import locale
 from warnings import warn
 import time
 
+from contextlib import contextmanager
+import os
+
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_random_state, check_array
 from sklearn.neighbors import KDTree
@@ -843,6 +846,8 @@ class UMATO(BaseEstimator):
         init="pca",
         ll=None,
         verbose=False,
+        n_jobs=None,
+        execution_mode="deterministic",
     ):
         self.n_neighbors = n_neighbors
         self.hub_num = hub_num
@@ -866,7 +871,12 @@ class UMATO(BaseEstimator):
         self.b = b
         self.init = init
 
+        self.n_jobs = n_jobs
+        self.execution_mode = execution_mode
+
         self.ll = ll
+
+        self._thread_count = None
 
     def _validate_parameters(self):
         n_samples = self._raw_data.shape[0]
@@ -930,6 +940,15 @@ class UMATO(BaseEstimator):
         elif not isinstance(self.init, str):
             raise ValueError('init must be one of {"pca", "random", "spectral"} or a numpy.ndarray')
 
+        if self.n_jobs is not None:
+            if not isinstance(self.n_jobs, int):
+                raise ValueError("n_jobs must be an integer or None")
+            if self.n_jobs == 0 or self.n_jobs < -1:
+                raise ValueError("n_jobs must be None, -1, or a positive integer")
+
+        if self.execution_mode not in {"deterministic", "fast"}:
+            raise ValueError("execution_mode must be 'deterministic' or 'fast'")
+
         if self.global_n_epochs is not None and (
             not isinstance(self.global_n_epochs, int) or self.global_n_epochs < 10
         ):
@@ -944,6 +963,8 @@ class UMATO(BaseEstimator):
             self._sparse_data = True
         else:
             self._sparse_data = False
+
+        self._thread_count = self._resolve_thread_count()
 
         # set input distance metric
         if self.metric in dist.named_distances:
@@ -973,6 +994,27 @@ class UMATO(BaseEstimator):
             "hellinger",
         ):
             self.angular_rp_forest = True
+
+    def _resolve_thread_count(self) -> int:
+        if self.n_jobs is None:
+            return numba.get_num_threads()
+        if self.n_jobs == -1:
+            cpu_count = os.cpu_count()
+            return cpu_count if cpu_count is not None else numba.get_num_threads()
+        return self.n_jobs
+
+    @contextmanager
+    def _numba_thread_context(self):
+        target = self._thread_count or numba.get_num_threads()
+        previous = numba.get_num_threads()
+        need_set = target != previous
+        if need_set:
+            numba.set_num_threads(target)
+        try:
+            yield
+        finally:
+            if need_set:
+                numba.set_num_threads(previous)
 
     def fit(self, X):
         """Fit X into an embedded space.
@@ -1011,238 +1053,242 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(str(self))
 
-        # Error check n_neighbors based on data size
-        if X.shape[0] <= self.n_neighbors:
-            if X.shape[0] == 1:
-                self.embedding_ = np.zeros(
-                    (1, self.n_components)
-                )  # needed to sklearn comparability
-                return self
+        parallel_local = self.execution_mode == "fast"
 
-            warn(
-                "n_neighbors is larger than the dataset size; truncating to "
-                "X.shape[0] - 1"
-            )
-            self._n_neighbors = X.shape[0] - 1
-        else:
-            self._n_neighbors = self.n_neighbors
+        with self._numba_thread_context():
+            # Error check n_neighbors based on data size
+            if X.shape[0] <= self.n_neighbors:
+                if X.shape[0] == 1:
+                    self.embedding_ = np.zeros(
+                        (1, self.n_components)
+                    )  # needed to sklearn comparability
+                    return self
 
-        random_state = check_random_state(self.random_state)
+                warn(
+                    "n_neighbors is larger than the dataset size; truncating to "
+                    "X.shape[0] - 1"
+                )
+                self._n_neighbors = X.shape[0] - 1
+            else:
+                self._n_neighbors = self.n_neighbors
 
-        if self.verbose:
-            print(ts(), "Construct fuzzy simplicial set")
+            random_state = check_random_state(self.random_state)
 
-        # pass string identifier if pynndescent also defines distance metric
-        if _HAVE_PYNNDESCENT:
-            if self._sparse_data and self.metric in pynn_sparse_named_distances:
-                nn_metric = self.metric
-            elif not self._sparse_data and self.metric in pynn_named_distances:
-                nn_metric = self.metric
+            if self.verbose:
+                print(ts(), "Construct fuzzy simplicial set")
+
+            # pass string identifier if pynndescent also defines distance metric
+            if _HAVE_PYNNDESCENT:
+                if self._sparse_data and self.metric in pynn_sparse_named_distances:
+                    nn_metric = self.metric
+                elif not self._sparse_data and self.metric in pynn_named_distances:
+                    nn_metric = self.metric
+                else:
+                    nn_metric = self._input_distance_func
             else:
                 nn_metric = self._input_distance_func
-        else:
-            nn_metric = self._input_distance_func
 
-        (self._knn_indices, self._knn_dists, _) = nearest_neighbors(
-            X,
-            self._n_neighbors,
-            # int(self._n_neighbors * 1.2),  # we can use more neighbors
-            nn_metric,
-            self.angular_rp_forest,
-            random_state,
-            self.low_memory,
-            use_pynndescent=True,
-            verbose=self.verbose,
-        )
-
-        if self.local_n_epochs is None:
-            self.local_n_epochs = 50
-
-        if self.global_n_epochs is None:
-            self.global_n_epochs = 100
-
-        if self.verbose:
-            print(ts(), "Build K-nearest neighbor graph structure")
-
-        flat_indices = self._knn_indices.flatten()  # flattening all knn indices
-        index, freq = np.unique(flat_indices, return_counts=True)
-        # sorted_index = index[freq.argsort(kind="stable")]  # sorted index in increasing order
-        sorted_index = index[
-            freq.argsort(kind="stable")[::-1]
-        ]  # sorted index in decreasing order
-        missing_indices = np.setdiff1d(
-            np.arange(X.shape[0], dtype=np.int64),
-            sorted_index.astype(np.int64),
-            assume_unique=False,
-        )
-        if missing_indices.size > 0:
-            sorted_index = np.concatenate([sorted_index, missing_indices]).astype(
-                np.int64, copy=False
-            )
-
-        # get disjoint NN matrix
-        if self._sparse_data:
-            disjoints = build_knn_graph_from_knn(
-                sorted_index=sorted_index,
-                knn_indices=self._knn_indices,
-                hub_num=self.hub_num,
-            )
-        else:
-            disjoints = build_knn_graph(
-                data=X, sorted_index=sorted_index, hub_num=self.hub_num,
-            )
-
-        # get hub indices from disjoint set
-        hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
-
-        if self.verbose:
-            print(ts(), "Run global optimization")
-
-        init_global = build_global_structure(
-            data=X,
-            hubs=hubs,
-            n_components=self.n_components,
-            a=self.a,
-            b=self.b,
-            random_state=random_state,
-            alpha=self.global_learning_rate,
-            n_epochs=self.global_n_epochs,
-            verbose=self.verbose,
-            label=self.ll,
-            init_global=self.init,
-        )
-
-        if self.verbose:
-            print(
-                ts(), "Get NN indices & Initialize them using original hub information"
-            )
-
-        if self._sparse_data:
-            init, hub_info, hubs = embed_others_nn_from_graph(
-                n_samples=X.shape[0],
-                init_global=init_global,
-                hubs=hubs,
-                knn_indices=self._knn_indices,
-                knn_dists=self._knn_dists,
-                nn_consider=self._n_neighbors,
-                random_state=random_state,
+            (self._knn_indices, self._knn_dists, _) = nearest_neighbors(
+                X,
+                self._n_neighbors,
+                # int(self._n_neighbors * 1.2),  # we can use more neighbors
+                nn_metric,
+                self.angular_rp_forest,
+                random_state,
+                self.low_memory,
+                use_pynndescent=True,
                 verbose=self.verbose,
-            )
-        else:
-            init, hub_info, hubs = embed_others_nn(
-                data=X,
-                init_global=init_global,
-                hubs=hubs,
-                knn_indices=self._knn_indices,
-                nn_consider=self._n_neighbors,
-                random_state=random_state,
-                label=self.ll,
-                verbose=self.verbose,
+                n_jobs=self._thread_count,
             )
 
-        source_knn_indices = self._knn_indices
-        source_knn_dists = self._knn_dists
+            if self.local_n_epochs is None:
+                self.local_n_epochs = 50
 
-        self._knn_indices, self._knn_dists, counts = select_from_knn(
-            knn_indices=source_knn_indices,
-            knn_dists=source_knn_dists,
-            hub_info=hub_info,
-            n_neighbors=self._n_neighbors,
-            n=X.shape[0],
-        )
+            if self.global_n_epochs is None:
+                self.global_n_epochs = 100
 
-        counts_hub = counts[hubs]
-        counts_sum = len(counts_hub[counts_hub < self._n_neighbors])
-        if counts_sum > 0:
             if self.verbose:
-                print(ts(), "Adding more KNNs to build the graph")
+                print(ts(), "Build K-nearest neighbor graph structure")
 
+            flat_indices = self._knn_indices.flatten()  # flattening all knn indices
+            index, freq = np.unique(flat_indices, return_counts=True)
+            # sorted_index = index[freq.argsort(kind="stable")]  # sorted index in increasing order
+            sorted_index = index[
+                freq.argsort(kind="stable")[::-1]
+            ]  # sorted index in decreasing order
+            missing_indices = np.setdiff1d(
+                np.arange(X.shape[0], dtype=np.int64),
+                sorted_index.astype(np.int64),
+                assume_unique=False,
+            )
+            if missing_indices.size > 0:
+                sorted_index = np.concatenate([sorted_index, missing_indices]).astype(
+                    np.int64, copy=False
+                )
+
+            # get disjoint NN matrix
             if self._sparse_data:
-                self._knn_indices, self._knn_dists, counts_sum = fill_missing_knn_from_source(
-                    selected_indices=self._knn_indices,
-                    selected_dists=self._knn_dists,
-                    source_indices=source_knn_indices,
-                    source_dists=source_knn_dists,
-                    counts=counts,
-                    n_neighbors=self._n_neighbors,
+                disjoints = build_knn_graph_from_knn(
+                    sorted_index=sorted_index,
+                    knn_indices=self._knn_indices,
+                    hub_num=self.hub_num,
                 )
             else:
-                self._knn_indices, self._knn_dists, counts_sum = apppend_knn(
-                    data=X,
+                disjoints = build_knn_graph(
+                    data=X, sorted_index=sorted_index, hub_num=self.hub_num,
+                )
+
+            # get hub indices from disjoint set
+            hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
+
+            if self.verbose:
+                print(ts(), "Run global optimization")
+
+            init_global = build_global_structure(
+                data=X,
+                hubs=hubs,
+                n_components=self.n_components,
+                a=self.a,
+                b=self.b,
+                random_state=random_state,
+                alpha=self.global_learning_rate,
+                n_epochs=self.global_n_epochs,
+                verbose=self.verbose,
+                label=self.ll,
+                init_global=self.init,
+            )
+
+            if self.verbose:
+                print(
+                    ts(), "Get NN indices & Initialize them using original hub information"
+                )
+
+            if self._sparse_data:
+                init, hub_info, hubs = embed_others_nn_from_graph(
+                    n_samples=X.shape[0],
+                    init_global=init_global,
+                    hubs=hubs,
                     knn_indices=self._knn_indices,
                     knn_dists=self._knn_dists,
-                    hub_info=hub_info,
-                    n_neighbors=self._n_neighbors,
-                    counts=counts,
-                    counts_sum=counts_sum,
+                    nn_consider=self._n_neighbors,
+                    random_state=random_state,
+                    verbose=self.verbose,
+                )
+            else:
+                init, hub_info, hubs = embed_others_nn(
+                    data=X,
+                    init_global=init_global,
+                    hubs=hubs,
+                    knn_indices=self._knn_indices,
+                    nn_consider=self._n_neighbors,
+                    random_state=random_state,
+                    label=self.ll,
+                    verbose=self.verbose,
                 )
 
-            if counts_sum != 0:
-                raise ValueError(
-                    f"KNN indices not fully determined! counts_sum: {counts_sum} != 0"
-                )
+            source_knn_indices = self._knn_indices
+            source_knn_dists = self._knn_dists
 
-        self.graph_, _, _ = fuzzy_simplicial_set(
-            X[hubs],
-            self._n_neighbors,
-            random_state,
-            nn_metric,
-            hubs,
-            self._knn_indices[hubs],
-            self._knn_dists[hubs],
-            self.angular_rp_forest,
-            self.set_op_mix_ratio,
-            self.local_connectivity,
-            True,
-            True,
-        )
-
-        if self.verbose:
-            print(ts(), "Run local optimization")
-
-        init = local_optimize_nn(
-            data=X,
-            graph=self.graph_,
-            hub_info=hub_info,
-            n_components=self.n_components,
-            learning_rate=self.local_learning_rate,
-            a=self.a,
-            b=self.b,
-            gamma=self.gamma,
-            negative_sample_rate=self.negative_sample_rate,
-            n_epochs=self.local_n_epochs,
-            init=init,
-            random_state=random_state,
-            parallel=False,
-            verbose=self.verbose,
-            label=self.ll,
-        )
-
-        if self.verbose:
-            print(ts(), "Embedding outliers")
-
-        if self._sparse_data:
-            self.embedding_ = embed_outliers_from_knn(
-                init=init,
-                hub_info=hub_info,
+            self._knn_indices, self._knn_dists, counts = select_from_knn(
                 knn_indices=source_knn_indices,
-                random_state=random_state,
-                nn_consider=self._n_neighbors,
-            )
-        else:
-            self.embedding_ = embed_outliers(
-                data=X,
-                init=init,
-                hubs=hubs,
-                disjoints=disjoints,
-                random_state=random_state,
-                label=self.ll,
+                knn_dists=source_knn_dists,
+                hub_info=hub_info,
                 n_neighbors=self._n_neighbors,
-                verbose=self.verbose,
+                n=X.shape[0],
             )
 
-        if self.verbose:
-            print(ts(), "Finished embedding")
+            counts_hub = counts[hubs]
+            counts_sum = len(counts_hub[counts_hub < self._n_neighbors])
+            if counts_sum > 0:
+                if self.verbose:
+                    print(ts(), "Adding more KNNs to build the graph")
+
+                if self._sparse_data:
+                    self._knn_indices, self._knn_dists, counts_sum = fill_missing_knn_from_source(
+                        selected_indices=self._knn_indices,
+                        selected_dists=self._knn_dists,
+                        source_indices=source_knn_indices,
+                        source_dists=source_knn_dists,
+                        counts=counts,
+                        n_neighbors=self._n_neighbors,
+                    )
+                else:
+                    self._knn_indices, self._knn_dists, counts_sum = apppend_knn(
+                        data=X,
+                        knn_indices=self._knn_indices,
+                        knn_dists=self._knn_dists,
+                        hub_info=hub_info,
+                        n_neighbors=self._n_neighbors,
+                        counts=counts,
+                        counts_sum=counts_sum,
+                    )
+
+                if counts_sum != 0:
+                    raise ValueError(
+                        f"KNN indices not fully determined! counts_sum: {counts_sum} != 0"
+                    )
+
+            self.graph_, _, _ = fuzzy_simplicial_set(
+                X[hubs],
+                self._n_neighbors,
+                random_state,
+                nn_metric,
+                hubs,
+                self._knn_indices[hubs],
+                self._knn_dists[hubs],
+                self.angular_rp_forest,
+                self.set_op_mix_ratio,
+                self.local_connectivity,
+                True,
+                True,
+            )
+
+            if self.verbose:
+                print(ts(), "Run local optimization")
+
+            init = local_optimize_nn(
+                data=X,
+                graph=self.graph_,
+                hub_info=hub_info,
+                n_components=self.n_components,
+                learning_rate=self.local_learning_rate,
+                a=self.a,
+                b=self.b,
+                gamma=self.gamma,
+                negative_sample_rate=self.negative_sample_rate,
+                n_epochs=self.local_n_epochs,
+                init=init,
+                random_state=random_state,
+                parallel=parallel_local,
+                verbose=self.verbose,
+                label=self.ll,
+            )
+
+            if self.verbose:
+                print(ts(), "Embedding outliers")
+
+            if self._sparse_data:
+                self.embedding_ = embed_outliers_from_knn(
+                    init=init,
+                    hub_info=hub_info,
+                    knn_indices=source_knn_indices,
+                    random_state=random_state,
+                    nn_consider=self._n_neighbors,
+                )
+            else:
+                self.embedding_ = embed_outliers(
+                    data=X,
+                    init=init,
+                    hubs=hubs,
+                    disjoints=disjoints,
+                    random_state=random_state,
+                    label=self.ll,
+                    n_neighbors=self._n_neighbors,
+                    verbose=self.verbose,
+                )
+
+            if self.verbose:
+                print(ts(), "Finished embedding")
 
         self._input_hash = joblib.hash(self._raw_data)
 
