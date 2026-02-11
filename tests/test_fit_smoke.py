@@ -71,3 +71,22 @@ def test_n_components_smoke(iris_data: np.ndarray, n_components: int) -> None:
 
     assert emb.shape == (iris_data.shape[0], n_components)
     assert np.isfinite(emb).all()
+
+
+def test_duplicate_points_knn_coverage_regression() -> None:
+    rng = np.random.RandomState(0)
+    x_dup = rng.randint(0, 3, size=(100, 2)).astype(np.float32)
+
+    emb = UMATO(
+        n_neighbors=5,
+        hub_num=10,
+        metric="euclidean",
+        init="pca",
+        negative_sample_rate=1,
+        global_n_epochs=11,
+        local_n_epochs=11,
+        random_state=42,
+    ).fit_transform(x_dup)
+
+    assert emb.shape == (x_dup.shape[0], 2)
+    assert np.isfinite(emb).all()

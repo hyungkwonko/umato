@@ -83,7 +83,7 @@ def build_knn_graph(
 ):
     sorted_index_c = sorted_index.copy()
 
-    index_map = [0] * len(sorted_index_c)
+    index_map = [0] * data.shape[0]
     for i, val in enumerate(sorted_index_c):
         index_map[val] = i
     index_map = np.array(index_map)
@@ -169,6 +169,104 @@ def build_knn_graph(
     return np.array(disjoints)
 
 
+def build_knn_graph_from_knn(
+    sorted_index,
+    knn_indices,
+    hub_num,
+):
+    n_samples = knn_indices.shape[0]
+    leaf_num = int(np.ceil(n_samples / hub_num))
+    n_groups = int(np.ceil(n_samples / leaf_num))
+
+    remaining = np.ones(n_samples, dtype=np.bool_)
+    order = sorted_index.astype(np.int64, copy=False)
+    disjoints = []
+
+    for _ in range(n_groups):
+        source = -1
+        for idx in order:
+            if remaining[idx]:
+                source = int(idx)
+                break
+
+        if source < 0:
+            break
+
+        remaining[source] = False
+        disjoint = [source]
+
+        queue = [source]
+        seen = {source}
+        q_ptr = 0
+
+        while q_ptr < len(queue) and len(disjoint) < leaf_num:
+            node = queue[q_ptr]
+            q_ptr += 1
+
+            for nb in knn_indices[node]:
+                nb = int(nb)
+                if nb < 0:
+                    continue
+                if nb not in seen:
+                    seen.add(nb)
+                    queue.append(nb)
+                if remaining[nb]:
+                    remaining[nb] = False
+                    disjoint.append(nb)
+                    if len(disjoint) >= leaf_num:
+                        break
+
+        if len(disjoint) < leaf_num:
+            for idx in order:
+                idx = int(idx)
+                if remaining[idx]:
+                    remaining[idx] = False
+                    disjoint.append(idx)
+                    if len(disjoint) >= leaf_num:
+                        break
+
+        if len(disjoint) < leaf_num:
+            disjoint.extend([-1] * (leaf_num - len(disjoint)))
+
+        disjoints.append(disjoint)
+
+    return np.array(disjoints, dtype=np.int64)
+
+
+def fill_missing_knn_from_source(
+    selected_indices,
+    selected_dists,
+    source_indices,
+    source_dists,
+    counts,
+    n_neighbors,
+):
+    remaining = 0
+    for i in range(selected_indices.shape[0]):
+        need = n_neighbors - int(counts[i])
+        if need <= 0:
+            continue
+
+        present = set(selected_indices[i, : counts[i]].tolist())
+        insert_pos = int(counts[i])
+
+        for j in range(source_indices.shape[1]):
+            cand = int(source_indices[i, j])
+            if cand < 0 or cand in present:
+                continue
+            selected_indices[i, insert_pos] = cand
+            selected_dists[i, insert_pos] = source_dists[i, j]
+            present.add(cand)
+            insert_pos += 1
+            if insert_pos >= n_neighbors:
+                break
+
+        if insert_pos < n_neighbors:
+            remaining += 1
+
+    return selected_indices, selected_dists, remaining
+
+
 def pick_hubs(
     disjoints, random_state, popular=False,
 ):
@@ -208,9 +306,15 @@ def build_global_structure(
     label=None,
     init_global="pca",
 ):
+    hub_data = data[hubs]
+    if scipy.sparse.issparse(hub_data):
+        hub_data = np.asarray(hub_data.toarray(), dtype=np.float32, order="C")
+    else:
+        hub_data = np.asarray(hub_data, dtype=np.float32, order="C")
+
     if isinstance(init_global, str):
         if init_global == "pca":
-            Z = PCA(n_components=n_components).fit_transform(data[hubs])
+            Z = PCA(n_components=n_components).fit_transform(hub_data)
             Z /= Z.max()
         elif init_global == "random":
             Z = random_state.normal(
@@ -218,14 +322,14 @@ def build_global_structure(
             ).astype(np.float32)
             Z /= Z.max()
         elif init_global == "spectral":
-            Z = SpectralEmbedding(n_components=n_components).fit_transform(data[hubs])
+            Z = SpectralEmbedding(n_components=n_components).fit_transform(hub_data)
         else:
             raise ValueError("Check hub node initializing method!")
     else:
         Z = init_global[hubs]
         Z /= Z.max()
 
-    P = adjacency_matrix(data[hubs])
+    P = adjacency_matrix(hub_data)
     # P /= np.sum(P, axis=1, keepdims=True)
     P /= P.max()
 
@@ -298,6 +402,77 @@ def embed_others_nn(
     return init, hub_info, hubs
 
 
+def embed_others_nn_from_graph(
+    n_samples,
+    init_global,
+    hubs,
+    knn_indices,
+    knn_dists,
+    nn_consider,
+    random_state,
+    verbose=False,
+):
+    init = np.zeros((n_samples, init_global.shape[1]), dtype=np.float32)
+    original_hubs = np.asarray(hubs, dtype=np.int64)
+    init[original_hubs] = init_global
+
+    max_iterations = n_samples + 1
+    iterations = 0
+    hubs_expanded = original_hubs.copy()
+
+    while True:
+        prev_len = len(hubs_expanded)
+        hubs_expanded = hub_nn_num(
+            data=np.empty((n_samples, 1), dtype=np.float32),
+            hubs=hubs_expanded,
+            knn_indices=knn_indices,
+            nn_consider=nn_consider,
+        )
+        iterations += 1
+        if iterations > max_iterations:
+            raise RuntimeError(
+                "Exceeded hub expansion iteration guard while initializing sparse neighbors."
+            )
+        if prev_len == len(hubs_expanded):
+            if n_samples > len(hubs_expanded) and verbose:
+                print(f"len(hubs) {len(hubs_expanded)} is smaller than n_samples {n_samples}")
+            break
+
+    hub_nn = np.array(list(set(hubs_expanded) - set(original_hubs)), dtype=np.int64)
+    original_hub_set = set(int(x) for x in original_hubs.tolist())
+    fallback_mean = init[original_hubs].mean(axis=0) if len(original_hubs) else np.zeros(init.shape[1], dtype=np.float32)
+
+    for idx in hub_nn:
+        neighbors = knn_indices[idx][:nn_consider]
+        neighbor_dists = knn_dists[idx][:nn_consider]
+
+        hub_candidates = []
+        hub_weights = []
+        for nb, dist_val in zip(neighbors, neighbor_dists):
+            nb = int(nb)
+            if nb in original_hub_set:
+                hub_candidates.append(nb)
+                hub_weights.append(1.0 / (float(dist_val) + 1e-6))
+
+        if hub_candidates:
+            w = np.asarray(hub_weights, dtype=np.float32)
+            w /= w.sum()
+            init[idx] = np.sum(init[np.asarray(hub_candidates, dtype=np.int64)] * w[:, None], axis=0)
+        else:
+            sample_size = min(10, len(original_hubs))
+            sampled = random_state.choice(original_hubs, size=sample_size, replace=False)
+            init[idx] = init[sampled].mean(axis=0) if sample_size > 0 else fallback_mean
+
+        init[idx] += random_state.normal(
+            loc=0.0, scale=0.05, size=init.shape[1]
+        ).astype(np.float32)
+
+    hub_info = np.zeros(n_samples)
+    hub_info[hub_nn] = 1
+    hub_info[original_hubs] = 2
+    return init, hub_info, hubs_expanded
+
+
 def embed_outliers(
     data, init, hubs, disjoints, random_state, label, n_neighbors, verbose=False,
 ):
@@ -315,6 +490,50 @@ def embed_outliers(
         raise ValueError(
             f"total data # ({len(init)}) != total embedded # ({len(nodes_number)})!"
         )
+
+    return init
+
+
+def embed_outliers_from_knn(
+    init,
+    hub_info,
+    knn_indices,
+    random_state,
+    nn_consider,
+):
+    assigned = hub_info > 0
+    noise_scale = 0.02
+
+    max_passes = 10
+    for _ in range(max_passes):
+        changed = 0
+        for i in range(init.shape[0]):
+            if assigned[i]:
+                continue
+
+            neighbors = knn_indices[i][:nn_consider]
+            valid = [int(nb) for nb in neighbors if nb >= 0 and assigned[int(nb)]]
+            if valid:
+                init[i] = init[np.asarray(valid, dtype=np.int64)].mean(axis=0)
+                init[i] += random_state.normal(
+                    loc=0.0, scale=noise_scale, size=init.shape[1]
+                ).astype(np.float32)
+                assigned[i] = True
+                changed += 1
+
+        if changed == 0:
+            break
+
+    unresolved = np.where(~assigned)[0]
+    if unresolved.size > 0:
+        if np.any(assigned):
+            base = init[assigned].mean(axis=0)
+        else:
+            base = np.zeros(init.shape[1], dtype=np.float32)
+        for i in unresolved:
+            init[i] = base + random_state.normal(
+                loc=0.0, scale=noise_scale, size=init.shape[1]
+            ).astype(np.float32)
 
     return init
 
@@ -769,18 +988,17 @@ class UMATO(BaseEstimator):
             or 'coo'.
         """
 
-        X = check_array(X, dtype=np.float32, accept_sparse="csr", order="C")
-        if scipy.sparse.isspmatrix_csr(X):
-            total_elements = X.shape[0] * X.shape[1]
+        X_checked = check_array(X, dtype=np.float32, accept_sparse="csr", order="C")
+        self._sparse_native_mode = False
+        if scipy.sparse.isspmatrix_csr(X_checked):
+            total_elements = X_checked.shape[0] * X_checked.shape[1]
             if total_elements > MAX_SPARSE_TO_DENSE_ELEMENTS:
-                raise ValueError(
-                    "CSR input is too large to densify safely; "
-                    f"shape={X.shape} ({total_elements} elements) exceeds "
-                    f"limit={MAX_SPARSE_TO_DENSE_ELEMENTS}"
-                )
-            X = np.asarray(X.toarray(), dtype=np.float32, order="C")
+                X = X_checked
+                self._sparse_native_mode = True
+            else:
+                X = np.asarray(X_checked.toarray(), dtype=np.float32, order="C")
         else:
-            X = np.asarray(X, dtype=np.float32, order="C")
+            X = np.asarray(X_checked, dtype=np.float32, order="C")
 
         self._raw_data = X
 
@@ -852,11 +1070,27 @@ class UMATO(BaseEstimator):
         sorted_index = index[
             freq.argsort(kind="stable")[::-1]
         ]  # sorted index in decreasing order
+        missing_indices = np.setdiff1d(
+            np.arange(X.shape[0], dtype=np.int64),
+            sorted_index.astype(np.int64),
+            assume_unique=False,
+        )
+        if missing_indices.size > 0:
+            sorted_index = np.concatenate([sorted_index, missing_indices]).astype(
+                np.int64, copy=False
+            )
 
         # get disjoint NN matrix
-        disjoints = build_knn_graph(
-            data=X, sorted_index=sorted_index, hub_num=self.hub_num,
-        )
+        if self._sparse_data:
+            disjoints = build_knn_graph_from_knn(
+                sorted_index=sorted_index,
+                knn_indices=self._knn_indices,
+                hub_num=self.hub_num,
+            )
+        else:
+            disjoints = build_knn_graph(
+                data=X, sorted_index=sorted_index, hub_num=self.hub_num,
+            )
 
         # get hub indices from disjoint set
         hubs = pick_hubs(disjoints=disjoints, random_state=random_state, popular=True,)
@@ -883,20 +1117,35 @@ class UMATO(BaseEstimator):
                 ts(), "Get NN indices & Initialize them using original hub information"
             )
 
-        init, hub_info, hubs = embed_others_nn(
-            data=X,
-            init_global=init_global,
-            hubs=hubs,
-            knn_indices=self._knn_indices,
-            nn_consider=self._n_neighbors,
-            random_state=random_state,
-            label=self.ll,
-            verbose=self.verbose,
-        )
+        if self._sparse_data:
+            init, hub_info, hubs = embed_others_nn_from_graph(
+                n_samples=X.shape[0],
+                init_global=init_global,
+                hubs=hubs,
+                knn_indices=self._knn_indices,
+                knn_dists=self._knn_dists,
+                nn_consider=self._n_neighbors,
+                random_state=random_state,
+                verbose=self.verbose,
+            )
+        else:
+            init, hub_info, hubs = embed_others_nn(
+                data=X,
+                init_global=init_global,
+                hubs=hubs,
+                knn_indices=self._knn_indices,
+                nn_consider=self._n_neighbors,
+                random_state=random_state,
+                label=self.ll,
+                verbose=self.verbose,
+            )
+
+        source_knn_indices = self._knn_indices
+        source_knn_dists = self._knn_dists
 
         self._knn_indices, self._knn_dists, counts = select_from_knn(
-            knn_indices=self._knn_indices,
-            knn_dists=self._knn_dists,
+            knn_indices=source_knn_indices,
+            knn_dists=source_knn_dists,
             hub_info=hub_info,
             n_neighbors=self._n_neighbors,
             n=X.shape[0],
@@ -908,15 +1157,25 @@ class UMATO(BaseEstimator):
             if self.verbose:
                 print(ts(), "Adding more KNNs to build the graph")
 
-            self._knn_indices, self._knn_dists, counts_sum = apppend_knn(
-                data=X,
-                knn_indices=self._knn_indices,
-                knn_dists=self._knn_dists,
-                hub_info=hub_info,
-                n_neighbors=self._n_neighbors,
-                counts=counts,
-                counts_sum=counts_sum,
-            )
+            if self._sparse_data:
+                self._knn_indices, self._knn_dists, counts_sum = fill_missing_knn_from_source(
+                    selected_indices=self._knn_indices,
+                    selected_dists=self._knn_dists,
+                    source_indices=source_knn_indices,
+                    source_dists=source_knn_dists,
+                    counts=counts,
+                    n_neighbors=self._n_neighbors,
+                )
+            else:
+                self._knn_indices, self._knn_dists, counts_sum = apppend_knn(
+                    data=X,
+                    knn_indices=self._knn_indices,
+                    knn_dists=self._knn_dists,
+                    hub_info=hub_info,
+                    n_neighbors=self._n_neighbors,
+                    counts=counts,
+                    counts_sum=counts_sum,
+                )
 
             if counts_sum != 0:
                 raise ValueError(
@@ -962,16 +1221,25 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(ts(), "Embedding outliers")
 
-        self.embedding_ = embed_outliers(
-            data=X,
-            init=init,
-            hubs=hubs,
-            disjoints=disjoints,
-            random_state=random_state,
-            label=self.ll,
-            n_neighbors=self._n_neighbors,
-            verbose=self.verbose,
-        )
+        if self._sparse_data:
+            self.embedding_ = embed_outliers_from_knn(
+                init=init,
+                hub_info=hub_info,
+                knn_indices=source_knn_indices,
+                random_state=random_state,
+                nn_consider=self._n_neighbors,
+            )
+        else:
+            self.embedding_ = embed_outliers(
+                data=X,
+                init=init,
+                hubs=hubs,
+                disjoints=disjoints,
+                random_state=random_state,
+                label=self.ll,
+                n_neighbors=self._n_neighbors,
+                verbose=self.verbose,
+            )
 
         if self.verbose:
             print(ts(), "Finished embedding")
