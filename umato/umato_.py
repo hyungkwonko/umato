@@ -61,6 +61,7 @@ locale.setlocale(locale.LC_NUMERIC, "C")
 
 INT32_MIN = np.iinfo(np.int32).min + 1
 INT32_MAX = np.iinfo(np.int32).max - 1
+MAX_SPARSE_TO_DENSE_ELEMENTS = 50_000_000
 
 
 @numba.njit(parallel=True, fastmath=True)
@@ -189,7 +190,7 @@ def pick_hubs(
         hubs.append(choice)
 
         if hub_num != len(hubs):
-            ValueError(f"hub_num({hub_num}) is not the same as hubs({hubs})!")
+            raise ValueError(f"hub_num({hub_num}) is not the same as hubs({hubs})!")
 
         return hubs
 
@@ -253,11 +254,18 @@ def embed_others_nn(
     original_hubs = hubs.copy()
     init[original_hubs] = init_global
 
+    max_iterations = data.shape[0] + 1
+    iterations = 0
     while True:
         val = len(hubs)
         hubs = hub_nn_num(
             data=data, hubs=hubs, knn_indices=knn_indices, nn_consider=nn_consider,
         )
+        iterations += 1
+        if iterations > max_iterations:
+            raise RuntimeError(
+                "Exceeded hub expansion iteration guard while initializing neighbors."
+            )
 
         if val == len(hubs):
             if len(init) > len(hubs) and verbose:
@@ -454,13 +462,12 @@ def select_from_knn(
 
 @numba.njit(
     # locals={"dists": numba.types.float32[::1],},
-    parallel=True,
     fastmath=True,
 )
 def apppend_knn(
     data, knn_indices, knn_dists, hub_info, n_neighbors, counts, counts_sum,
 ):
-    for i in numba.prange(data.shape[0]):
+    for i in range(data.shape[0]):
         num = n_neighbors - counts[i]
         if hub_info[i] > 0 and num > 0:
             # found neighbors (# of neighbors < n_neighbors)
@@ -491,12 +498,12 @@ def apppend_knn(
                 sorted_dists_index = dists.argsort(kind="quicksort")
 
                 # add more knns
-                for j in numba.prange(num):
+                for j in range(num):
                     knn_indices[i][counts[i] + j] = targets[
-                        sorted_dists_index[counts[i] + j]
+                        sorted_dists_index[j]
                     ]
                     knn_dists[i][counts[i] + j] = dists[
-                        sorted_dists_index[counts[i] + j]
+                        sorted_dists_index[j]
                     ]
 
                 # re-sort index
@@ -527,6 +534,10 @@ def local_optimize_nn(
     verbose=False,
     label=None,
 ):
+    if negative_sample_rate <= 0:
+        raise ValueError("negative_sample_rate must be greater than 0")
+    if np.count_nonzero(hub_info > 0) == 0:
+        raise ValueError("No hub-linked vertices available for negative sampling.")
 
     graph = graph.tocoo()
     graph.sum_duplicates()
@@ -639,10 +650,25 @@ class UMATO(BaseEstimator):
         self.ll = ll
 
     def _validate_parameters(self):
-        if self.hub_num >= self._raw_data.shape[0]:
-            raise ValueError("hub_num must be less than the number of data points")
+        n_samples = self._raw_data.shape[0]
+
+        if not isinstance(self.hub_num, int):
+            raise ValueError("hub_num must be an integer")
         if self.hub_num < 2:
-            raise ValueError("hub_num cannot be smaller than 2")
+            raise ValueError("hub_num must be at least 2")
+        if self.hub_num >= n_samples:
+            raise ValueError("hub_num must be less than the number of data points")
+
+        if not isinstance(self.n_neighbors, int):
+            raise ValueError("n_neighbors must be an integer")
+        if self.n_neighbors < 2:
+            raise ValueError("n_neighbors must be greater than 1")
+
+        if not isinstance(self.negative_sample_rate, (int, float)):
+            raise ValueError("negative_sample_rate must be a numeric value")
+        if self.negative_sample_rate <= 0:
+            raise ValueError("negative_sample_rate must be greater than 0")
+
         if self.set_op_mix_ratio < 0.0 or self.set_op_mix_ratio > 1.0:
             raise ValueError("set_op_mix_ratio must be between 0.0 and 1.0")
         if self.gamma < 0.0:
@@ -653,14 +679,8 @@ class UMATO(BaseEstimator):
             raise ValueError("min_dist cannot be negative")
         if not isinstance(self.metric, str) and not callable(self.metric):
             raise ValueError("metric must be string or callable")
-        if self.negative_sample_rate < 0:
-            raise ValueError("negative sample rate must be positive")
         if self.global_learning_rate < 0.0 or self.local_learning_rate < 0.0:
             raise ValueError("learning_rates must be positive")
-        if self.n_neighbors < 2:
-            raise ValueError("n_neighbors must be greater than 1")
-        if not isinstance(self.hub_num, int) or self.hub_num < -1:
-            raise ValueError("hub_num must be a positive integer or -1 (None)")
         if not isinstance(self.n_components, int):
             if isinstance(self.n_components, str):
                 raise ValueError("n_components must be an int")
@@ -675,12 +695,28 @@ class UMATO(BaseEstimator):
         if self.n_components < 1:
             raise ValueError("n_components must be greater than 0")
 
+        if isinstance(self.init, np.ndarray):
+            if self.init.ndim != 2:
+                raise ValueError("init array must be 2D with shape (n_samples, n_components)")
+            if self.init.shape[0] != n_samples:
+                raise ValueError(
+                    "init array first dimension must match n_samples "
+                    f"({self.init.shape[0]} != {n_samples})"
+                )
+            if self.init.shape[1] != self.n_components:
+                raise ValueError(
+                    "init array second dimension must match n_components "
+                    f"({self.init.shape[1]} != {self.n_components})"
+                )
+        elif not isinstance(self.init, str):
+            raise ValueError('init must be one of {"pca", "random", "spectral"} or a numpy.ndarray')
+
         if self.global_n_epochs is not None and (
-            self.global_n_epochs <= 10 or not isinstance(self.global_n_epochs, int)
+            not isinstance(self.global_n_epochs, int) or self.global_n_epochs < 10
         ):
             raise ValueError("global_n_epochs must be a positive integer of at least 10")
         if self.local_n_epochs is not None and (
-            self.local_n_epochs <= 10 or not isinstance(self.local_n_epochs, int)
+            not isinstance(self.local_n_epochs, int) or self.local_n_epochs < 10
         ):
             raise ValueError("local_n_epochs must be a positive integer of at least 10")
 
@@ -734,6 +770,18 @@ class UMATO(BaseEstimator):
         """
 
         X = check_array(X, dtype=np.float32, accept_sparse="csr", order="C")
+        if scipy.sparse.isspmatrix_csr(X):
+            total_elements = X.shape[0] * X.shape[1]
+            if total_elements > MAX_SPARSE_TO_DENSE_ELEMENTS:
+                raise ValueError(
+                    "CSR input is too large to densify safely; "
+                    f"shape={X.shape} ({total_elements} elements) exceeds "
+                    f"limit={MAX_SPARSE_TO_DENSE_ELEMENTS}"
+                )
+            X = np.asarray(X.toarray(), dtype=np.float32, order="C")
+        else:
+            X = np.asarray(X, dtype=np.float32, order="C")
+
         self._raw_data = X
 
         # Handle all the optional arguments, setting default
@@ -745,11 +793,9 @@ class UMATO(BaseEstimator):
         if self.verbose:
             print(str(self))
 
-        index = list(range(X.shape[0]))
-
         # Error check n_neighbors based on data size
-        if X[index].shape[0] <= self.n_neighbors:
-            if X[index].shape[0] == 1:
+        if X.shape[0] <= self.n_neighbors:
+            if X.shape[0] == 1:
                 self.embedding_ = np.zeros(
                     (1, self.n_components)
                 )  # needed to sklearn comparability
@@ -759,14 +805,9 @@ class UMATO(BaseEstimator):
                 "n_neighbors is larger than the dataset size; truncating to "
                 "X.shape[0] - 1"
             )
-            self._n_neighbors = X[index].shape[0] - 1
+            self._n_neighbors = X.shape[0] - 1
         else:
             self._n_neighbors = self.n_neighbors
-
-        # Note: unless it causes issues for setting 'index', could move this to
-        # initial sparsity check above
-        if self._sparse_data and not X.has_sorted_indices:
-            X.sort_indices()
 
         random_state = check_random_state(self.random_state)
 
@@ -785,7 +826,7 @@ class UMATO(BaseEstimator):
             nn_metric = self._input_distance_func
 
         (self._knn_indices, self._knn_dists, _) = nearest_neighbors(
-            X[index],
+            X,
             self._n_neighbors,
             # int(self._n_neighbors * 1.2),  # we can use more neighbors
             nn_metric,
@@ -857,12 +898,12 @@ class UMATO(BaseEstimator):
             knn_indices=self._knn_indices,
             knn_dists=self._knn_dists,
             hub_info=hub_info,
-            n_neighbors=self.n_neighbors,
+            n_neighbors=self._n_neighbors,
             n=X.shape[0],
         )
 
         counts_hub = counts[hubs]
-        counts_sum = len(counts_hub[counts_hub < self.n_neighbors])
+        counts_sum = len(counts_hub[counts_hub < self._n_neighbors])
         if counts_sum > 0:
             if self.verbose:
                 print(ts(), "Adding more KNNs to build the graph")
@@ -872,7 +913,7 @@ class UMATO(BaseEstimator):
                 knn_indices=self._knn_indices,
                 knn_dists=self._knn_dists,
                 hub_info=hub_info,
-                n_neighbors=self.n_neighbors,
+                n_neighbors=self._n_neighbors,
                 counts=counts,
                 counts_sum=counts_sum,
             )
@@ -884,7 +925,7 @@ class UMATO(BaseEstimator):
 
         self.graph_, _, _ = fuzzy_simplicial_set(
             X[hubs],
-            self.n_neighbors,
+            self._n_neighbors,
             random_state,
             nn_metric,
             hubs,
@@ -928,7 +969,7 @@ class UMATO(BaseEstimator):
             disjoints=disjoints,
             random_state=random_state,
             label=self.ll,
-						n_neighbors=self.n_neighbors,
+            n_neighbors=self._n_neighbors,
             verbose=self.verbose,
         )
 

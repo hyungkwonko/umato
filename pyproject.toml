@@ -50,8 +50,27 @@ dependencies = [
     "joblib"
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4",
+    "pytest-xdist>=3.6",
+    "pytest-timeout>=2.3"
+]
+
 [project.urls]
 Homepage = "https://github.com/hyungkwonko/umato"
 
 [tool.setuptools]
 packages = ["umato"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "slow: slow tests with larger sweeps or full dataset runs",
+    "datasets: tests that require labeled-datasets checkout",
+]
+filterwarnings = [
+    "error:divide by zero encountered in divide:RuntimeWarning:umato.layouts",
+    "error:invalid value encountered.*:RuntimeWarning:umato",
+]

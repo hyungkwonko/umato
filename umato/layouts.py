@@ -91,6 +91,8 @@ def nn_layout_optimize(
     (_, dim) = head_embedding.shape
     move_other = head_embedding.shape[0] == tail_embedding.shape[0]
     alpha = learning_rate
+    if negative_sample_rate <= 0:
+        raise ValueError("negative_sample_rate must be greater than 0")
 
     epochs_per_negative_sample = epochs_per_sample / negative_sample_rate
     epoch_of_next_negative_sample = epochs_per_negative_sample.copy()
@@ -182,10 +184,19 @@ def _nn_layout_optimize_single_epoch(
             )
 
             for p in range(n_neg_samples):
+                max_attempts = n_vertices * 2 + 1
+                attempts = 0
                 while True:
                     k = tau_rand_int(rng_state) % n_vertices
                     if hub_info[k] > 0:
                         break
+                    attempts += 1
+                    if attempts >= max_attempts:
+                        k = -1
+                        break
+
+                if k == -1:
+                    break
 
                 other = tail_embedding[k]
                 dist_squared = rdist(current, other)

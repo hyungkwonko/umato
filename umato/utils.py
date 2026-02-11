@@ -166,10 +166,15 @@ def rejection_sample(n_samples, pool_size, rng_state):
     sample: array of shape(n_samples,)
         The ``n_samples`` randomly selected elements from the pool.
     """
+    if n_samples > pool_size:
+        raise ValueError("n_samples cannot be larger than pool_size in rejection_sample")
+
     result = np.empty(n_samples, dtype=np.int64)
     for i in range(n_samples):
         reject_sample = True
         j = 0
+        attempts = 0
+        max_attempts = pool_size * 4 + 1
         while reject_sample:
             j = tau_rand_int(rng_state) % pool_size
             for k in range(i):
@@ -177,6 +182,9 @@ def rejection_sample(n_samples, pool_size, rng_state):
                     break
             else:
                 reject_sample = False
+            attempts += 1
+            if attempts >= max_attempts:
+                raise RuntimeError("rejection_sample exceeded max attempts")
         result[i] = j
     return result
 
